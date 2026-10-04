@@ -1,0 +1,26 @@
+[versions]
+spring-boot = "4.1.1"
+spring-dependency-management = "1.1.7"
+node-gradle = "7.1.0"
+nodejs = "24.21.0"
+groovy = "5.0.8"
+spock = "2.4-groovy-5.0"
+junit = "6.0.3"
+jacoco = "0.8.15"
+playwright = "1.56.0"
+
+[libraries]
+groovy-bom = { module = "org.apache.groovy:groovy-bom", version.ref = "groovy" }
+groovy = { module = "org.apache.groovy:groovy" }
+groovy-json = { module = "org.apache.groovy:groovy-json" }
+spock-bom = { module = "org.spockframework:spock-bom", version.ref = "spock" }
+spock-core = { module = "org.spockframework:spock-core" }
+spock-spring = { module = "org.spockframework:spock-spring" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+playwright = { module = "com.microsoft.playwright:playwright", version.ref = "playwright" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }
+node = { id = "com.github.node-gradle.node", version.ref = "node-gradle" }

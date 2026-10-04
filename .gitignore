@@ -1,11 +1,14 @@
-backend/target/
 *.log
 
 .idea/
 *.iml
 .vscode/*
-!frontend/.vscode/
+!gui/.vscode/
 
 .DS_Store
 backend/data/
 data/
+
+.gradle/
+build/
+.kotlin/

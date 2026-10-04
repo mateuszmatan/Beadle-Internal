@@ -34,6 +34,7 @@ class ApplicationProfilesSpec extends Specification {
         env.getProperty('spring.datasource.username') == 'DSO_PORTAL'
         env.getProperty('spring.datasource.password') == 'secret'
         env.getProperty('spring.jpa.hibernate.ddl-auto') == 'validate'
+        env.getProperty('spring.liquibase.analytics-enabled') == 'false'
         env.getProperty('dso.demo-data') == 'false'
         env.getProperty('spring.datasource.hikari.maximum-pool-size') == poolSize
         env.getProperty('management.endpoint.health.show-details') == healthDetails

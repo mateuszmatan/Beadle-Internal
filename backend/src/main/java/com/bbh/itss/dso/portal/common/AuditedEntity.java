@@ -8,9 +8,6 @@ import jakarta.persistence.Version;
 
 import java.time.Instant;
 
-/**
- * Creation and modification timestamps plus the optimistic locking version shared by the editable tables.
- */
 @MappedSuperclass
 public abstract class AuditedEntity {
 

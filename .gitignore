@@ -1,14 +1,11 @@
-# Backend
 backend/target/
 *.log
 
-# IDE
 .idea/
 *.iml
 .vscode/*
 !frontend/.vscode/
 
-# OS
 .DS_Store
 backend/data/
 data/

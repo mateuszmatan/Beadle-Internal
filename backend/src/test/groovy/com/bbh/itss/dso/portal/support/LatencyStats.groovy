@@ -4,9 +4,6 @@ import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-/**
- * Response times of repeated calls: percentiles in milliseconds and the throughput reached.
- */
 class LatencyStats {
 
     final String name
@@ -21,12 +18,6 @@ class LatencyStats {
         this.errors = errors
     }
 
-    /**
-     * Calls {@code call} with the call's index and reports how long the calls took; {@code call} returns true
-     * on success. Options: {@code calls}, {@code threads} (default 1) and {@code warmUp} (default true), one
-     * unmeasured call per thread first so the figures leave out warming up the JVM and the pools. Calls that
-     * change data must not warm up.
-     */
     static LatencyStats measure(Map options, String name, Closure<Boolean> call) {
         int calls = options.calls as int
         int threads = (options.threads ?: 1) as int

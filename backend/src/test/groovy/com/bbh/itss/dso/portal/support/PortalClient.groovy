@@ -7,9 +7,6 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
 
-/**
- * Calls a running portal over HTTP the way the Angular client and the DevSecOps pipelines do.
- */
 class PortalClient {
 
     final String baseUrl

@@ -2,9 +2,6 @@ package com.bbh.itss.dso.portal.common;
 
 import java.util.List;
 
-/**
- * Validation failure found by the business rules after bean validation passed, reported field by field.
- */
 public class InvalidRequestException extends RuntimeException {
 
     private final List<FieldProblem> problems;

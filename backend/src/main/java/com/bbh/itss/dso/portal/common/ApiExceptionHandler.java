@@ -11,10 +11,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.List;
 
-/**
- * Maps exceptions to RFC 9457 problem details. Field level problems are listed under {@code errors}
- * so the UI can show each message next to its input.
- */
 @RestControllerAdvice
 public class ApiExceptionHandler {
 

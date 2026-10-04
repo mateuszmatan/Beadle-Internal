@@ -5,10 +5,6 @@ import com.bbh.itss.dso.portal.common.InvalidRequestException.FieldProblem;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Collects the business rule violations of one request so they are all reported together, each against
- * the path of the field it concerns, for example {@code services[2].build.javaPath}.
- */
 public class ValidationProblems {
 
     private final String prefix;
@@ -23,7 +19,6 @@ public class ValidationProblems {
         this.problems = problems;
     }
 
-    /** A view that prefixes every field it reports with {@code path}, sharing this collection. */
     public ValidationProblems at(String path) {
         return new ValidationProblems(prefix + path + ".", problems);
     }

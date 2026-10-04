@@ -1,0 +1,63 @@
+spring:
+  application:
+    name: dso-portal
+  datasource:
+    url: ${DB_URL:jdbc:oracle:thin:@//localhost:1521/FREEPDB1}
+    username: ${DB_USERNAME:DSO_PORTAL}
+    password: ${DB_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        type:
+          preferred_instant_jdbc_type: TIMESTAMP
+  flyway:
+    enabled: true
+
+server:
+  port: ${PORT:8080}
+  error:
+    include-message: always
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+dso:
+  # BBH-wide values written into every generated config.yaml; a service may override them in its additional YAML.
+  defaults:
+    asoc-url: ${DSO_ASOC_URL:https://bbh.cloud.appscan.com}
+    sonar-server-url: ${DSO_SONAR_URL:https://tools.bbh.com/sonar}
+    nexus-iq-server-url: ${DSO_NEXUS_IQ_URL:https://tools.bbh.com/IQ}
+    nexus-iq-credentials-id: ${DSO_NEXUS_IQ_CREDENTIALS_ID:nexusiqP}
+    influx-write-url: ${DSO_INFLUX_WRITE_URL:http://qcwsecopsmon1.testbbh.com:8086/api/v2/write?org=DevSecOps&bucket=DORA-metrics&precision=s}
+    influx-credentials-id: ${DSO_INFLUX_CREDENTIALS_ID:influxdb-token}
+  # InfluxDB the pipelines write to, read by the monitoring pages. Leave the URL empty to switch monitoring off.
+  influx:
+    url: ${INFLUX_URL:}
+    org: ${INFLUX_ORG:DevSecOps}
+    bucket: ${INFLUX_BUCKET:DORA-metrics}
+    token: ${INFLUX_TOKEN:}
+  # Grafana whose panels are embedded in the pipeline details. Leave the URL empty to hide the panels.
+  grafana:
+    url: ${GRAFANA_URL:}
+    org-id: ${GRAFANA_ORG_ID:1}
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:h2:mem:dso;MODE=Oracle;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      # H2 reports Oracle NUMBER columns with other JDBC types, so the schema is validated on Oracle only.
+      ddl-auto: none

@@ -1,3 +1,6 @@
+# Default profile: Oracle, the production database. Other profiles:
+#   local - embedded H2 file database with demo data; needs nothing but Java
+#   mysql - a local MySQL 8 (docker compose up mysql)
 spring:
   application:
     name: dso-portal
@@ -9,6 +12,9 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+      # Keep the upper case names of the mappings: MySQL table names are case sensitive on Linux.
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
     properties:
       hibernate:
         jdbc:
@@ -16,12 +22,10 @@ spring:
         type:
           preferred_instant_jdbc_type: TIMESTAMP
   flyway:
-    enabled: true
+    locations: classpath:db/migration/oracle
 
 server:
   port: ${PORT:8080}
-  error:
-    include-message: always
 
 management:
   endpoints:
@@ -48,16 +52,33 @@ dso:
   grafana:
     url: ${GRAFANA_URL:}
     org-id: ${GRAFANA_ORG_ID:1}
+  # Sample products, services and pipelines created at start-up when the database holds no product.
+  demo-data: false
 ---
 spring:
   config:
     activate:
       on-profile: local
   datasource:
-    url: jdbc:h2:mem:dso;MODE=Oracle;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
-    username: sa
-    password:
+    url: ${DB_URL:jdbc:h2:file:./data/dso-portal;MODE=Oracle;DEFAULT_NULL_ORDERING=HIGH;AUTO_SERVER=TRUE}
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
   jpa:
     hibernate:
-      # H2 reports Oracle NUMBER columns with other JDBC types, so the schema is validated on Oracle only.
+      # H2 reports Oracle NUMBER columns with other JDBC types, so the schema is validated on Oracle and MySQL only.
       ddl-auto: none
+dso:
+  demo-data: true
+---
+spring:
+  config:
+    activate:
+      on-profile: mysql
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/dso_portal}
+    username: ${DB_USERNAME:dso_portal}
+    password: ${DB_PASSWORD:dso_portal}
+  flyway:
+    locations: classpath:db/migration/mysql
+dso:
+  demo-data: ${DSO_DEMO_DATA:true}

@@ -10,3 +10,5 @@ backend/target/
 
 # OS
 .DS_Store
+backend/data/
+data/

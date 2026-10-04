@@ -26,14 +26,14 @@ public abstract class AuditedEntity {
 
     @PrePersist
     void onCreate() {
-        Instant now = Instant.now();
+        Instant now = Timestamps.now();
         createdAt = now;
         updatedAt = now;
     }
 
     @PreUpdate
     void onUpdate() {
-        updatedAt = Instant.now();
+        updatedAt = Timestamps.now();
     }
 
     public Instant getCreatedAt() {

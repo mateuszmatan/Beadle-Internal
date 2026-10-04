@@ -12,6 +12,7 @@ class AuditedEntitySpec extends Specification {
 
         then:
         entity.createdAt != null
+        entity.createdAt.nano % 1000 == 0
         entity.updatedAt == entity.createdAt
         entity.version == 0
     }

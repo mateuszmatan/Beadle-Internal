@@ -1,6 +1,6 @@
-package com.bbh.dso.portal.common
+package com.bbh.itss.dso.portal.common
 
-import com.bbh.dso.portal.common.InvalidRequestException.FieldProblem
+import com.bbh.itss.dso.portal.common.InvalidRequestException.FieldProblem
 import org.springframework.core.MethodParameter
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus

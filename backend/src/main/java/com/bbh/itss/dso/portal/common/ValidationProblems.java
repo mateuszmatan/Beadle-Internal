@@ -1,6 +1,6 @@
-package com.bbh.dso.portal.common;
+package com.bbh.itss.dso.portal.common;
 
-import com.bbh.dso.portal.common.InvalidRequestException.FieldProblem;
+import com.bbh.itss.dso.portal.common.InvalidRequestException.FieldProblem;
 
 import java.util.ArrayList;
 import java.util.List;

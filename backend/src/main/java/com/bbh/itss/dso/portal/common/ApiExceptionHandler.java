@@ -1,4 +1,4 @@
-package com.bbh.dso.portal.common;
+package com.bbh.itss.dso.portal.common;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;

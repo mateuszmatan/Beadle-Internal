@@ -1,4 +1,4 @@
-package com.bbh.dso.portal.common;
+package com.bbh.itss.dso.portal.common;
 
 import jakarta.persistence.AttributeConverter;
 

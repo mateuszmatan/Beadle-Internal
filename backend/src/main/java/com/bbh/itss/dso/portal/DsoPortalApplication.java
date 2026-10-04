@@ -1,4 +1,4 @@
-package com.bbh.dso.portal;
+package com.bbh.itss.dso.portal;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

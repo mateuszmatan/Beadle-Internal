@@ -1,4 +1,4 @@
-package com.bbh.dso.portal.config
+package com.bbh.itss.dso.portal.config
 
 import spock.lang.Specification
 

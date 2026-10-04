@@ -1,4 +1,4 @@
-package com.bbh.dso.portal.config;
+package com.bbh.itss.dso.portal.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

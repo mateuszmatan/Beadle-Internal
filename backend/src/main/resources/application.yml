@@ -21,8 +21,11 @@ spring:
           time_zone: UTC
         type:
           preferred_instant_jdbc_type: TIMESTAMP
-  flyway:
-    locations: classpath:db/migration/oracle
+        # Loads the lists of many services (test jobs, deployment targets, UrbanCode applications) in batches.
+        default_batch_fetch_size: 50
+  # The schema: Liquibase changesets for Oracle (also run on H2) and MySQL, see db/changelog.
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
 
 server:
   port: ${PORT:8080}
@@ -34,14 +37,8 @@ management:
         include: health,info
 
 dso:
-  # BBH-wide values written into every generated config.yaml; a service may override them in its additional YAML.
-  defaults:
-    asoc-url: ${DSO_ASOC_URL:https://bbh.cloud.appscan.com}
-    sonar-server-url: ${DSO_SONAR_URL:https://tools.bbh.com/sonar}
-    nexus-iq-server-url: ${DSO_NEXUS_IQ_URL:https://tools.bbh.com/IQ}
-    nexus-iq-credentials-id: ${DSO_NEXUS_IQ_CREDENTIALS_ID:nexusiqP}
-    influx-write-url: ${DSO_INFLUX_WRITE_URL:http://qcwsecopsmon1.testbbh.com:8086/api/v2/write?org=DevSecOps&bucket=DORA-metrics&precision=s}
-    influx-credentials-id: ${DSO_INFLUX_CREDENTIALS_ID:influxdb-token}
+  # The BBH-wide pipeline settings (tool addresses, scan policy, defaults) are not configured here: they are stored
+  # in the database and edited in the portal's DevSecOps Global Settings tab.
   # InfluxDB the pipelines write to, read by the monitoring pages. Leave the URL empty to switch monitoring off.
   influx:
     url: ${INFLUX_URL:}
@@ -78,7 +75,5 @@ spring:
     url: ${DB_URL:jdbc:mysql://localhost:3306/dso_portal}
     username: ${DB_USERNAME:dso_portal}
     password: ${DB_PASSWORD:dso_portal}
-  flyway:
-    locations: classpath:db/migration/mysql
 dso:
   demo-data: ${DSO_DEMO_DATA:true}

@@ -6,6 +6,7 @@ import com.bbh.itss.dso.portal.application.catalog.port.out.PipelineCountsPort
 import com.bbh.itss.dso.portal.application.catalog.port.out.ProductRepositoryPort
 import com.bbh.itss.dso.portal.application.dsoconfig.port.in.PublishPipelineConfigsUseCase
 import com.bbh.itss.dso.portal.application.dsoconfig.port.out.ConfigSerializerPort
+import com.bbh.itss.dso.portal.application.dsoconfig.port.out.PublicationLockPort
 import com.bbh.itss.dso.portal.application.dsoconfig.port.out.PublishedConfigRepositoryPort
 import com.bbh.itss.dso.portal.application.evidence.port.out.RunEvidencePort
 import com.bbh.itss.dso.portal.application.monitoring.port.out.DashboardLinksPort
@@ -53,6 +54,7 @@ class UseCaseConfigurationSpec extends Specification {
     PipelineCountsPort pipelineCounts = Mock()
     PipelineRepositoryPort pipelines = Mock()
     PublishedConfigRepositoryPort published = Mock()
+    PublicationLockPort publicationLock = Mock()
     PipelineRunsPort runs = Mock()
     MonitoringStatusPort monitoringStatus = Mock()
     DashboardLinksPort dashboards = Mock()
@@ -66,6 +68,7 @@ class UseCaseConfigurationSpec extends Specification {
             .withBean(PublishPipelineConfigsUseCase, { publisher } as Supplier<PublishPipelineConfigsUseCase>,
                     { it.primary = true } as BeanDefinitionCustomizer)
             .withBean(PublishedConfigRepositoryPort, { published } as Supplier<PublishedConfigRepositoryPort>)
+            .withBean(PublicationLockPort, { publicationLock } as Supplier<PublicationLockPort>)
             .withBean(ConfigSerializerPort, { { Map config -> config.toString() } as ConfigSerializerPort }
                     as Supplier<ConfigSerializerPort>)
             .withBean(ProductRepositoryPort, { products } as Supplier<ProductRepositoryPort>)
@@ -111,7 +114,7 @@ class UseCaseConfigurationSpec extends Specification {
         then:
         transactions.log == ['begin read-write', 'commit']
         repository.calls == ['load read-write', 'save read-write']
-        publisher.calls == ['settingsChanged read-write']
+        publisher.calls == ['lockConfigurations read-write', 'settingsChanged read-write']
         repository.stored.jenkinsUrl() == 'https://jenkins.bbh.com'
     }
 
@@ -131,7 +134,7 @@ class UseCaseConfigurationSpec extends Specification {
         then:
         exception.isInstance(failure)
         transactions.log == ['begin read-write', 'rollback']
-        publisher.calls == []
+        publisher.calls == ['lockConfigurations read-write']
 
         where:
         reason                  | exception               | command
@@ -227,6 +230,11 @@ class UseCaseConfigurationSpec extends Specification {
     static class RecordingPublisher implements PublishPipelineConfigsUseCase {
 
         final List<String> calls = []
+
+        @Override
+        void lockConfigurations() {
+            calls << 'lockConfigurations ' + transactionState()
+        }
 
         @Override
         void productChanged(long productId) {

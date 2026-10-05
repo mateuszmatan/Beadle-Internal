@@ -1,5 +1,6 @@
-package com.bbh.itss.dso.portal.common;
+package com.bbh.itss.dso.portal.adapter.out.persistence;
 
+import com.bbh.itss.dso.portal.domain.shared.Timestamps;
 import jakarta.persistence.Column;
 import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.PrePersist;

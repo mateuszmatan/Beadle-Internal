@@ -1,6 +1,9 @@
-package com.bbh.itss.dso.portal.common
+package com.bbh.itss.dso.portal.adapter.in.web
 
-import com.bbh.itss.dso.portal.common.InvalidRequestException.FieldProblem
+import com.bbh.itss.dso.portal.domain.shared.ConflictException
+import com.bbh.itss.dso.portal.domain.shared.InvalidRequestException
+import com.bbh.itss.dso.portal.domain.shared.InvalidRequestException.FieldProblem
+import com.bbh.itss.dso.portal.domain.shared.NotFoundException
 import org.springframework.core.MethodParameter
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus

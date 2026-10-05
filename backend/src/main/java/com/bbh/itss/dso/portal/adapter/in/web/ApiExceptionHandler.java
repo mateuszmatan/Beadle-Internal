@@ -1,5 +1,8 @@
-package com.bbh.itss.dso.portal.common;
+package com.bbh.itss.dso.portal.adapter.in.web;
 
+import com.bbh.itss.dso.portal.domain.shared.ConflictException;
+import com.bbh.itss.dso.portal.domain.shared.InvalidRequestException;
+import com.bbh.itss.dso.portal.domain.shared.NotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -26,8 +29,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(OptimisticLockingFailureException.class)
     ProblemDetail staleData(OptimisticLockingFailureException e) {
-        return problem(HttpStatus.CONFLICT, "Conflict",
-                "The record was changed by someone else in the meantime. Reload it and apply your change again.");
+        return problem(HttpStatus.CONFLICT, "Conflict", ConflictException.STALE_VERSION);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

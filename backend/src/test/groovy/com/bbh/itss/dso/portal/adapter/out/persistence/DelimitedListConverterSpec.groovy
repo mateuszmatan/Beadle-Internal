@@ -1,4 +1,4 @@
-package com.bbh.itss.dso.portal.common
+package com.bbh.itss.dso.portal.adapter.out.persistence
 
 import spock.lang.Specification
 
@@ -35,12 +35,6 @@ class DelimitedListConverterSpec extends Specification {
         null        | null
         []          | ''
         ['', '  ']  | '  '
-    }
-
-    def "clean keeps the order of the first occurrence"() {
-        expect:
-        DelimitedListConverter.clean(['b', 'a', ' b']) == ['b', 'a']
-        DelimitedListConverter.clean(null) == []
     }
 
     def "command line tokens are stored one per line, keeping repeated tokens in their order"() {
@@ -94,24 +88,5 @@ class DelimitedListConverterSpec extends Specification {
         pipes.convertToDatabaseColumn(['a', 'b', 'a']) == 'a|b'
         pipes.convertToEntityAttribute('a|b|a') == ['a', 'b']
         dots.convertToEntityAttribute('a.b.a') == ['a', 'b', 'a']
-    }
-
-    def "trimmed drops blanks but keeps the order and repeated values"() {
-        expect:
-        DelimitedListConverter.trimmed([' -s ', 'settings.xml', '', null, ' ', '-gs', 'settings.xml ']) ==
-                ['-s', 'settings.xml', '-gs', 'settings.xml']
-        DelimitedListConverter.trimmed(null) == []
-        DelimitedListConverter.trimmed([]) == []
-    }
-
-    def "the cleaned and trimmed lists cannot be changed"() {
-        when:
-        DelimitedListConverter."$method"(['a']).add('b')
-
-        then:
-        thrown(UnsupportedOperationException)
-
-        where:
-        method << ['clean', 'trimmed']
     }
 }

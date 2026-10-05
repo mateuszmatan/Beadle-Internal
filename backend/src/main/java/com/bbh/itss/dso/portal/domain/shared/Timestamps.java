@@ -1,4 +1,4 @@
-package com.bbh.itss.dso.portal.common;
+package com.bbh.itss.dso.portal.domain.shared;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;

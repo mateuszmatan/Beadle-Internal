@@ -8,6 +8,7 @@ spock = "2.4-groovy-5.0"
 junit = "6.0.3"
 jacoco = "0.8.15"
 playwright = "1.56.0"
+archunit = "1.4.2"
 
 [libraries]
 groovy-bom = { module = "org.apache.groovy:groovy-bom", version.ref = "groovy" }
@@ -19,6 +20,7 @@ spock-spring = { module = "org.spockframework:spock-spring" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 playwright = { module = "com.microsoft.playwright:playwright", version.ref = "playwright" }
+archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }

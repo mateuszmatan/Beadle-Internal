@@ -1,5 +1,6 @@
-package com.bbh.itss.dso.portal.common;
+package com.bbh.itss.dso.portal.adapter.out.persistence;
 
+import com.bbh.itss.dso.portal.domain.shared.Text;
 import jakarta.persistence.AttributeConverter;
 
 import java.util.Arrays;
@@ -34,21 +35,7 @@ public abstract class DelimitedListConverter implements AttributeConverter<List<
     }
 
     private List<String> normalize(List<String> values) {
-        return distinct ? clean(values) : trimmed(values);
-    }
-
-    public static List<String> clean(List<String> values) {
-        if (values == null) {
-            return List.of();
-        }
-        return values.stream().filter(v -> !Text.isBlank(v)).map(String::trim).distinct().toList();
-    }
-
-    public static List<String> trimmed(List<String> values) {
-        if (values == null) {
-            return List.of();
-        }
-        return values.stream().filter(v -> !Text.isBlank(v)).map(String::trim).toList();
+        return distinct ? Text.clean(values) : Text.trimmed(values);
     }
 
     public static class Lines extends DelimitedListConverter {

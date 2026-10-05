@@ -1,8 +1,8 @@
-package com.bbh.itss.dso.portal.common;
+package com.bbh.itss.dso.portal.domain.shared;
 
 import java.util.List;
 
-public class InvalidRequestException extends RuntimeException {
+public class InvalidRequestException extends DomainException {
 
     private final List<FieldProblem> problems;
 

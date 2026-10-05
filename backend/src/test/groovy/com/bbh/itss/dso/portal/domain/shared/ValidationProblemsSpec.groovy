@@ -1,6 +1,6 @@
-package com.bbh.itss.dso.portal.common
+package com.bbh.itss.dso.portal.domain.shared
 
-import com.bbh.itss.dso.portal.common.InvalidRequestException.FieldProblem
+import com.bbh.itss.dso.portal.domain.shared.InvalidRequestException.FieldProblem
 import spock.lang.Specification
 
 class ValidationProblemsSpec extends Specification {

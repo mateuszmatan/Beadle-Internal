@@ -1,4 +1,4 @@
-package com.bbh.itss.dso.portal.common
+package com.bbh.itss.dso.portal.adapter.out.persistence
 
 import spock.lang.Specification
 

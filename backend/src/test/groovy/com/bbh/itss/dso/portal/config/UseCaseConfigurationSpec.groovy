@@ -7,6 +7,10 @@ import com.bbh.itss.dso.portal.application.catalog.port.out.ProductRepositoryPor
 import com.bbh.itss.dso.portal.application.dsoconfig.port.in.PublishPipelineConfigsUseCase
 import com.bbh.itss.dso.portal.application.dsoconfig.port.out.ConfigSerializerPort
 import com.bbh.itss.dso.portal.application.dsoconfig.port.out.PublishedConfigRepositoryPort
+import com.bbh.itss.dso.portal.application.evidence.port.out.RunEvidencePort
+import com.bbh.itss.dso.portal.application.monitoring.port.out.DashboardLinksPort
+import com.bbh.itss.dso.portal.application.monitoring.port.out.MonitoringStatusPort
+import com.bbh.itss.dso.portal.application.monitoring.port.out.PipelineRunsPort
 import com.bbh.itss.dso.portal.application.pipeline.port.in.QueryPipelinesUseCase
 import com.bbh.itss.dso.portal.application.pipeline.port.out.PipelineRepositoryPort
 import com.bbh.itss.dso.portal.application.settings.port.in.ManageGlobalSettingsUseCase
@@ -49,6 +53,10 @@ class UseCaseConfigurationSpec extends Specification {
     PipelineCountsPort pipelineCounts = Mock()
     PipelineRepositoryPort pipelines = Mock()
     PublishedConfigRepositoryPort published = Mock()
+    PipelineRunsPort runs = Mock()
+    MonitoringStatusPort monitoringStatus = Mock()
+    DashboardLinksPort dashboards = Mock()
+    RunEvidencePort evidence = Mock()
 
     def runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(AopAutoConfiguration, TransactionAutoConfiguration))
@@ -63,6 +71,10 @@ class UseCaseConfigurationSpec extends Specification {
             .withBean(ProductRepositoryPort, { products } as Supplier<ProductRepositoryPort>)
             .withBean(PipelineCountsPort, { pipelineCounts } as Supplier<PipelineCountsPort>)
             .withBean(PipelineRepositoryPort, { pipelines } as Supplier<PipelineRepositoryPort>)
+            .withBean(PipelineRunsPort, { runs } as Supplier<PipelineRunsPort>)
+            .withBean(MonitoringStatusPort, { monitoringStatus } as Supplier<MonitoringStatusPort>)
+            .withBean(DashboardLinksPort, { dashboards } as Supplier<DashboardLinksPort>)
+            .withBean(RunEvidencePort, { evidence } as Supplier<RunEvidencePort>)
             .withBean(KeyGenerator, { { -> 'key' } as KeyGenerator } as Supplier<KeyGenerator>)
             .withBean(Clock, { Clock.systemUTC() } as Supplier<Clock>)
 
@@ -71,7 +83,8 @@ class UseCaseConfigurationSpec extends Specification {
         runner.run { ApplicationContext context ->
             def useCases = context.getBeansWithAnnotation(UseCase)
             assert useCases.keySet().containsAll(['globalSettingsService', 'productCatalogService', 'pipelineService',
-                                                  'pipelineConfigService', 'pipelineConfigPublisher'])
+                                                  'pipelineConfigService', 'pipelineConfigPublisher',
+                                                  'pipelineMonitoringService', 'changeEvidenceService'])
             useCases.values().each { useCase ->
                 assert AopUtils.isAopProxy(useCase)
                 assert (useCase as Advised).advisors*.advice.any { it instanceof TransactionInterceptor }

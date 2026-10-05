@@ -10,17 +10,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
-final class MalformedBody {
+record MalformedBody(String detail, List<FieldProblem> problems) {
 
     private static final String MISSING = "Required request body is missing";
-
-    private final String detail;
-    private final List<FieldProblem> problems;
-
-    private MalformedBody(String detail, List<FieldProblem> problems) {
-        this.detail = detail;
-        this.problems = problems;
-    }
 
     static MalformedBody of(HttpMessageNotReadableException e) {
         if (e.getMessage() != null && e.getMessage().startsWith(MISSING)) {
@@ -63,13 +55,5 @@ final class MalformedBody {
             }
         }
         return path.toString();
-    }
-
-    String detail() {
-        return detail;
-    }
-
-    List<FieldProblem> problems() {
-        return problems;
     }
 }

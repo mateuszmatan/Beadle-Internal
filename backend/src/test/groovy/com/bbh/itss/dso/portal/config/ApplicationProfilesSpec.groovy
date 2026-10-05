@@ -26,7 +26,7 @@ class ApplicationProfilesSpec extends Specification {
 
     def "the #profile profile runs on the Oracle database given by the environment"() {
         when:
-        def env = environment([profile], ORACLE)
+        def env = environment([profile], ORACLE + variables)
 
         then:
         env.activeProfiles as List == [profile, 'oracle']
@@ -41,10 +41,11 @@ class ApplicationProfilesSpec extends Specification {
         env.getProperty('logging.level.com.bbh.itss.dso') == logLevel
 
         where:
-        profile || poolSize | healthDetails | logLevel
-        'rd'    || '5'      | 'always'      | 'DEBUG'
-        'qc'    || '10'     | 'always'      | 'INFO'
-        'prod'  || '20'     | 'never'       | 'INFO'
+        profile | variables            || poolSize | healthDetails | logLevel
+        'rd'    | [:]                  || '5'      | 'always'      | 'DEBUG'
+        'qc'    | [:]                  || '10'     | 'always'      | 'INFO'
+        'prod'  | [:]                  || '20'     | 'never'       | 'INFO'
+        'prod'  | [DB_POOL_SIZE: '40'] || '40'     | 'never'       | 'INFO'
     }
 
     def "the #profile profile does not start without the database address"() {
@@ -59,9 +60,20 @@ class ApplicationProfilesSpec extends Specification {
         profile << ['rd', 'qc', 'prod']
     }
 
-    def "the pool size can be set for any Oracle environment"() {
-        expect:
-        environment(['prod'], ORACLE + [DB_POOL_SIZE: '40']).getProperty('spring.datasource.hikari.maximum-pool-size') == '40'
+    def "InfluxDB and Grafana are links to their own servers, given by the environment"() {
+        when:
+        def env = environment([], variables)
+
+        then:
+        ['url', 'token', 'org', 'bucket'].collect { env.getProperty("dso.influx.$it") } == influx
+        ['dashboard-url', 'security-dashboard-url'].collect { env.getProperty("dso.grafana.$it") } == grafana
+
+        where:
+        variables << [[:], [INFLUX_URL: 'https://influx.bbh.com', INFLUX_TOKEN: 'token', INFLUX_ORG: 'BBH',
+                            INFLUX_BUCKET: 'metrics', GRAFANA_DASHBOARD_URL: 'https://grafana.bbh.com/d/adzfc54123/p',
+                            GRAFANA_SECURITY_DASHBOARD_URL: 'https://grafana.bbh.com/d/ad2trcm/s']]
+        influx << [['', '', 'DevSecOps', 'DORA-metrics'], ['https://influx.bbh.com', 'token', 'BBH', 'metrics']]
+        grafana << [['', ''], ['https://grafana.bbh.com/d/adzfc54123/p', 'https://grafana.bbh.com/d/ad2trcm/s']]
     }
 
     private static Environment environment(List<String> profiles, Map<String, String> variables) {

@@ -18,7 +18,7 @@ class StoredListSpec extends Specification {
         ','       | ['\u017c\u00f3\u0142\u0107', 'ab'] || false
     }
 
-    def "an entry list longer than its column is reported against its field"() {
+    def "an entry list longer than its column is reported against its field, each list with the size of its column"() {
         given:
         def problems = new ValidationProblems()
 
@@ -29,10 +29,6 @@ class StoredListSpec extends Specification {
         then:
         problems.list()*.field == ['flutter.modules']
         problems.list()*.message == ['is too long: all entries together may take at most 1000 bytes']
-    }
-
-    def "the stored lists use the separators and sizes of their columns"() {
-        expect:
         [StoredList.LINES_1000, StoredList.LINES_2000, StoredList.LINES_4000, StoredList.COMMAS_1000,
          StoredList.COMMAS_2000].collect { [it.separator(), it.maxBytes()] } ==
                 [['\n', 1000], ['\n', 2000], ['\n', 4000], [',', 1000], [',', 2000]]

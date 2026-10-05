@@ -1,23 +1,21 @@
 package com.bbh.itss.dso.portal.config
 
 import com.bbh.itss.dso.portal.application.UseCase
-import com.bbh.itss.dso.portal.application.catalog.port.in.QueryProductsUseCase
+import com.bbh.itss.dso.portal.application.catalog.port.in.ProductsUseCase
 import com.bbh.itss.dso.portal.application.catalog.port.out.PipelineCountsPort
 import com.bbh.itss.dso.portal.application.catalog.port.out.ProductRepositoryPort
 import com.bbh.itss.dso.portal.application.dsoconfig.port.in.PublishPipelineConfigsUseCase
 import com.bbh.itss.dso.portal.application.dsoconfig.port.out.ConfigSerializerPort
 import com.bbh.itss.dso.portal.application.dsoconfig.port.out.PublicationLockPort
-import com.bbh.itss.dso.portal.application.evidence.port.in.QueryEvidenceUseCase
-import com.bbh.itss.dso.portal.application.monitoring.port.in.MonitorPipelinesUseCase
 import com.bbh.itss.dso.portal.application.dsoconfig.port.out.PublishedConfigRepositoryPort
+import com.bbh.itss.dso.portal.application.evidence.port.in.QueryEvidenceUseCase
 import com.bbh.itss.dso.portal.application.evidence.port.out.RunEvidencePort
+import com.bbh.itss.dso.portal.application.monitoring.port.in.MonitorPipelinesUseCase
 import com.bbh.itss.dso.portal.application.monitoring.port.out.DashboardLinksPort
-import com.bbh.itss.dso.portal.application.monitoring.port.out.MonitoringStatusPort
 import com.bbh.itss.dso.portal.application.monitoring.port.out.PipelineRunsPort
-import com.bbh.itss.dso.portal.application.pipeline.port.in.QueryPipelinesUseCase
+import com.bbh.itss.dso.portal.application.pipeline.port.in.PipelinesUseCase
 import com.bbh.itss.dso.portal.application.pipeline.port.out.PipelineRepositoryPort
 import com.bbh.itss.dso.portal.application.settings.port.in.ManageGlobalSettingsUseCase
-import com.bbh.itss.dso.portal.application.settings.port.in.UpdateGlobalSettingsCommand
 import com.bbh.itss.dso.portal.application.settings.port.out.GlobalSettingsRepositoryPort
 import com.bbh.itss.dso.portal.domain.pipeline.KeyGenerator
 import com.bbh.itss.dso.portal.domain.settings.GlobalSettings
@@ -46,11 +44,21 @@ import java.time.Clock
 import java.time.Instant
 import java.util.function.Supplier
 
+import static com.bbh.itss.dso.portal.support.Fixtures.copy
+
 class UseCaseConfigurationSpec extends Specification {
 
     def transactions = new RecordingTransactionManager()
-    def repository = new InMemoryGlobalSettings()
-    def publisher = new RecordingPublisher()
+    List<String> calls = []
+    GlobalSettings stored = new GlobalSettings(GlobalSettingsValues.bbhDefaults(), 1, Instant.parse('2026-10-04T12:00:00Z'))
+    def repository = [load: { -> calls << 'load ' + transactionState(); Optional.ofNullable(stored) },
+                      save: { GlobalSettings settings ->
+                          calls << 'save ' + transactionState()
+                          stored = new GlobalSettings(settings.values(), settings.version() + 1, Instant.EPOCH)
+                      }] as GlobalSettingsRepositoryPort
+    def publisher = ['lockConfigurations', 'settingsChanged'].collectEntries { name ->
+        [name, { -> calls << name + ' ' + transactionState() }]
+    } as PublishPipelineConfigsUseCase
     def bbh = GlobalSettingsValues.bbhDefaults()
     ProductRepositoryPort products = Mock()
     PipelineCountsPort pipelineCounts = Mock()
@@ -58,7 +66,6 @@ class UseCaseConfigurationSpec extends Specification {
     PublishedConfigRepositoryPort published = Mock()
     PublicationLockPort publicationLock = Mock()
     PipelineRunsPort runs = Mock()
-    MonitoringStatusPort monitoringStatus = Mock()
     DashboardLinksPort dashboards = Mock()
     RunEvidencePort evidence = Mock()
 
@@ -77,7 +84,6 @@ class UseCaseConfigurationSpec extends Specification {
             .withBean(PipelineCountsPort, { pipelineCounts } as Supplier<PipelineCountsPort>)
             .withBean(PipelineRepositoryPort, { pipelines } as Supplier<PipelineRepositoryPort>)
             .withBean(PipelineRunsPort, { runs } as Supplier<PipelineRunsPort>)
-            .withBean(MonitoringStatusPort, { monitoringStatus } as Supplier<MonitoringStatusPort>)
             .withBean(DashboardLinksPort, { dashboards } as Supplier<DashboardLinksPort>)
             .withBean(RunEvidencePort, { evidence } as Supplier<RunEvidencePort>)
             .withBean(KeyGenerator, { { -> 'key' } as KeyGenerator } as Supplier<KeyGenerator>)
@@ -98,27 +104,34 @@ class UseCaseConfigurationSpec extends Specification {
         }
     }
 
-    def "a reading use case method runs in a read-only transaction"() {
+    def "reading the settings runs read-only and creating them at start-up runs read-write"() {
+        given:
+        stored = existing
+
         when:
-        runner.run { ApplicationContext context -> context.getBean(ManageGlobalSettingsUseCase).current() }
+        runner.run { ApplicationContext context -> context.getBean(ManageGlobalSettingsUseCase)."$method"() }
 
         then:
-        transactions.log == ['begin read-only', 'commit']
-        repository.calls == ['load read-only']
+        transactions.log == ['begin ' + mode, 'commit']
+        calls == expected
+
+        where:
+        method         | existing                     || mode        | expected
+        'current'      | GlobalSettings.bbhDefaults() || 'read-only'  | ['load read-only']
+        'ensureExists' | null                         || 'read-write' | ['load read-write', 'save read-write']
     }
 
     def "a change is saved and published in one read-write transaction"() {
         when:
         runner.run { ApplicationContext context ->
-            context.getBean(ManageGlobalSettingsUseCase).update(new UpdateGlobalSettingsCommand(1L,
-                    bbh.withPlatform(bbh.platform().withJenkinsUrl('https://jenkins.bbh.com'))))
+            context.getBean(ManageGlobalSettingsUseCase).update(1L,
+                    bbh.withPlatform(bbh.platform().withJenkinsUrl('https://jenkins.bbh.com')))
         }
 
         then:
         transactions.log == ['begin read-write', 'commit']
-        repository.calls == ['load read-write', 'save read-write']
-        publisher.calls == ['lockConfigurations read-write', 'settingsChanged read-write']
-        repository.stored.jenkinsUrl() == 'https://jenkins.bbh.com'
+        calls == ['lockConfigurations read-write', 'load read-write', 'save read-write', 'settingsChanged read-write']
+        stored.jenkinsUrl() == 'https://jenkins.bbh.com'
     }
 
     def "a domain exception rolls the transaction back: #reason"() {
@@ -128,7 +141,7 @@ class UseCaseConfigurationSpec extends Specification {
         when:
         runner.run { ApplicationContext context ->
             try {
-                context.getBean(ManageGlobalSettingsUseCase).update(command(bbh))
+                context.getBean(ManageGlobalSettingsUseCase).update(version, values)
             } catch (RuntimeException e) {
                 failure = e
             }
@@ -137,44 +150,54 @@ class UseCaseConfigurationSpec extends Specification {
         then:
         exception.isInstance(failure)
         transactions.log == ['begin read-write', 'rollback']
-        publisher.calls == ['lockConfigurations read-write']
+        calls == ['lockConfigurations read-write', 'load read-write']
 
         where:
-        reason                  | exception               | command
-        'a concurrent change'   | ConflictException       | { GlobalSettingsValues v -> new UpdateGlobalSettingsCommand(0L, v) }
-        'a broken business rule' | InvalidRequestException | { GlobalSettingsValues v ->
-            new UpdateGlobalSettingsCommand(1L, new GlobalSettingsValues(v.platform(), v.deployment(),
-                    v.limits().findAll { it.key != Scanner.SAST }, v.scans(), v.releaseGate(), v.serviceDefaults(),
-                    v.goldenFix()))
-        }
+        reason                   | version | values                             || exception
+        'a concurrent change'    | 0L      | GlobalSettingsValues.bbhDefaults() || ConflictException
+        'a broken business rule' | 1L      | withoutLimit(Scanner.SAST)         || InvalidRequestException
     }
 
     def "the monitoring and evidence pages query InfluxDB with no transaction and no database connection of their own"() {
         given:
-        monitoringStatus.configured() >> false
+        def influx = { String query, Object answer -> calls << query + ' ' + transactionState(); answer }
+        runs.configured() >> true
+        runs.ping() >> { influx('ping', null) }
+        runs.latestRuns(_) >> { influx('latest runs', [:]) }
+        runs.recentRuns(*_) >> { influx('recent runs', []) }
+        runs.doraPoints(*_) >> { influx('DORA points', []) }
+        evidence.evidenceOf(_) >> { influx('evidence', [:]) }
         dashboards.url() >> Optional.empty()
+        dashboards.dashboardUrl(*_) >> Optional.empty()
+        def product = Fixtures.product(id: 5L, services: [[id: 10L, name: 'gui']])
+        def pipeline = Fixtures.pipeline(id: 20L, productId: 5L, serviceId: 10L)
 
         when:
         runner.run { ApplicationContext context ->
             context.getBean(MonitorPipelinesUseCase).status()
             context.getBean(MonitorPipelinesUseCase).overview()
+            context.getBean(MonitorPipelinesUseCase).pipeline(20L, '30d')
             context.getBean(QueryEvidenceUseCase).product(5L)
         }
 
-        then: 'only the two short reads of the catalogue run in a transaction, the InfluxDB queries do not'
-        transactions.log == ['begin read-only', 'begin read-only', 'commit', 'commit',
-                             'begin read-only', 'begin read-only', 'commit', 'commit']
-        1 * products.findAll() >> []
-        1 * pipelines.findAll() >> []
-        1 * products.load(5L) >> Optional.of(Fixtures.product(id: 5L))
-        1 * pipelines.findByProductId(5L) >> []
+        then: 'only the short reads of the catalogue run in a transaction, the InfluxDB queries do not'
+        transactions.log == ['begin read-only', 'begin read-only', 'commit', 'commit'] * 3
+        calls == ['ping without transaction', 'load read-only', 'latest runs without transaction',
+                  'load read-only', 'recent runs without transaction', 'DORA points without transaction',
+                  'latest runs without transaction', 'load read-only', 'latest runs without transaction',
+                  'evidence without transaction']
+        1 * products.findAll() >> [product]
+        1 * pipelines.findAll() >> [pipeline]
+        2 * products.load(5L) >> Optional.of(product)
+        1 * pipelines.load(20L) >> Optional.of(pipeline)
+        1 * pipelines.findByProductId(5L) >> [pipeline]
     }
 
     def "the catalog and pipeline queries run in read-only transactions, also when they read the settings"() {
         when:
         runner.run { ApplicationContext context ->
-            context.getBean(QueryProductsUseCase).list(null)
-            context.getBean(QueryPipelinesUseCase).listForProduct(5L)
+            context.getBean(ProductsUseCase).list(null)
+            context.getBean(PipelinesUseCase).listForProduct(5L)
         }
 
         then:
@@ -187,16 +210,9 @@ class UseCaseConfigurationSpec extends Specification {
         1 * pipelines.findByProductId(5L) >> []
     }
 
-    def "creating the settings at start-up runs in a read-write transaction"() {
-        given:
-        repository.stored = null
-
-        when:
-        runner.run { ApplicationContext context -> context.getBean(ManageGlobalSettingsUseCase).ensureExists() }
-
-        then:
-        transactions.log == ['begin read-write', 'commit']
-        repository.calls == ['load read-write', 'save read-write']
+    private static GlobalSettingsValues withoutLimit(Scanner scanner) {
+        def bbh = GlobalSettingsValues.bbhDefaults()
+        copy(bbh, limits: bbh.limits().findAll { it.key != scanner })
     }
 
     static String transactionState() {
@@ -228,57 +244,6 @@ class UseCaseConfigurationSpec extends Specification {
         @Override
         protected void doRollback(DefaultTransactionStatus status) {
             log << 'rollback'
-        }
-    }
-
-    static class InMemoryGlobalSettings implements GlobalSettingsRepositoryPort {
-
-        GlobalSettings stored = new GlobalSettings(GlobalSettingsValues.bbhDefaults(), 1,
-                Instant.parse('2026-10-04T12:00:00Z'))
-        final List<String> calls = []
-
-        @Override
-        Optional<GlobalSettings> load() {
-            calls << 'load ' + transactionState()
-            Optional.ofNullable(stored)
-        }
-
-        @Override
-        GlobalSettings save(GlobalSettings settings) {
-            calls << 'save ' + transactionState()
-            stored = new GlobalSettings(settings.values(), settings.version() + 1, Instant.parse('2026-10-04T13:00:00Z'))
-            stored
-        }
-    }
-
-    static class RecordingPublisher implements PublishPipelineConfigsUseCase {
-
-        final List<String> calls = []
-
-        @Override
-        void lockConfigurations() {
-            calls << 'lockConfigurations ' + transactionState()
-        }
-
-        @Override
-        void productChanged(long productId) {
-            calls << 'productChanged ' + transactionState()
-        }
-
-        @Override
-        void pipelineChanged(long pipelineId) {
-            calls << 'pipelineChanged ' + transactionState()
-        }
-
-        @Override
-        void settingsChanged() {
-            calls << 'settingsChanged ' + transactionState()
-        }
-
-        @Override
-        int publishAll() {
-            calls << 'publishAll ' + transactionState()
-            0
         }
     }
 }

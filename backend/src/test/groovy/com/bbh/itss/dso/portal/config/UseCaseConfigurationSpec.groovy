@@ -160,23 +160,37 @@ class UseCaseConfigurationSpec extends Specification {
 
     def "the monitoring and evidence pages query InfluxDB with no transaction and no database connection of their own"() {
         given:
-        runs.configured() >> false
+        def influx = { String query, Object answer -> calls << query + ' ' + transactionState(); answer }
+        runs.configured() >> true
+        runs.ping() >> { influx('ping', null) }
+        runs.latestRuns(_) >> { influx('latest runs', [:]) }
+        runs.recentRuns(*_) >> { influx('recent runs', []) }
+        runs.doraPoints(*_) >> { influx('DORA points', []) }
+        evidence.evidenceOf(_) >> { influx('evidence', [:]) }
         dashboards.url() >> Optional.empty()
+        dashboards.dashboardUrl(*_) >> Optional.empty()
+        def product = Fixtures.product(id: 5L, services: [[id: 10L, name: 'gui']])
+        def pipeline = Fixtures.pipeline(id: 20L, productId: 5L, serviceId: 10L)
 
         when:
         runner.run { ApplicationContext context ->
             context.getBean(MonitorPipelinesUseCase).status()
             context.getBean(MonitorPipelinesUseCase).overview()
+            context.getBean(MonitorPipelinesUseCase).pipeline(20L, '30d')
             context.getBean(QueryEvidenceUseCase).product(5L)
         }
 
-        then: 'only the two short reads of the catalogue run in a transaction, the InfluxDB queries do not'
-        transactions.log == ['begin read-only', 'begin read-only', 'commit', 'commit',
-                             'begin read-only', 'begin read-only', 'commit', 'commit']
-        1 * products.findAll() >> []
-        1 * pipelines.findAll() >> []
-        1 * products.load(5L) >> Optional.of(Fixtures.product(id: 5L))
-        1 * pipelines.findByProductId(5L) >> []
+        then: 'only the short reads of the catalogue run in a transaction, the InfluxDB queries do not'
+        transactions.log == ['begin read-only', 'begin read-only', 'commit', 'commit'] * 3
+        calls == ['ping without transaction', 'load read-only', 'latest runs without transaction',
+                  'load read-only', 'recent runs without transaction', 'DORA points without transaction',
+                  'latest runs without transaction', 'load read-only', 'latest runs without transaction',
+                  'evidence without transaction']
+        1 * products.findAll() >> [product]
+        1 * pipelines.findAll() >> [pipeline]
+        2 * products.load(5L) >> Optional.of(product)
+        1 * pipelines.load(20L) >> Optional.of(pipeline)
+        1 * pipelines.findByProductId(5L) >> [pipeline]
     }
 
     def "the catalog and pipeline queries run in read-only transactions, also when they read the settings"() {

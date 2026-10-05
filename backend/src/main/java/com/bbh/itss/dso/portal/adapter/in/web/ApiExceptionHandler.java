@@ -1,5 +1,6 @@
 package com.bbh.itss.dso.portal.adapter.in.web;
 
+import com.bbh.itss.dso.portal.domain.pipeline.KeyRevokedException;
 import com.bbh.itss.dso.portal.domain.shared.ConflictException;
 import com.bbh.itss.dso.portal.domain.shared.InvalidRequestException;
 import com.bbh.itss.dso.portal.domain.shared.NotFoundException;
@@ -20,6 +21,11 @@ public class ApiExceptionHandler {
     @ExceptionHandler(NotFoundException.class)
     ProblemDetail notFound(NotFoundException e) {
         return problem(HttpStatus.NOT_FOUND, "Not found", e.getMessage());
+    }
+
+    @ExceptionHandler(KeyRevokedException.class)
+    ProblemDetail revoked(KeyRevokedException e) {
+        return problem(HttpStatus.FORBIDDEN, "Pipeline key invalidated", e.getMessage());
     }
 
     @ExceptionHandler(ConflictException.class)

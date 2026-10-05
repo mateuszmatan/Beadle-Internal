@@ -49,6 +49,7 @@ dso:
   grafana:
     url: ${GRAFANA_URL:}
     org-id: ${GRAFANA_ORG_ID:1}
+    datasource-uid: ${GRAFANA_DATASOURCE_UID:dso-influxdb}
   demo-data: false
 ---
 spring:

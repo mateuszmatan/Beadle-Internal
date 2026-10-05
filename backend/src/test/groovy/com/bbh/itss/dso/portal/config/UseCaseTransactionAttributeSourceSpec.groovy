@@ -1,6 +1,7 @@
 package com.bbh.itss.dso.portal.config
 
 import com.bbh.itss.dso.portal.application.ReadOnly
+import com.bbh.itss.dso.portal.application.WithoutTransaction
 import org.springframework.transaction.TransactionDefinition
 import spock.lang.Specification
 import spock.lang.Subject
@@ -30,11 +31,32 @@ class UseCaseTransactionAttributeSourceSpec extends Specification {
         kind = readOnly ? 'read-only' : 'read-write'
     }
 
+    def "#method runs outside any transaction, so nothing it waits for holds a database connection"() {
+        when:
+        def attribute = source.getTransactionAttribute(declaring.getMethod(method), ReportingUseCase)
+
+        then:
+        attribute.propagationBehavior == TransactionDefinition.PROPAGATION_NOT_SUPPORTED
+        !attribute.readOnly
+
+        where:
+        declaring        | method
+        ReportingUseCase | 'ask'
+        ReportingPort    | 'askAgain'
+        ReportingUseCase | 'askAgain'
+    }
+
     def "a method is looked at with the methods it overrides when the target class is not known"() {
         expect:
         source.getTransactionAttribute(ReportingPort.getMethod('report'), null).readOnly
         source.getTransactionAttribute(ReportingUseCase.getMethod('report'), null).readOnly
         !source.getTransactionAttribute(ReportingUseCase.getMethod('record'), null).readOnly
+    }
+
+    def "a method that both reads and asks another system is not run in a transaction"() {
+        expect:
+        source.getTransactionAttribute(ReportingUseCase.getMethod('reportAndAsk'), ReportingUseCase)
+                .propagationBehavior == TransactionDefinition.PROPAGATION_NOT_SUPPORTED
     }
 
     def "the methods every object has run without a transaction"() {
@@ -57,6 +79,9 @@ interface ReportingPort {
     String report()
 
     String record()
+
+    @WithoutTransaction
+    String askAgain()
 }
 
 interface ReportingAgainPort {
@@ -82,5 +107,20 @@ class ReportingUseCase implements ReportingPort, ReportingAgainPort {
     @ReadOnly
     String audit() {
         'audit'
+    }
+
+    @WithoutTransaction
+    String ask() {
+        'ask'
+    }
+
+    String askAgain() {
+        'ask again'
+    }
+
+    @ReadOnly
+    @WithoutTransaction
+    String reportAndAsk() {
+        'both'
     }
 }

@@ -27,6 +27,13 @@ class PortalClient {
         send(request(path).POST(body == null ? HttpRequest.BodyPublishers.noBody() : json(body)))
     }
 
+    Response postRaw(String path, String contentType, String body) {
+        send(HttpRequest.newBuilder(URI.create(baseUrl + path))
+                .timeout(Duration.ofSeconds(30))
+                .header('Content-Type', contentType)
+                .POST(HttpRequest.BodyPublishers.ofString(body)))
+    }
+
     Response put(String path, Object body) {
         send(request(path).PUT(json(body)))
     }

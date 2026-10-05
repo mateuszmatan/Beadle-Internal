@@ -8,6 +8,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Version;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @MappedSuperclass
 public abstract class AuditedEntity {
@@ -31,7 +32,12 @@ public abstract class AuditedEntity {
 
     @PreUpdate
     void onUpdate() {
-        updatedAt = Timestamps.now();
+        touch();
+    }
+
+    void touch() {
+        Instant now = Timestamps.now();
+        updatedAt = updatedAt == null || now.isAfter(updatedAt) ? now : updatedAt.plus(1, ChronoUnit.MICROS);
     }
 
     public Instant getCreatedAt() {

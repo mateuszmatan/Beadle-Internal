@@ -6,6 +6,9 @@ import com.bbh.itss.dso.portal.application.catalog.port.out.PipelineCountsPort
 import com.bbh.itss.dso.portal.application.catalog.port.out.ProductRepositoryPort
 import com.bbh.itss.dso.portal.application.dsoconfig.port.in.PublishPipelineConfigsUseCase
 import com.bbh.itss.dso.portal.application.dsoconfig.port.out.ConfigSerializerPort
+import com.bbh.itss.dso.portal.application.dsoconfig.port.out.PublicationLockPort
+import com.bbh.itss.dso.portal.application.evidence.port.in.QueryEvidenceUseCase
+import com.bbh.itss.dso.portal.application.monitoring.port.in.MonitorPipelinesUseCase
 import com.bbh.itss.dso.portal.application.dsoconfig.port.out.PublishedConfigRepositoryPort
 import com.bbh.itss.dso.portal.application.evidence.port.out.RunEvidencePort
 import com.bbh.itss.dso.portal.application.monitoring.port.out.DashboardLinksPort
@@ -53,6 +56,7 @@ class UseCaseConfigurationSpec extends Specification {
     PipelineCountsPort pipelineCounts = Mock()
     PipelineRepositoryPort pipelines = Mock()
     PublishedConfigRepositoryPort published = Mock()
+    PublicationLockPort publicationLock = Mock()
     PipelineRunsPort runs = Mock()
     MonitoringStatusPort monitoringStatus = Mock()
     DashboardLinksPort dashboards = Mock()
@@ -66,6 +70,7 @@ class UseCaseConfigurationSpec extends Specification {
             .withBean(PublishPipelineConfigsUseCase, { publisher } as Supplier<PublishPipelineConfigsUseCase>,
                     { it.primary = true } as BeanDefinitionCustomizer)
             .withBean(PublishedConfigRepositoryPort, { published } as Supplier<PublishedConfigRepositoryPort>)
+            .withBean(PublicationLockPort, { publicationLock } as Supplier<PublicationLockPort>)
             .withBean(ConfigSerializerPort, { { Map config -> config.toString() } as ConfigSerializerPort }
                     as Supplier<ConfigSerializerPort>)
             .withBean(ProductRepositoryPort, { products } as Supplier<ProductRepositoryPort>)
@@ -84,7 +89,8 @@ class UseCaseConfigurationSpec extends Specification {
             def useCases = context.getBeansWithAnnotation(UseCase)
             assert useCases.keySet().containsAll(['globalSettingsService', 'productCatalogService', 'pipelineService',
                                                   'pipelineConfigService', 'pipelineConfigPublisher',
-                                                  'pipelineMonitoringService', 'changeEvidenceService'])
+                                                  'pipelineMonitoringService', 'changeEvidenceService',
+                                                  'monitoringTargetsService'])
             useCases.values().each { useCase ->
                 assert AopUtils.isAopProxy(useCase)
                 assert (useCase as Advised).advisors*.advice.any { it instanceof TransactionInterceptor }
@@ -111,7 +117,7 @@ class UseCaseConfigurationSpec extends Specification {
         then:
         transactions.log == ['begin read-write', 'commit']
         repository.calls == ['load read-write', 'save read-write']
-        publisher.calls == ['settingsChanged read-write']
+        publisher.calls == ['lockConfigurations read-write', 'settingsChanged read-write']
         repository.stored.jenkinsUrl() == 'https://jenkins.bbh.com'
     }
 
@@ -131,7 +137,7 @@ class UseCaseConfigurationSpec extends Specification {
         then:
         exception.isInstance(failure)
         transactions.log == ['begin read-write', 'rollback']
-        publisher.calls == []
+        publisher.calls == ['lockConfigurations read-write']
 
         where:
         reason                  | exception               | command
@@ -141,6 +147,27 @@ class UseCaseConfigurationSpec extends Specification {
                     v.limits().findAll { it.key != Scanner.SAST }, v.scans(), v.releaseGate(), v.serviceDefaults(),
                     v.goldenFix()))
         }
+    }
+
+    def "the monitoring and evidence pages query InfluxDB with no transaction and no database connection of their own"() {
+        given:
+        monitoringStatus.configured() >> false
+        dashboards.url() >> Optional.empty()
+
+        when:
+        runner.run { ApplicationContext context ->
+            context.getBean(MonitorPipelinesUseCase).status()
+            context.getBean(MonitorPipelinesUseCase).overview()
+            context.getBean(QueryEvidenceUseCase).product(5L)
+        }
+
+        then: 'only the two short reads of the catalogue run in a transaction, the InfluxDB queries do not'
+        transactions.log == ['begin read-only', 'begin read-only', 'commit', 'commit',
+                             'begin read-only', 'begin read-only', 'commit', 'commit']
+        1 * products.findAll() >> []
+        1 * pipelines.findAll() >> []
+        1 * products.load(5L) >> Optional.of(Fixtures.product(id: 5L))
+        1 * pipelines.findByProductId(5L) >> []
     }
 
     def "the catalog and pipeline queries run in read-only transactions, also when they read the settings"() {
@@ -227,6 +254,11 @@ class UseCaseConfigurationSpec extends Specification {
     static class RecordingPublisher implements PublishPipelineConfigsUseCase {
 
         final List<String> calls = []
+
+        @Override
+        void lockConfigurations() {
+            calls << 'lockConfigurations ' + transactionState()
+        }
 
         @Override
         void productChanged(long productId) {

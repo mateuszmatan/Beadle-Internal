@@ -1,15 +1,22 @@
 package com.bbh.itss.dso.portal.config
 
 import com.bbh.itss.dso.portal.application.UseCase
+import com.bbh.itss.dso.portal.application.catalog.port.in.QueryProductsUseCase
+import com.bbh.itss.dso.portal.application.catalog.port.out.PipelineCountsPort
+import com.bbh.itss.dso.portal.application.catalog.port.out.ProductRepositoryPort
 import com.bbh.itss.dso.portal.application.dsoconfig.port.in.PublishPipelineConfigsUseCase
+import com.bbh.itss.dso.portal.application.pipeline.port.in.QueryPipelinesUseCase
+import com.bbh.itss.dso.portal.application.pipeline.port.out.PipelineRepositoryPort
 import com.bbh.itss.dso.portal.application.settings.port.in.ManageGlobalSettingsUseCase
 import com.bbh.itss.dso.portal.application.settings.port.in.UpdateGlobalSettingsCommand
 import com.bbh.itss.dso.portal.application.settings.port.out.GlobalSettingsRepositoryPort
+import com.bbh.itss.dso.portal.domain.pipeline.KeyGenerator
 import com.bbh.itss.dso.portal.domain.settings.GlobalSettings
 import com.bbh.itss.dso.portal.domain.settings.GlobalSettingsValues
 import com.bbh.itss.dso.portal.domain.settings.Scanner
 import com.bbh.itss.dso.portal.domain.shared.ConflictException
 import com.bbh.itss.dso.portal.domain.shared.InvalidRequestException
+import com.bbh.itss.dso.portal.support.Fixtures
 import org.springframework.aop.framework.Advised
 import org.springframework.aop.support.AopUtils
 import org.springframework.boot.autoconfigure.AutoConfigurations
@@ -25,6 +32,7 @@ import org.springframework.transaction.support.DefaultTransactionStatus
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import spock.lang.Specification
 
+import java.time.Clock
 import java.time.Instant
 import java.util.function.Supplier
 
@@ -34,6 +42,9 @@ class UseCaseConfigurationSpec extends Specification {
     def repository = new InMemoryGlobalSettings()
     def publisher = new RecordingPublisher()
     def bbh = GlobalSettingsValues.bbhDefaults()
+    ProductRepositoryPort products = Mock()
+    PipelineCountsPort pipelineCounts = Mock()
+    PipelineRepositoryPort pipelines = Mock()
 
     def runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(AopAutoConfiguration, TransactionAutoConfiguration))
@@ -41,12 +52,17 @@ class UseCaseConfigurationSpec extends Specification {
             .withBean(PlatformTransactionManager, { transactions } as Supplier<PlatformTransactionManager>)
             .withBean(GlobalSettingsRepositoryPort, { repository } as Supplier<GlobalSettingsRepositoryPort>)
             .withBean(PublishPipelineConfigsUseCase, { publisher } as Supplier<PublishPipelineConfigsUseCase>)
+            .withBean(ProductRepositoryPort, { products } as Supplier<ProductRepositoryPort>)
+            .withBean(PipelineCountsPort, { pipelineCounts } as Supplier<PipelineCountsPort>)
+            .withBean(PipelineRepositoryPort, { pipelines } as Supplier<PipelineRepositoryPort>)
+            .withBean(KeyGenerator, { { -> 'key' } as KeyGenerator } as Supplier<KeyGenerator>)
+            .withBean(Clock, { Clock.systemUTC() } as Supplier<Clock>)
 
     def "every use case of the application layer is a bean behind a transactional proxy"() {
         expect:
         runner.run { ApplicationContext context ->
             def useCases = context.getBeansWithAnnotation(UseCase)
-            assert useCases.keySet().contains('globalSettingsService')
+            assert useCases.keySet().containsAll(['globalSettingsService', 'productCatalogService', 'pipelineService'])
             useCases.values().each { useCase ->
                 assert AopUtils.isAopProxy(useCase)
                 assert (useCase as Advised).advisors*.advice.any { it instanceof TransactionInterceptor }
@@ -103,6 +119,23 @@ class UseCaseConfigurationSpec extends Specification {
                     v.limits().findAll { it.key != Scanner.SAST }, v.scans(), v.releaseGate(), v.serviceDefaults(),
                     v.goldenFix()))
         }
+    }
+
+    def "the catalog and pipeline queries run in read-only transactions, also when they read the settings"() {
+        when:
+        runner.run { ApplicationContext context ->
+            context.getBean(QueryProductsUseCase).list(null)
+            context.getBean(QueryPipelinesUseCase).listForProduct(5L)
+        }
+
+        then:
+        transactions.log == ['begin read-only', 'commit', 'begin read-only', 'begin read-only', 'commit', 'commit']
+        1 * products.servicesPerProduct() >> [:]
+        1 * pipelineCounts.pipelinesPerProduct() >> [:]
+        1 * pipelineCounts.activePipelinesPerProduct() >> [:]
+        1 * products.summaries() >> []
+        1 * products.load(5L) >> Optional.of(Fixtures.product(id: 5L))
+        1 * pipelines.findByProductId(5L) >> []
     }
 
     def "creating the settings at start-up runs in a read-write transaction"() {

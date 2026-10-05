@@ -13,14 +13,12 @@ import java.time.temporal.ChronoUnit;
 @MappedSuperclass
 public abstract class AuditedEntity {
 
-    @Column(name = "CREATED_AT", nullable = false, updatable = false)
+    @Column(updatable = false)
     private Instant createdAt;
 
-    @Column(name = "UPDATED_AT", nullable = false)
     private Instant updatedAt;
 
     @Version
-    @Column(name = "VERSION", nullable = false)
     private long version;
 
     @PrePersist

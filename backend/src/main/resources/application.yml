@@ -1,28 +1,27 @@
-# Default profile: Oracle, the production database. Other profiles:
-#   local - embedded H2 file database with demo data; needs nothing but Java
-#   mysql - a local MySQL 8 (docker compose up mysql)
 spring:
   application:
     name: dso-portal
-  datasource:
-    url: ${DB_URL:jdbc:oracle:thin:@//localhost:1521/FREEPDB1}
-    username: ${DB_USERNAME:DSO_PORTAL}
-    password: ${DB_PASSWORD:}
+  profiles:
+    default: local
+    group:
+      rd: oracle
+      qc: oracle
+      prod: oracle
   jpa:
     open-in-view: false
     hibernate:
       ddl-auto: validate
-      # Keep the upper case names of the mappings: MySQL table names are case sensitive on Linux.
-      naming:
-        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
     properties:
       hibernate:
         jdbc:
           time_zone: UTC
         type:
           preferred_instant_jdbc_type: TIMESTAMP
-  flyway:
-    locations: classpath:db/migration/oracle
+          preferred_boolean_jdbc_type: INTEGER
+        default_batch_fetch_size: 50
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+    analytics-enabled: false
 
 server:
   port: ${PORT:8080}
@@ -32,27 +31,23 @@ management:
     web:
       exposure:
         include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    com.bbh.itss.dso: INFO
 
 dso:
-  # BBH-wide values written into every generated config.yaml; a service may override them in its additional YAML.
-  defaults:
-    asoc-url: ${DSO_ASOC_URL:https://bbh.cloud.appscan.com}
-    sonar-server-url: ${DSO_SONAR_URL:https://tools.bbh.com/sonar}
-    nexus-iq-server-url: ${DSO_NEXUS_IQ_URL:https://tools.bbh.com/IQ}
-    nexus-iq-credentials-id: ${DSO_NEXUS_IQ_CREDENTIALS_ID:nexusiqP}
-    influx-write-url: ${DSO_INFLUX_WRITE_URL:http://qcwsecopsmon1.testbbh.com:8086/api/v2/write?org=DevSecOps&bucket=DORA-metrics&precision=s}
-    influx-credentials-id: ${DSO_INFLUX_CREDENTIALS_ID:influxdb-token}
-  # InfluxDB the pipelines write to, read by the monitoring pages. Leave the URL empty to switch monitoring off.
   influx:
     url: ${INFLUX_URL:}
     org: ${INFLUX_ORG:DevSecOps}
     bucket: ${INFLUX_BUCKET:DORA-metrics}
     token: ${INFLUX_TOKEN:}
-  # Grafana whose panels are embedded in the pipeline details. Leave the URL empty to hide the panels.
   grafana:
-    url: ${GRAFANA_URL:}
-    org-id: ${GRAFANA_ORG_ID:1}
-  # Sample products, services and pipelines created at start-up when the database holds no product.
+    dashboard-url: ${GRAFANA_DASHBOARD_URL:}
+    security-dashboard-url: ${GRAFANA_SECURITY_DASHBOARD_URL:}
   demo-data: false
 ---
 spring:
@@ -65,20 +60,53 @@ spring:
     password: ${DB_PASSWORD:}
   jpa:
     hibernate:
-      # H2 reports Oracle NUMBER columns with other JDBC types, so the schema is validated on Oracle and MySQL only.
       ddl-auto: none
+management:
+  endpoint:
+    health:
+      show-details: always
 dso:
-  demo-data: true
+  demo-data: ${DSO_DEMO_DATA:true}
 ---
 spring:
   config:
     activate:
-      on-profile: mysql
+      on-profile: oracle
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/dso_portal}
-    username: ${DB_USERNAME:dso_portal}
-    password: ${DB_PASSWORD:dso_portal}
-  flyway:
-    locations: classpath:db/migration/mysql
-dso:
-  demo-data: ${DSO_DEMO_DATA:true}
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+---
+spring:
+  config:
+    activate:
+      on-profile: rd
+  datasource:
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:5}
+management:
+  endpoint:
+    health:
+      show-details: always
+logging:
+  level:
+    com.bbh.itss.dso: DEBUG
+---
+spring:
+  config:
+    activate:
+      on-profile: qc
+management:
+  endpoint:
+    health:
+      show-details: always
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:20}

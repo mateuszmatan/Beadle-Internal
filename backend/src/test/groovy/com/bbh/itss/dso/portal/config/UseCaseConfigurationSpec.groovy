@@ -7,6 +7,8 @@ import com.bbh.itss.dso.portal.application.catalog.port.out.ProductRepositoryPor
 import com.bbh.itss.dso.portal.application.dsoconfig.port.in.PublishPipelineConfigsUseCase
 import com.bbh.itss.dso.portal.application.dsoconfig.port.out.ConfigSerializerPort
 import com.bbh.itss.dso.portal.application.dsoconfig.port.out.PublicationLockPort
+import com.bbh.itss.dso.portal.application.evidence.port.in.QueryEvidenceUseCase
+import com.bbh.itss.dso.portal.application.monitoring.port.in.MonitorPipelinesUseCase
 import com.bbh.itss.dso.portal.application.dsoconfig.port.out.PublishedConfigRepositoryPort
 import com.bbh.itss.dso.portal.application.evidence.port.out.RunEvidencePort
 import com.bbh.itss.dso.portal.application.monitoring.port.out.DashboardLinksPort
@@ -87,7 +89,8 @@ class UseCaseConfigurationSpec extends Specification {
             def useCases = context.getBeansWithAnnotation(UseCase)
             assert useCases.keySet().containsAll(['globalSettingsService', 'productCatalogService', 'pipelineService',
                                                   'pipelineConfigService', 'pipelineConfigPublisher',
-                                                  'pipelineMonitoringService', 'changeEvidenceService'])
+                                                  'pipelineMonitoringService', 'changeEvidenceService',
+                                                  'monitoringTargetsService'])
             useCases.values().each { useCase ->
                 assert AopUtils.isAopProxy(useCase)
                 assert (useCase as Advised).advisors*.advice.any { it instanceof TransactionInterceptor }
@@ -144,6 +147,27 @@ class UseCaseConfigurationSpec extends Specification {
                     v.limits().findAll { it.key != Scanner.SAST }, v.scans(), v.releaseGate(), v.serviceDefaults(),
                     v.goldenFix()))
         }
+    }
+
+    def "the monitoring and evidence pages query InfluxDB with no transaction and no database connection of their own"() {
+        given:
+        monitoringStatus.configured() >> false
+        dashboards.url() >> Optional.empty()
+
+        when:
+        runner.run { ApplicationContext context ->
+            context.getBean(MonitorPipelinesUseCase).status()
+            context.getBean(MonitorPipelinesUseCase).overview()
+            context.getBean(QueryEvidenceUseCase).product(5L)
+        }
+
+        then: 'only the two short reads of the catalogue run in a transaction, the InfluxDB queries do not'
+        transactions.log == ['begin read-only', 'begin read-only', 'commit', 'commit',
+                             'begin read-only', 'begin read-only', 'commit', 'commit']
+        1 * products.findAll() >> []
+        1 * pipelines.findAll() >> []
+        1 * products.load(5L) >> Optional.of(Fixtures.product(id: 5L))
+        1 * pipelines.findByProductId(5L) >> []
     }
 
     def "the catalog and pipeline queries run in read-only transactions, also when they read the settings"() {

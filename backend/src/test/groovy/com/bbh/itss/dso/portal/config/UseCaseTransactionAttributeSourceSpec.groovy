@@ -11,39 +11,29 @@ class UseCaseTransactionAttributeSourceSpec extends Specification {
     @Subject
     def source = new UseCaseTransactionAttributeSource()
 
-    def "#method of the use case runs in a #kind transaction"() {
+    def "#method of #declaring.simpleName runs #kind"() {
         when:
         def attribute = source.getTransactionAttribute(declaring.getMethod(method), ReportingUseCase)
 
         then:
-        attribute.propagationBehavior == TransactionDefinition.PROPAGATION_REQUIRED
+        attribute.propagationBehavior == propagation
         attribute.readOnly == readOnly
 
         where:
-        declaring        | method          || readOnly
-        ReportingUseCase | 'record'        || false
-        ReportingUseCase | 'audit'         || true
-        ReportingUseCase | 'report'        || true
-        ReportingPort    | 'report'        || true
-        ReportingPort    | 'record'        || false
-        ReportingUseCase | 'reportAgain'   || true
+        declaring        | method         || propagation                                     | readOnly
+        ReportingUseCase | 'record'       || TransactionDefinition.PROPAGATION_REQUIRED      | false
+        ReportingUseCase | 'audit'        || TransactionDefinition.PROPAGATION_REQUIRED      | true
+        ReportingUseCase | 'report'       || TransactionDefinition.PROPAGATION_REQUIRED      | true
+        ReportingPort    | 'report'       || TransactionDefinition.PROPAGATION_REQUIRED      | true
+        ReportingPort    | 'record'       || TransactionDefinition.PROPAGATION_REQUIRED      | false
+        ReportingUseCase | 'reportAgain'  || TransactionDefinition.PROPAGATION_REQUIRED      | true
+        ReportingUseCase | 'ask'          || TransactionDefinition.PROPAGATION_NOT_SUPPORTED | false
+        ReportingPort    | 'askAgain'     || TransactionDefinition.PROPAGATION_NOT_SUPPORTED | false
+        ReportingUseCase | 'askAgain'     || TransactionDefinition.PROPAGATION_NOT_SUPPORTED | false
+        ReportingUseCase | 'reportAndAsk' || TransactionDefinition.PROPAGATION_NOT_SUPPORTED | false
 
-        kind = readOnly ? 'read-only' : 'read-write'
-    }
-
-    def "#method runs outside any transaction, so nothing it waits for holds a database connection"() {
-        when:
-        def attribute = source.getTransactionAttribute(declaring.getMethod(method), ReportingUseCase)
-
-        then:
-        attribute.propagationBehavior == TransactionDefinition.PROPAGATION_NOT_SUPPORTED
-        !attribute.readOnly
-
-        where:
-        declaring        | method
-        ReportingUseCase | 'ask'
-        ReportingPort    | 'askAgain'
-        ReportingUseCase | 'askAgain'
+        kind = propagation == TransactionDefinition.PROPAGATION_NOT_SUPPORTED ? 'outside any transaction'
+                : readOnly ? 'in a read-only transaction' : 'in a read-write transaction'
     }
 
     def "a method is looked at with the methods it overrides when the target class is not known"() {
@@ -51,12 +41,6 @@ class UseCaseTransactionAttributeSourceSpec extends Specification {
         source.getTransactionAttribute(ReportingPort.getMethod('report'), null).readOnly
         source.getTransactionAttribute(ReportingUseCase.getMethod('report'), null).readOnly
         !source.getTransactionAttribute(ReportingUseCase.getMethod('record'), null).readOnly
-    }
-
-    def "a method that both reads and asks another system is not run in a transaction"() {
-        expect:
-        source.getTransactionAttribute(ReportingUseCase.getMethod('reportAndAsk'), ReportingUseCase)
-                .propagationBehavior == TransactionDefinition.PROPAGATION_NOT_SUPPORTED
     }
 
     def "the methods every object has run without a transaction"() {

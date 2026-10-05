@@ -19,18 +19,12 @@ class TextSpec extends Specification {
         'text without spaces' | 'develop' || false | 'develop'
     }
 
-    def "clean keeps the order of the first occurrence"() {
+    def "clean keeps the first occurrence of each value, trimmed keeps repeated values, both in their order"() {
         expect:
         Text.clean(['b', 'a', ' b']) == ['b', 'a']
-        Text.clean(null) == []
-    }
-
-    def "trimmed drops blanks but keeps the order and repeated values"() {
-        expect:
         Text.trimmed([' -s ', 'settings.xml', '', null, ' ', '-gs', 'settings.xml ']) ==
                 ['-s', 'settings.xml', '-gs', 'settings.xml']
-        Text.trimmed(null) == []
-        Text.trimmed([]) == []
+        [Text.clean(null), Text.trimmed(null), Text.trimmed([])] == [[], [], []]
     }
 
     def "the cleaned and trimmed lists cannot be changed"() {

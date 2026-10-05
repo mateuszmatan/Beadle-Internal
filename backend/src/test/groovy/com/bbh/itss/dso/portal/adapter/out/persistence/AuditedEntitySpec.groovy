@@ -9,21 +9,15 @@ class AuditedEntitySpec extends Specification {
 
     def entity = new AuditedEntity() {}
 
-    def "creating sets both timestamps to the same instant"() {
+    def "creating sets both timestamps to the same microsecond and updating moves only the modification time"() {
         when:
         entity.onCreate()
+        def created = entity.createdAt
 
         then:
-        entity.createdAt != null
-        entity.createdAt.nano % 1000 == 0
-        entity.updatedAt == entity.createdAt
+        created.nano % 1000 == 0
+        entity.updatedAt == created
         entity.version == 0
-    }
-
-    def "updating moves only the modification time"() {
-        given:
-        entity.onCreate()
-        def created = entity.createdAt
 
         when:
         entity.onUpdate()
@@ -33,8 +27,9 @@ class AuditedEntitySpec extends Specification {
         !entity.updatedAt.isBefore(created)
     }
 
-    def "touching moves the modification time forward, also within the same microsecond"() {
+    def "touching moves the modification time forward, also within the same microsecond or before the first save"() {
         given:
+        def fresh = new AuditedEntity() {}
         entity.onCreate()
         def created = entity.createdAt
         Instant ahead = Instant.now().plusSeconds(60).truncatedTo(ChronoUnit.MICROS)
@@ -45,18 +40,12 @@ class AuditedEntitySpec extends Specification {
 
         when:
         entity.touch()
+        fresh.touch()
 
         then:
         entity.updatedAt == ahead.plus(1, ChronoUnit.MICROS)
         entity.createdAt == created
-    }
-
-    def "touching an entity that was never stored sets its modification time"() {
-        when:
-        entity.touch()
-
-        then:
-        entity.updatedAt != null
-        entity.createdAt == null
+        fresh.updatedAt != null
+        fresh.createdAt == null
     }
 }

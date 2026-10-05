@@ -44,11 +44,21 @@ import java.time.Clock
 import java.time.Instant
 import java.util.function.Supplier
 
+import static com.bbh.itss.dso.portal.support.Fixtures.copy
+
 class UseCaseConfigurationSpec extends Specification {
 
     def transactions = new RecordingTransactionManager()
-    def repository = new InMemoryGlobalSettings()
-    def publisher = new RecordingPublisher()
+    List<String> calls = []
+    GlobalSettings stored = new GlobalSettings(GlobalSettingsValues.bbhDefaults(), 1, Instant.parse('2026-10-04T12:00:00Z'))
+    def repository = [load: { -> calls << 'load ' + transactionState(); Optional.ofNullable(stored) },
+                      save: { GlobalSettings settings ->
+                          calls << 'save ' + transactionState()
+                          stored = new GlobalSettings(settings.values(), settings.version() + 1, Instant.EPOCH)
+                      }] as GlobalSettingsRepositoryPort
+    def publisher = ['lockConfigurations', 'settingsChanged'].collectEntries { name ->
+        [name, { -> calls << name + ' ' + transactionState() }]
+    } as PublishPipelineConfigsUseCase
     def bbh = GlobalSettingsValues.bbhDefaults()
     ProductRepositoryPort products = Mock()
     PipelineCountsPort pipelineCounts = Mock()
@@ -94,13 +104,21 @@ class UseCaseConfigurationSpec extends Specification {
         }
     }
 
-    def "a reading use case method runs in a read-only transaction"() {
+    def "reading the settings runs read-only and creating them at start-up runs read-write"() {
+        given:
+        stored = existing
+
         when:
-        runner.run { ApplicationContext context -> context.getBean(ManageGlobalSettingsUseCase).current() }
+        runner.run { ApplicationContext context -> context.getBean(ManageGlobalSettingsUseCase)."$method"() }
 
         then:
-        transactions.log == ['begin read-only', 'commit']
-        repository.calls == ['load read-only']
+        transactions.log == ['begin ' + mode, 'commit']
+        calls == expected
+
+        where:
+        method         | existing                     || mode        | expected
+        'current'      | GlobalSettings.bbhDefaults() || 'read-only'  | ['load read-only']
+        'ensureExists' | null                         || 'read-write' | ['load read-write', 'save read-write']
     }
 
     def "a change is saved and published in one read-write transaction"() {
@@ -112,9 +130,8 @@ class UseCaseConfigurationSpec extends Specification {
 
         then:
         transactions.log == ['begin read-write', 'commit']
-        repository.calls == ['load read-write', 'save read-write']
-        publisher.calls == ['lockConfigurations read-write', 'settingsChanged read-write']
-        repository.stored.jenkinsUrl() == 'https://jenkins.bbh.com'
+        calls == ['lockConfigurations read-write', 'load read-write', 'save read-write', 'settingsChanged read-write']
+        stored.jenkinsUrl() == 'https://jenkins.bbh.com'
     }
 
     def "a domain exception rolls the transaction back: #reason"() {
@@ -133,7 +150,7 @@ class UseCaseConfigurationSpec extends Specification {
         then:
         exception.isInstance(failure)
         transactions.log == ['begin read-write', 'rollback']
-        publisher.calls == ['lockConfigurations read-write']
+        calls == ['lockConfigurations read-write', 'load read-write']
 
         where:
         reason                   | version | values                             || exception
@@ -179,22 +196,9 @@ class UseCaseConfigurationSpec extends Specification {
         1 * pipelines.findByProductId(5L) >> []
     }
 
-    def "creating the settings at start-up runs in a read-write transaction"() {
-        given:
-        repository.stored = null
-
-        when:
-        runner.run { ApplicationContext context -> context.getBean(ManageGlobalSettingsUseCase).ensureExists() }
-
-        then:
-        transactions.log == ['begin read-write', 'commit']
-        repository.calls == ['load read-write', 'save read-write']
-    }
-
     private static GlobalSettingsValues withoutLimit(Scanner scanner) {
-        def v = GlobalSettingsValues.bbhDefaults()
-        new GlobalSettingsValues(v.platform(), v.deployment(), v.limits().findAll { it.key != scanner }, v.scans(),
-                v.releaseGate(), v.serviceDefaults(), v.goldenFix())
+        def bbh = GlobalSettingsValues.bbhDefaults()
+        copy(bbh, limits: bbh.limits().findAll { it.key != scanner })
     }
 
     static String transactionState() {
@@ -226,62 +230,6 @@ class UseCaseConfigurationSpec extends Specification {
         @Override
         protected void doRollback(DefaultTransactionStatus status) {
             log << 'rollback'
-        }
-    }
-
-    static class InMemoryGlobalSettings implements GlobalSettingsRepositoryPort {
-
-        GlobalSettings stored = new GlobalSettings(GlobalSettingsValues.bbhDefaults(), 1,
-                Instant.parse('2026-10-04T12:00:00Z'))
-        final List<String> calls = []
-
-        @Override
-        Optional<GlobalSettings> load() {
-            calls << 'load ' + transactionState()
-            Optional.ofNullable(stored)
-        }
-
-        @Override
-        GlobalSettings save(GlobalSettings settings) {
-            calls << 'save ' + transactionState()
-            stored = new GlobalSettings(settings.values(), settings.version() + 1, Instant.parse('2026-10-04T13:00:00Z'))
-            stored
-        }
-    }
-
-    static class RecordingPublisher implements PublishPipelineConfigsUseCase {
-
-        final List<String> calls = []
-
-        @Override
-        void lockConfigurations() {
-            calls << 'lockConfigurations ' + transactionState()
-        }
-
-        @Override
-        void productChanged(long productId) {
-            calls << 'productChanged ' + transactionState()
-        }
-
-        @Override
-        void pipelineChanged(long pipelineId) {
-            calls << 'pipelineChanged ' + transactionState()
-        }
-
-        @Override
-        void settingsChanged() {
-            calls << 'settingsChanged ' + transactionState()
-        }
-
-        @Override
-        Optional<Map<String, Object>> currentConfig(long pipelineId) {
-            Optional.empty()
-        }
-
-        @Override
-        int publishAll() {
-            calls << 'publishAll ' + transactionState()
-            0
         }
     }
 }

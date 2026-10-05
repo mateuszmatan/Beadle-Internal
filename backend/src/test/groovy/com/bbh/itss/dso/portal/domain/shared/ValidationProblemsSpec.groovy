@@ -18,40 +18,24 @@ class ValidationProblemsSpec extends Specification {
                             new FieldProblem('services[0].build.javaPath', 'is required')]
     }
 
-    def "a request without problems passes"() {
-        when:
-        problems.throwIfAny()
-
-        then:
-        problems.isEmpty()
-        notThrown(InvalidRequestException)
-    }
-
-    def "a single problem is the message of the exception"() {
+    def "a request with #fields.size() problems #outcome"() {
         given:
-        problems.add('name', 'is taken')
+        fields.each { problems.add(it, 'is taken') }
 
         when:
         problems.throwIfAny()
 
         then:
         def e = thrown(InvalidRequestException)
-        e.message == 'is taken'
-        e.problems == [new FieldProblem('name', 'is taken')]
-    }
+        e.message == message
+        e.problems*.field == fields
 
-    def "several problems are counted in the message of the exception"() {
-        given:
-        problems.add('name', 'is taken')
-        problems.at('services[1]').add('name', 'is not unique')
+        where:
+        fields           || message
+        ['name']         || 'is taken'
+        ['name', 'code'] || '2 fields are invalid'
 
-        when:
-        problems.throwIfAny()
-
-        then:
-        def e = thrown(InvalidRequestException)
-        e.message == '2 fields are invalid'
-        e.problems*.field == ['name', 'services[1].name']
+        outcome = fields.size() == 1 ? 'says it' : 'counts them'
     }
 
     def "the list is a snapshot that cannot be changed"() {
@@ -72,11 +56,13 @@ class ValidationProblemsSpec extends Specification {
         thrown(UnsupportedOperationException)
     }
 
-    def "a single field problem can be raised directly"() {
+    def "a request without problems passes and a single field problem can be raised directly"() {
         when:
+        problems.throwIfAny()
         def e = InvalidRequestException.of('range', 'use 30d')
 
         then:
+        problems.isEmpty()
         e.message == 'use 30d'
         e.problems == [new FieldProblem('range', 'use 30d')]
     }

@@ -1,6 +1,9 @@
 package com.bbh.itss.dso.portal.adapter;
 
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -17,6 +20,8 @@ import java.util.Optional;
 
 public final class RecordMapper {
 
+    private static final MethodHandles.Lookup LOOKUP = MethodHandles.lookup();
+
     private static final ClassValue<Shape> SHAPES = new ClassValue<>() {
         @Override
         protected Shape computeValue(Class<?> type) {
@@ -24,22 +29,33 @@ public final class RecordMapper {
         }
     };
 
-    private static final ClassValue<Map<String, Method>> ACCESSORS = new ClassValue<>() {
+    private static final ClassValue<Map<String, MethodHandle>> READERS = new ClassValue<>() {
         @Override
-        protected Map<String, Method> computeValue(Class<?> type) {
-            Map<String, Method> accessors = new HashMap<>();
-            for (Class<?> declaring = type; declaring != null && declaring != Object.class;
-                 declaring = declaring.getSuperclass()) {
-                for (Method method : declaring.getDeclaredMethods()) {
-                    if (method.getParameterCount() == 0 && method.getReturnType() != void.class
-                            && !Modifier.isStatic(method.getModifiers()) && !Modifier.isPrivate(method.getModifiers())
-                            && !accessors.containsKey(method.getName())) {
-                        method.setAccessible(true);
-                        accessors.put(method.getName(), method);
+        protected Map<String, MethodHandle> computeValue(Class<?> type) {
+            Map<String, MethodHandle> readers = new HashMap<>();
+            try {
+                for (Class<?> declaring = type; declaring != Object.class; declaring = declaring.getSuperclass()) {
+                    for (Method method : declaring.getDeclaredMethods()) {
+                        if (method.getParameterCount() == 0 && method.getReturnType() != void.class
+                                && !Modifier.isStatic(method.getModifiers())
+                                && !Modifier.isPrivate(method.getModifiers())) {
+                            method.setAccessible(true);
+                            readers.putIfAbsent(method.getName(), LOOKUP.unreflect(method));
+                        }
                     }
                 }
+                for (Class<?> declaring = type; declaring != Object.class; declaring = declaring.getSuperclass()) {
+                    for (Field field : declaring.getDeclaredFields()) {
+                        if (!Modifier.isStatic(field.getModifiers())) {
+                            field.setAccessible(true);
+                            readers.putIfAbsent(field.getName(), LOOKUP.unreflectGetter(field));
+                        }
+                    }
+                }
+            } catch (IllegalAccessException e) {
+                throw new IllegalStateException(e);
             }
-            return accessors;
+            return readers;
         }
     };
 
@@ -98,22 +114,18 @@ public final class RecordMapper {
 
     private static Object read(String name, Object... sources) {
         for (Object source : sources) {
-            Method accessor = source == null ? null : ACCESSORS.get(source.getClass()).get(name);
-            if (accessor != null) {
+            MethodHandle reader = source == null ? null : READERS.get(source.getClass()).get(name);
+            if (reader != null) {
                 try {
-                    return accessor.invoke(source);
-                } catch (InvocationTargetException e) {
-                    throw rethrown(e);
-                } catch (IllegalAccessException e) {
+                    return reader.invoke(source);
+                } catch (RuntimeException | Error e) {
+                    throw e;
+                } catch (Throwable e) {
                     throw new IllegalStateException(e);
                 }
             }
         }
         return null;
-    }
-
-    private static RuntimeException rethrown(InvocationTargetException e) {
-        return e.getCause() instanceof RuntimeException runtime ? runtime : new IllegalStateException(e.getCause());
     }
 
     private record Shape(Constructor<?> constructor, List<RecordComponent> components, Optional<Class<?>> mirrored) {
@@ -145,7 +157,8 @@ public final class RecordMapper {
             try {
                 return constructor.newInstance(values);
             } catch (InvocationTargetException e) {
-                throw rethrown(e);
+                throw e.getCause() instanceof RuntimeException runtime ? runtime
+                        : new IllegalStateException(e.getCause());
             } catch (ReflectiveOperationException e) {
                 throw new IllegalStateException(e);
             }

@@ -5,6 +5,8 @@ import com.bbh.itss.dso.portal.application.catalog.port.in.QueryProductsUseCase
 import com.bbh.itss.dso.portal.application.catalog.port.out.PipelineCountsPort
 import com.bbh.itss.dso.portal.application.catalog.port.out.ProductRepositoryPort
 import com.bbh.itss.dso.portal.application.dsoconfig.port.in.PublishPipelineConfigsUseCase
+import com.bbh.itss.dso.portal.application.dsoconfig.port.out.ConfigSerializerPort
+import com.bbh.itss.dso.portal.application.dsoconfig.port.out.PublishedConfigRepositoryPort
 import com.bbh.itss.dso.portal.application.pipeline.port.in.QueryPipelinesUseCase
 import com.bbh.itss.dso.portal.application.pipeline.port.out.PipelineRepositoryPort
 import com.bbh.itss.dso.portal.application.settings.port.in.ManageGlobalSettingsUseCase
@@ -19,6 +21,7 @@ import com.bbh.itss.dso.portal.domain.shared.InvalidRequestException
 import com.bbh.itss.dso.portal.support.Fixtures
 import org.springframework.aop.framework.Advised
 import org.springframework.aop.support.AopUtils
+import org.springframework.beans.factory.config.BeanDefinitionCustomizer
 import org.springframework.boot.autoconfigure.AutoConfigurations
 import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
@@ -45,13 +48,18 @@ class UseCaseConfigurationSpec extends Specification {
     ProductRepositoryPort products = Mock()
     PipelineCountsPort pipelineCounts = Mock()
     PipelineRepositoryPort pipelines = Mock()
+    PublishedConfigRepositoryPort published = Mock()
 
     def runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(AopAutoConfiguration, TransactionAutoConfiguration))
             .withUserConfiguration(UseCaseConfiguration)
             .withBean(PlatformTransactionManager, { transactions } as Supplier<PlatformTransactionManager>)
             .withBean(GlobalSettingsRepositoryPort, { repository } as Supplier<GlobalSettingsRepositoryPort>)
-            .withBean(PublishPipelineConfigsUseCase, { publisher } as Supplier<PublishPipelineConfigsUseCase>)
+            .withBean(PublishPipelineConfigsUseCase, { publisher } as Supplier<PublishPipelineConfigsUseCase>,
+                    { it.primary = true } as BeanDefinitionCustomizer)
+            .withBean(PublishedConfigRepositoryPort, { published } as Supplier<PublishedConfigRepositoryPort>)
+            .withBean(ConfigSerializerPort, { { Map config -> config.toString() } as ConfigSerializerPort }
+                    as Supplier<ConfigSerializerPort>)
             .withBean(ProductRepositoryPort, { products } as Supplier<ProductRepositoryPort>)
             .withBean(PipelineCountsPort, { pipelineCounts } as Supplier<PipelineCountsPort>)
             .withBean(PipelineRepositoryPort, { pipelines } as Supplier<PipelineRepositoryPort>)
@@ -62,7 +70,8 @@ class UseCaseConfigurationSpec extends Specification {
         expect:
         runner.run { ApplicationContext context ->
             def useCases = context.getBeansWithAnnotation(UseCase)
-            assert useCases.keySet().containsAll(['globalSettingsService', 'productCatalogService', 'pipelineService'])
+            assert useCases.keySet().containsAll(['globalSettingsService', 'productCatalogService', 'pipelineService',
+                                                  'pipelineConfigService', 'pipelineConfigPublisher'])
             useCases.values().each { useCase ->
                 assert AopUtils.isAopProxy(useCase)
                 assert (useCase as Advised).advisors*.advice.any { it instanceof TransactionInterceptor }

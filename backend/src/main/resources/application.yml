@@ -47,9 +47,8 @@ dso:
     bucket: ${INFLUX_BUCKET:DORA-metrics}
     token: ${INFLUX_TOKEN:}
   grafana:
-    url: ${GRAFANA_URL:}
-    org-id: ${GRAFANA_ORG_ID:1}
-    datasource-uid: ${GRAFANA_DATASOURCE_UID:dso-influxdb}
+    dashboard-url: ${GRAFANA_DASHBOARD_URL:}
+    security-dashboard-url: ${GRAFANA_SECURITY_DASHBOARD_URL:}
   demo-data: false
 ---
 spring:

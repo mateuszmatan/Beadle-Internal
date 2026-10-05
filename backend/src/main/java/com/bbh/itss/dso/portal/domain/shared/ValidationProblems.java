@@ -3,6 +3,7 @@ package com.bbh.itss.dso.portal.domain.shared;
 import com.bbh.itss.dso.portal.domain.shared.InvalidRequestException.FieldProblem;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 public class ValidationProblems {
@@ -25,6 +26,13 @@ public class ValidationProblems {
 
     public void add(String field, String message) {
         problems.add(new FieldProblem(prefix + field, message));
+    }
+
+    public ValidationProblems require(String field, Object value, String message) {
+        if (value == null || value instanceof Collection<?> values && values.isEmpty()) {
+            add(field, message);
+        }
+        return this;
     }
 
     public boolean isEmpty() {

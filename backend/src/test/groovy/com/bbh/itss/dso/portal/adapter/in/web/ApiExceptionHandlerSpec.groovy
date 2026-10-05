@@ -249,7 +249,7 @@ class ApiExceptionHandlerSpec extends Specification {
         }
 
         @PostMapping('/api/samples/products')
-        String createProduct(@RequestBody ProductRequest request) {
+        String createProduct(@RequestBody ProductDto request) {
             request.code()
         }
     }

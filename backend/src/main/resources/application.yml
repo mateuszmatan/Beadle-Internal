@@ -22,6 +22,11 @@ spring:
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
     analytics-enabled: false
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          no-cache: true
 
 server:
   port: ${PORT:8080}

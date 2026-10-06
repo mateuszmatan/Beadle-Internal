@@ -80,7 +80,7 @@ class ApiExceptionHandlerSpec extends Specification {
         where:
         labels          || detail                   | fields
         []              || 'add at least one Jenkins agent label' | ['agentLabels']
-        ['a', 'b c d?'] || "agent labels may contain letters, digits, '.', '-' and '_'" | ['agentLabels[1]']
+        ['a', 'b,c']    || 'must be a Jenkins label or label expression such as linux && docker, without commas' | ['agentLabels[1]']
     }
 
     def "#request answers #status #title without naming a class or a method"() {

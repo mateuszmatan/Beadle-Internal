@@ -17,6 +17,7 @@ import com.bbh.itss.dso.portal.application.pipeline.port.in.PipelinesUseCase
 import com.bbh.itss.dso.portal.application.pipeline.port.out.PipelineRepositoryPort
 import com.bbh.itss.dso.portal.application.settings.port.in.ManageGlobalSettingsUseCase
 import com.bbh.itss.dso.portal.application.settings.port.out.GlobalSettingsRepositoryPort
+import com.bbh.itss.dso.portal.domain.monitoring.LatestRuns
 import com.bbh.itss.dso.portal.domain.pipeline.KeyGenerator
 import com.bbh.itss.dso.portal.domain.settings.GlobalSettings
 import com.bbh.itss.dso.portal.domain.settings.GlobalSettingsValues
@@ -163,7 +164,7 @@ class UseCaseConfigurationSpec extends Specification {
         def influx = { String query, Object answer -> calls << query + ' ' + transactionState(); answer }
         runs.configured() >> true
         runs.ping() >> { influx('ping', null) }
-        runs.latestRuns(_) >> { influx('latest runs', [:]) }
+        runs.latestRuns(*_) >> { influx('latest runs', LatestRuns.none()) }
         runs.recentRuns(*_) >> { influx('recent runs', []) }
         runs.doraPoints(*_) >> { influx('DORA points', []) }
         evidence.evidenceOf(_) >> { influx('evidence', [:]) }
@@ -191,6 +192,7 @@ class UseCaseConfigurationSpec extends Specification {
         2 * products.load(5L) >> Optional.of(product)
         1 * pipelines.load(20L) >> Optional.of(pipeline)
         1 * pipelines.findByProductId(5L) >> [pipeline]
+        3 * pipelines.sharedMetricsTags() >> ([] as Set)
     }
 
     def "the catalog and pipeline queries run in read-only transactions, also when they read the settings"() {

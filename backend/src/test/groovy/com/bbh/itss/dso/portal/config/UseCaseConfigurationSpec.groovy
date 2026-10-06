@@ -2,6 +2,7 @@ package com.bbh.itss.dso.portal.config
 
 import com.bbh.itss.dso.portal.application.UseCase
 import com.bbh.itss.dso.portal.application.catalog.port.in.ProductsUseCase
+import com.bbh.itss.dso.portal.application.catalog.port.out.DepartmentRepositoryPort
 import com.bbh.itss.dso.portal.application.catalog.port.out.PipelineCountsPort
 import com.bbh.itss.dso.portal.application.catalog.port.out.ProductRepositoryPort
 import com.bbh.itss.dso.portal.application.evidence.port.in.QueryEvidenceUseCase
@@ -54,6 +55,7 @@ class UseCaseConfigurationSpec extends Specification {
                       }] as GlobalSettingsRepositoryPort
     def bbh = GlobalSettingsValues.bbhDefaults()
     ProductRepositoryPort products = Mock()
+    DepartmentRepositoryPort departments = Mock()
     PipelineCountsPort pipelineCounts = Mock()
     PipelineRepositoryPort pipelines = Mock()
     PipelineRunsPort runs = Mock()
@@ -66,6 +68,7 @@ class UseCaseConfigurationSpec extends Specification {
             .withBean(PlatformTransactionManager, { transactions } as Supplier<PlatformTransactionManager>)
             .withBean(GlobalSettingsRepositoryPort, { repository } as Supplier<GlobalSettingsRepositoryPort>)
             .withBean(ProductRepositoryPort, { products } as Supplier<ProductRepositoryPort>)
+            .withBean(DepartmentRepositoryPort, { departments } as Supplier<DepartmentRepositoryPort>)
             .withBean(PipelineCountsPort, { pipelineCounts } as Supplier<PipelineCountsPort>)
             .withBean(PipelineRepositoryPort, { pipelines } as Supplier<PipelineRepositoryPort>)
             .withBean(PipelineRunsPort, { runs } as Supplier<PipelineRunsPort>)
@@ -78,8 +81,8 @@ class UseCaseConfigurationSpec extends Specification {
         expect:
         runner.run { ApplicationContext context ->
             def useCases = context.getBeansWithAnnotation(UseCase)
-            assert useCases.keySet().containsAll(['globalSettingsService', 'productCatalogService', 'pipelineService',
-                                                  'pipelineConfigService',
+            assert useCases.keySet().containsAll(['globalSettingsService', 'productCatalogService', 'departmentService',
+                                                  'pipelineService', 'pipelineConfigService',
                                                   'pipelineMonitoringService', 'changeEvidenceService',
                                                   'monitoringTargetsService'])
             useCases.values().each { useCase ->

@@ -47,6 +47,10 @@ class ProductCodeSpec extends Specification {
             Optional<ProductDirectory.ProductIdentity> findProductByName(String name) {
                 Optional.empty()
             }
+
+            boolean departmentExists(long id) {
+                true
+            }
         }
     }
 }

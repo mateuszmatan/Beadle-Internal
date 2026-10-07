@@ -27,6 +27,17 @@ class TextSpec extends Specification {
         [Text.clean(null), Text.trimmed(null), Text.trimmed([])] == [[], [], []]
     }
 
+    def "abbreviate cuts a text to the UTF-8 bytes of an Oracle column on a character boundary"() {
+        expect:
+        Text.bytes('zażółć') == 10
+        Text.abbreviate(null, 5) == null
+        Text.abbreviate('abcdef', 6) == 'abcdef'
+        Text.abbreviate('abc  defgh', 8) == 'abc...'
+        Text.abbreviate('ąąąąą', 9) == 'ąąą...'
+        Text.abbreviate('ab😀cd', 7) == 'ab...'
+        Text.bytes(Text.abbreviate('é' * 300, 160)) <= 160
+    }
+
     def "the cleaned and trimmed lists cannot be changed"() {
         when:
         Text."$method"(['a']).add('b')

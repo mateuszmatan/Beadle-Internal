@@ -35,10 +35,6 @@ public class ValidationProblems {
         return this;
     }
 
-    public boolean isEmpty() {
-        return problems.isEmpty();
-    }
-
     public List<FieldProblem> list() {
         return List.copyOf(problems);
     }

@@ -18,6 +18,7 @@ import static com.bbh.itss.dso.portal.domain.shared.Failures.STALE_VERSION
 import static com.bbh.itss.dso.portal.domain.shared.Failures.notFound
 import static com.bbh.itss.dso.portal.support.ApiJson.parse
 import static com.bbh.itss.dso.portal.support.ApiJson.toJson
+import static com.bbh.itss.dso.portal.support.ChangeFixtures.templateJson
 import static org.springframework.http.MediaType.APPLICATION_JSON
 import static org.springframework.http.MediaType.TEXT_PLAIN
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
@@ -82,6 +83,35 @@ class ApiExceptionHandlerSpec extends Specification {
         ['a', 'b,c']    || 'must be a Jenkins label or label expression such as linux && docker, without commas' | ['agentLabels[1]']
     }
 
+    def "a change profile with #refusal is refused against the path of each field"() {
+        when:
+        def response = mvc.perform(post('/api/samples/change-profile').contentType(APPLICATION_JSON)
+                .content(toJson([version: null, template: templateJson(edits)]))).andReturn().response
+        def problem = parse(response.contentAsString)
+
+        then:
+        response.status == 400
+        problem.title == title
+        problem.errors*.field.sort() == fields
+
+        where:
+        refusal                  | edits                                                       || title               | fields
+        'nested broken values'   | ['privilegedAccess.required': true, 'privilegedAccess.users': (1..3).collect { [user: "U$it", account: it == 3 ? ' ' : "adm_u$it"] }, 'planning.backoutPlan': 'x' * 2001, 'riskAssessment.bbhUsers': -1, 'timing.installationStart': '6pm'] || 'Validation failed' | ['template.planning.backoutPlan', 'template.privilegedAccess.users[2].account', 'template.riskAssessment.bbhUsers', 'template.timing.installationStart']
+        'too many users'         | ['privilegedAccess.users': (1..8).collect { [user: "U$it", account: "adm_u$it"] }, 'timing.installationHours': 73, jiraProjectKey: 'ce-rt'] || 'Validation failed' | ['template.jiraProjectKey', 'template.privilegedAccess.users', 'template.timing.installationHours']
+        'missing sections'       | [planning: null, timing: null, downtime: null]              || 'Validation failed' | ['template.downtime', 'template.planning', 'template.timing']
+        'a number that is text'  | ['riskAssessment.clients': 'many']                          || 'Malformed request' | ['template.riskAssessment.clients']
+    }
+
+    def "a complete change profile with the Jira key #key passes the bean validation"() {
+        expect:
+        mvc.perform(post('/api/samples/change-profile').contentType(APPLICATION_JSON)
+                .content(toJson([version: 3, template: templateJson(jiraProjectKey: key)])))
+                .andReturn().response.contentAsString == 'CERT'
+
+        where:
+        key << ['CERT', 'cert']
+    }
+
     def "#request answers #status #title without naming a class or a method"() {
         when:
         def response = mvc.perform(builder).andReturn().response
@@ -123,6 +153,11 @@ class ApiExceptionHandlerSpec extends Specification {
         @GetMapping('/api/samples')
         String list(@RequestParam('size') int size) {
             "$size samples"
+        }
+
+        @PostMapping('/api/samples/change-profile')
+        String profile(@jakarta.validation.Valid @RequestBody ChangeProfileRequest request) {
+            request.toTemplate().jiraProjectKey()
         }
 
         @PostMapping('/api/samples')

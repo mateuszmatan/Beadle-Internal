@@ -1,7 +1,6 @@
 package com.bbh.itss.dso.portal.adapter.out.persistence
 
 import com.bbh.itss.dso.portal.domain.catalog.Department
-import com.bbh.itss.dso.portal.domain.shared.ConflictException
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase
@@ -10,10 +9,13 @@ import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.JdbcTemplate
 import spock.lang.Specification
 
+import static com.bbh.itss.dso.portal.domain.shared.Failures.STALE_VERSION
+import static org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase.Replace.NONE
+
 @DataJpaTest(properties = [
         'spring.datasource.url=jdbc:h2:mem:department-adapter;MODE=Oracle;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1',
         'spring.datasource.username=sa'])
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@AutoConfigureTestDatabase(replace = NONE)
 @Import(DepartmentPersistenceAdapter)
 class DepartmentPersistenceAdapterSpec extends Specification {
 
@@ -68,8 +70,8 @@ class DepartmentPersistenceAdapterSpec extends Specification {
         adapter.save(department)
 
         then:
-        def e = thrown(ConflictException)
-        e.message == ConflictException.STALE_VERSION
+        def e = thrown(IllegalStateException)
+        e.message == STALE_VERSION
         jdbc.queryForObject('SELECT NAME FROM DSO_DEPARTMENT WHERE ID = 4', String) == 'Custody'
 
         where:

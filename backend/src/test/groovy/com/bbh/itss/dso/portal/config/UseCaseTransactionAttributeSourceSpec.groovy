@@ -2,9 +2,13 @@ package com.bbh.itss.dso.portal.config
 
 import com.bbh.itss.dso.portal.application.ReadOnly
 import com.bbh.itss.dso.portal.application.WithoutTransaction
-import org.springframework.transaction.TransactionDefinition
 import spock.lang.Specification
 import spock.lang.Subject
+
+import static com.bbh.itss.dso.portal.config.UseCaseTransactionAttributeSource.READ_ONLY
+import static com.bbh.itss.dso.portal.config.UseCaseTransactionAttributeSource.READ_WRITE
+import static org.springframework.transaction.TransactionDefinition.PROPAGATION_NOT_SUPPORTED
+import static org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRED
 
 class UseCaseTransactionAttributeSourceSpec extends Specification {
 
@@ -20,19 +24,19 @@ class UseCaseTransactionAttributeSourceSpec extends Specification {
         attribute.readOnly == readOnly
 
         where:
-        declaring        | method         || propagation                                     | readOnly
-        ReportingUseCase | 'record'       || TransactionDefinition.PROPAGATION_REQUIRED      | false
-        ReportingUseCase | 'audit'        || TransactionDefinition.PROPAGATION_REQUIRED      | true
-        ReportingUseCase | 'report'       || TransactionDefinition.PROPAGATION_REQUIRED      | true
-        ReportingPort    | 'report'       || TransactionDefinition.PROPAGATION_REQUIRED      | true
-        ReportingPort    | 'record'       || TransactionDefinition.PROPAGATION_REQUIRED      | false
-        ReportingUseCase | 'reportAgain'  || TransactionDefinition.PROPAGATION_REQUIRED      | true
-        ReportingUseCase | 'ask'          || TransactionDefinition.PROPAGATION_NOT_SUPPORTED | false
-        ReportingPort    | 'askAgain'     || TransactionDefinition.PROPAGATION_NOT_SUPPORTED | false
-        ReportingUseCase | 'askAgain'     || TransactionDefinition.PROPAGATION_NOT_SUPPORTED | false
-        ReportingUseCase | 'reportAndAsk' || TransactionDefinition.PROPAGATION_NOT_SUPPORTED | false
+        declaring        | method         || propagation               | readOnly
+        ReportingUseCase | 'record'       || PROPAGATION_REQUIRED      | false
+        ReportingUseCase | 'audit'        || PROPAGATION_REQUIRED      | true
+        ReportingUseCase | 'report'       || PROPAGATION_REQUIRED      | true
+        ReportingPort    | 'report'       || PROPAGATION_REQUIRED      | true
+        ReportingPort    | 'record'       || PROPAGATION_REQUIRED      | false
+        ReportingUseCase | 'reportAgain'  || PROPAGATION_REQUIRED      | true
+        ReportingUseCase | 'ask'          || PROPAGATION_NOT_SUPPORTED | false
+        ReportingPort    | 'askAgain'     || PROPAGATION_NOT_SUPPORTED | false
+        ReportingUseCase | 'askAgain'     || PROPAGATION_NOT_SUPPORTED | false
+        ReportingUseCase | 'reportAndAsk' || PROPAGATION_NOT_SUPPORTED | false
 
-        kind = propagation == TransactionDefinition.PROPAGATION_NOT_SUPPORTED ? 'outside any transaction'
+        kind = propagation == PROPAGATION_NOT_SUPPORTED ? 'outside any transaction'
                 : readOnly ? 'in a read-only transaction' : 'in a read-write transaction'
     }
 
@@ -51,9 +55,9 @@ class UseCaseTransactionAttributeSourceSpec extends Specification {
 
     def "domain exceptions and every other runtime failure roll the transaction back"() {
         expect:
-        UseCaseTransactionAttributeSource.READ_WRITE.rollbackOn(new IllegalStateException())
-        UseCaseTransactionAttributeSource.READ_ONLY.rollbackOn(new IllegalArgumentException())
-        !UseCaseTransactionAttributeSource.READ_WRITE.rollbackOn(new Exception())
+        READ_WRITE.rollbackOn(new IllegalStateException())
+        READ_ONLY.rollbackOn(new IllegalArgumentException())
+        !READ_WRITE.rollbackOn(new Exception())
     }
 }
 

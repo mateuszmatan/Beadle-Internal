@@ -1,8 +1,11 @@
 package com.bbh.itss.dso.portal.domain.shared;
 
+import lombok.Getter;
+
 import java.util.List;
 
-public class InvalidRequestException extends DomainException {
+@Getter
+public class InvalidRequestException extends IllegalArgumentException {
 
     private final List<FieldProblem> problems;
 
@@ -13,10 +16,6 @@ public class InvalidRequestException extends DomainException {
 
     public static InvalidRequestException of(String field, String message) {
         return new InvalidRequestException(List.of(new FieldProblem(field, message)));
-    }
-
-    public List<FieldProblem> getProblems() {
-        return problems;
     }
 
     public record FieldProblem(String field, String message) {

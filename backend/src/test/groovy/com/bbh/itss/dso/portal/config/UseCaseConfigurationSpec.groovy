@@ -23,11 +23,9 @@ import com.bbh.itss.dso.portal.domain.pipeline.KeyGenerator
 import com.bbh.itss.dso.portal.domain.settings.GlobalSettings
 import com.bbh.itss.dso.portal.domain.settings.GlobalSettingsValues
 import com.bbh.itss.dso.portal.domain.settings.Scanner
-import com.bbh.itss.dso.portal.domain.shared.ConflictException
 import com.bbh.itss.dso.portal.domain.shared.InvalidRequestException
 import com.bbh.itss.dso.portal.support.Fixtures
 import org.springframework.aop.framework.Advised
-import org.springframework.aop.support.AopUtils
 import org.springframework.boot.autoconfigure.AutoConfigurations
 import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
@@ -38,26 +36,32 @@ import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.interceptor.TransactionInterceptor
 import org.springframework.transaction.support.AbstractPlatformTransactionManager
 import org.springframework.transaction.support.DefaultTransactionStatus
-import org.springframework.transaction.support.TransactionSynchronizationManager
 import spock.lang.Specification
 
 import java.time.Clock
 import java.time.Instant
 import java.util.function.Supplier
 
+import static com.bbh.itss.dso.portal.domain.settings.GlobalSettingsValues.bbhDefaults
+import static com.bbh.itss.dso.portal.domain.settings.Scanner.SAST
 import static com.bbh.itss.dso.portal.support.Fixtures.copy
+import static java.time.Clock.systemUTC
+import static java.time.Instant.EPOCH
+import static org.springframework.aop.support.AopUtils.isAopProxy
+import static org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive
+import static org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly
 
 class UseCaseConfigurationSpec extends Specification {
 
     def transactions = new RecordingTransactionManager()
     List<String> calls = []
-    GlobalSettings stored = new GlobalSettings(GlobalSettingsValues.bbhDefaults(), 1, Instant.parse('2026-10-04T12:00:00Z'))
+    GlobalSettings stored = new GlobalSettings(bbhDefaults(), 1, Instant.parse('2026-10-04T12:00:00Z'))
     def repository = [load: { -> calls << 'load ' + transactionState(); Optional.ofNullable(stored) },
                       save: { GlobalSettings settings ->
                           calls << 'save ' + transactionState()
-                          stored = new GlobalSettings(settings.values(), settings.version() + 1, Instant.EPOCH)
+                          stored = new GlobalSettings(settings.values(), settings.version() + 1, EPOCH)
                       }] as GlobalSettingsRepositoryPort
-    def bbh = GlobalSettingsValues.bbhDefaults()
+    def bbh = bbhDefaults()
     ProductRepositoryPort products = Mock()
     DepartmentRepositoryPort departments = Mock()
     PipelineCountsPort pipelineCounts = Mock()
@@ -87,7 +91,7 @@ class UseCaseConfigurationSpec extends Specification {
             .withBean(JiraPort, { jira } as Supplier<JiraPort>)
             .withBean(ServiceNowPort, { serviceNow } as Supplier<ServiceNowPort>)
             .withBean(KeyGenerator, { { -> 'key' } as KeyGenerator } as Supplier<KeyGenerator>)
-            .withBean(Clock, { Clock.systemUTC() } as Supplier<Clock>)
+            .withBean(Clock, { systemUTC() } as Supplier<Clock>)
 
     def "every use case of the application layer is a bean behind a transactional proxy"() {
         expect:
@@ -99,7 +103,7 @@ class UseCaseConfigurationSpec extends Specification {
                                                   'monitoringTargetsService', 'changeProfileService',
                                                   'productionChangeService'])
             useCases.values().each { useCase ->
-                assert AopUtils.isAopProxy(useCase)
+                assert isAopProxy(useCase)
                 assert (useCase as Advised).advisors*.advice.any { it instanceof TransactionInterceptor }
             }
         }
@@ -154,9 +158,9 @@ class UseCaseConfigurationSpec extends Specification {
         calls == ['load read-write']
 
         where:
-        reason                   | version | values                             || exception
-        'a concurrent change'    | 0L      | GlobalSettingsValues.bbhDefaults() || ConflictException
-        'a broken business rule' | 1L      | withoutLimit(Scanner.SAST)         || InvalidRequestException
+        reason                   | version | values             || exception
+        'a concurrent change'    | 0L      | bbhDefaults()      || IllegalStateException
+        'a broken business rule' | 1L      | withoutLimit(SAST) || InvalidRequestException
     }
 
     def "the monitoring and evidence pages query InfluxDB with no transaction and no database connection of their own"() {
@@ -213,15 +217,15 @@ class UseCaseConfigurationSpec extends Specification {
     }
 
     private static GlobalSettingsValues withoutLimit(Scanner scanner) {
-        def bbh = GlobalSettingsValues.bbhDefaults()
+        def bbh = bbhDefaults()
         copy(bbh, limits: bbh.limits().findAll { it.key != scanner })
     }
 
     static String transactionState() {
-        if (!TransactionSynchronizationManager.actualTransactionActive) {
+        if (!isActualTransactionActive()) {
             return 'without transaction'
         }
-        TransactionSynchronizationManager.currentTransactionReadOnly ? 'read-only' : 'read-write'
+        isCurrentTransactionReadOnly() ? 'read-only' : 'read-write'
     }
 
     static class RecordingTransactionManager extends AbstractPlatformTransactionManager {

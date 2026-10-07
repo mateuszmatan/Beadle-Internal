@@ -1,10 +1,11 @@
 package com.bbh.itss.dso.portal.config
 
-import org.springframework.boot.WebApplicationType
 import org.springframework.boot.builder.SpringApplicationBuilder
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.env.Environment
 import spock.lang.Specification
+
+import static org.springframework.boot.WebApplicationType.NONE
 
 class ApplicationProfilesSpec extends Specification {
 
@@ -78,7 +79,7 @@ class ApplicationProfilesSpec extends Specification {
 
     private static Environment environment(List<String> profiles, Map<String, String> variables) {
         def application = new SpringApplicationBuilder(Empty)
-                .web(WebApplicationType.NONE)
+                .web(NONE)
                 .logStartupInfo(false)
                 .properties(variables.collectEntries { name, value -> [name, value] } as Map<String, Object>)
         if (profiles) {

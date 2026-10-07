@@ -6,12 +6,11 @@ import com.bbh.itss.dso.portal.application.catalog.port.out.PipelineCountsPort
 import com.bbh.itss.dso.portal.application.catalog.port.out.ProductRepositoryPort
 import com.bbh.itss.dso.portal.application.catalog.port.out.ProductSummary
 import com.bbh.itss.dso.portal.domain.catalog.Department
-import com.bbh.itss.dso.portal.domain.shared.ConflictException
-import com.bbh.itss.dso.portal.domain.shared.NotFoundException
-import org.spockframework.mock.EmptyOrDummyResponse
 import spock.lang.Specification
 
-import java.time.Instant
+import static com.bbh.itss.dso.portal.domain.shared.Failures.STALE_VERSION
+import static java.time.Instant.EPOCH
+import static org.spockframework.mock.EmptyOrDummyResponse.INSTANCE
 
 class DepartmentServiceSpec extends Specification {
 
@@ -19,7 +18,7 @@ class DepartmentServiceSpec extends Specification {
     static final Department CORPORATE = new Department(3L, 'corporate Technology', 1)
     static final Department FUND_SERVICES = new Department(5L, 'Fund Services', 0)
 
-    DepartmentRepositoryPort departments = Mock(defaultResponse: EmptyOrDummyResponse.INSTANCE)
+    DepartmentRepositoryPort departments = Mock(defaultResponse: INSTANCE)
     ProductRepositoryPort products = Stub()
     PipelineCountsPort pipelineCounts = Stub()
     def service = new DepartmentService(departments, products, pipelineCounts)
@@ -87,7 +86,7 @@ class DepartmentServiceSpec extends Specification {
         action(service)
 
         then:
-        def e = thrown(ConflictException)
+        def e = thrown(IllegalStateException)
         e.message == message
         0 * departments.save(_)
         0 * departments.delete(_)
@@ -96,7 +95,7 @@ class DepartmentServiceSpec extends Specification {
         refusal                               | action                                        || message
         'a new name in use'                   | { it.create('fund services') }                || 'A department named Fund Services already exists'
         'a rename to a name in use'           | { it.rename(3L, 1L, 'fund services') }        || 'A department named Fund Services already exists'
-        'a rename of an old version'          | { it.rename(3L, 0L, 'Corporate Technology') } || ConflictException.STALE_VERSION
+        'a rename of an old version'          | { it.rename(3L, 0L, 'Corporate Technology') } || STALE_VERSION
         'deleting a department with products' | { it.delete(3L) }                             || 'corporate Technology still has 2 product(s). Move them to another department first.'
     }
 
@@ -105,7 +104,7 @@ class DepartmentServiceSpec extends Specification {
         action(service)
 
         then:
-        def e = thrown(NotFoundException)
+        def e = thrown(NoSuchElementException)
         e.message == 'Department 9 does not exist'
         0 * departments.save(_)
         0 * departments.delete(_)
@@ -115,6 +114,7 @@ class DepartmentServiceSpec extends Specification {
     }
 
     private static ProductSummary summary(long id, Long departmentId) {
-        new ProductSummary(id, "P$id", "Product $id", null, null, departmentId, null, Instant.EPOCH)
+        ProductSummary.builder().id(id).code("P$id").name("Product $id").departmentId(departmentId)
+                .updatedAt(EPOCH).build()
     }
 }

@@ -3,17 +3,19 @@ package com.bbh.itss.dso.portal.adapter.out.jira
 import com.bbh.itss.dso.portal.domain.change.DateRange
 import spock.lang.Specification
 
-import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneOffset
+
+import static com.bbh.itss.dso.portal.adapter.out.jira.DemoJiraAdapter.EPICS_PER_PROJECT
+import static java.time.Clock.fixed
+import static java.time.ZoneOffset.UTC
 
 class DemoJiraAdapterSpec extends Specification {
 
     static final LocalDate TODAY = LocalDate.parse('2026-10-07')
     static final DateRange HALF_YEAR = new DateRange(TODAY.minusDays(240), TODAY)
 
-    def jira = new DemoJiraAdapter(Clock.fixed(Instant.parse('2026-10-07T10:00:00Z'), ZoneOffset.UTC))
+    def jira = new DemoJiraAdapter(fixed(Instant.parse('2026-10-07T10:00:00Z'), UTC))
 
     def "every project gets the same epics and stories on every call, newest first"() {
         when:
@@ -25,7 +27,7 @@ class DemoJiraAdapterSpec extends Specification {
         !jira.connected()
         jira.project('CERT') == issues
         jira.project('PAYHUB')*.summary() != issues*.summary()
-        epics.size() == DemoJiraAdapter.EPICS_PER_PROJECT
+        epics.size() == EPICS_PER_PROJECT
         epics*.summary().unique().size() == epics.size()
         stories.every { story -> epics*.key().contains(story.epicKey()) }
         issues*.key().every { it ==~ /CERT-\d{3}/ }

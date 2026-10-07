@@ -1,7 +1,8 @@
 package com.bbh.itss.dso.portal.domain.shared;
 
-import java.nio.charset.StandardCharsets;
 import java.util.List;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 public record StoredList(String separator, int maxBytes) {
 
@@ -12,7 +13,7 @@ public record StoredList(String separator, int maxBytes) {
     public static final StoredList COMMAS_2000 = new StoredList(",", 2000);
 
     public boolean fits(List<String> values) {
-        return String.join(separator, values).getBytes(StandardCharsets.UTF_8).length <= maxBytes;
+        return String.join(separator, values).getBytes(UTF_8).length <= maxBytes;
     }
 
     public void check(ValidationProblems problems, String field, List<String> values) {

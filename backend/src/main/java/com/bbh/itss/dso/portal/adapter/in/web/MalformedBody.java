@@ -8,14 +8,16 @@ import tools.jackson.databind.exc.InvalidFormatException;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.joining;
+import static org.apache.commons.lang3.Strings.CS;
 
 record MalformedBody(String detail, List<FieldProblem> problems) {
 
     private static final String MISSING = "Required request body is missing";
 
     static MalformedBody of(HttpMessageNotReadableException e) {
-        if (e.getMessage() != null && e.getMessage().startsWith(MISSING)) {
+        if (CS.startsWith(e.getMessage(), MISSING)) {
             return new MalformedBody("The request body is missing.", List.of());
         }
         if (e.getCause() instanceof DatabindException databind) {
@@ -40,7 +42,7 @@ record MalformedBody(String detail, List<FieldProblem> problems) {
         if (e instanceof InvalidFormatException invalid && invalid.getTargetType() != null
                 && invalid.getTargetType().isEnum()) {
             return "must be one of " + Arrays.stream(invalid.getTargetType().getEnumConstants())
-                    .map(String::valueOf).collect(Collectors.joining(", "));
+                    .map(String::valueOf).collect(joining(", "));
         }
         return "has a value this field cannot hold";
     }

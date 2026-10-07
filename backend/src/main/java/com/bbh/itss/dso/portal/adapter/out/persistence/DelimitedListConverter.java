@@ -1,13 +1,15 @@
 package com.bbh.itss.dso.portal.adapter.out.persistence;
 
-import com.bbh.itss.dso.portal.domain.shared.Text;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import static com.bbh.itss.dso.portal.domain.shared.Text.clean;
+import static com.bbh.itss.dso.portal.domain.shared.Text.trimmed;
+import static java.util.Arrays.asList;
+import static java.util.regex.Pattern.quote;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 public abstract class DelimitedListConverter implements AttributeConverter<List<String>, String> {
@@ -22,7 +24,7 @@ public abstract class DelimitedListConverter implements AttributeConverter<List<
 
     protected DelimitedListConverter(String delimiter, boolean distinct) {
         this.delimiter = delimiter;
-        this.splitter = Pattern.compile(Pattern.quote(delimiter));
+        this.splitter = Pattern.compile(quote(delimiter));
         this.distinct = distinct;
     }
 
@@ -34,11 +36,11 @@ public abstract class DelimitedListConverter implements AttributeConverter<List<
 
     @Override
     public List<String> convertToEntityAttribute(String column) {
-        return isBlank(column) ? List.of() : normalize(Arrays.asList(splitter.split(column)));
+        return isBlank(column) ? List.of() : normalize(asList(splitter.split(column)));
     }
 
     private List<String> normalize(List<String> values) {
-        return distinct ? Text.clean(values) : Text.trimmed(values);
+        return distinct ? clean(values) : trimmed(values);
     }
 
     @Converter(autoApply = true)

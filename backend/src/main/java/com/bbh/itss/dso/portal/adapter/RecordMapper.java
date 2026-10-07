@@ -1,12 +1,13 @@
 package com.bbh.itss.dso.portal.adapter;
 
+import lombok.NoArgsConstructor;
+
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.RecordComponent;
 import java.lang.reflect.Type;
@@ -19,15 +20,18 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static java.lang.invoke.MethodHandles.lookup;
+import static java.lang.reflect.Modifier.isPrivate;
+import static java.lang.reflect.Modifier.isStatic;
+import static lombok.AccessLevel.PRIVATE;
+
+@NoArgsConstructor(access = PRIVATE)
 public final class RecordMapper {
 
-    private static final MethodHandles.Lookup LOOKUP = MethodHandles.lookup();
+    private static final MethodHandles.Lookup LOOKUP = lookup();
 
     private static final Map<Class<?>, Shape> SHAPES = new ConcurrentHashMap<>();
     private static final Map<Class<?>, Map<String, MethodHandle>> READERS = new ConcurrentHashMap<>();
-
-    private RecordMapper() {
-    }
 
     private static Map<String, MethodHandle> readers(Class<?> type) {
         Map<String, MethodHandle> readers = new HashMap<>();
@@ -35,8 +39,7 @@ public final class RecordMapper {
             for (Class<?> declaring = type; declaring != Object.class; declaring = declaring.getSuperclass()) {
                 for (Method method : declaring.getDeclaredMethods()) {
                     if (method.getParameterCount() == 0 && method.getReturnType() != void.class
-                            && !Modifier.isStatic(method.getModifiers())
-                            && !Modifier.isPrivate(method.getModifiers())) {
+                            && !isStatic(method.getModifiers()) && !isPrivate(method.getModifiers())) {
                         method.setAccessible(true);
                         readers.putIfAbsent(method.getName(), LOOKUP.unreflect(method));
                     }
@@ -44,7 +47,7 @@ public final class RecordMapper {
             }
             for (Class<?> declaring = type; declaring != Object.class; declaring = declaring.getSuperclass()) {
                 for (Field field : declaring.getDeclaredFields()) {
-                    if (!Modifier.isStatic(field.getModifiers())) {
+                    if (!isStatic(field.getModifiers())) {
                         field.setAccessible(true);
                         readers.putIfAbsent(field.getName(), LOOKUP.unreflectGetter(field));
                     }
@@ -108,7 +111,8 @@ public final class RecordMapper {
 
     private static Object read(String name, Object... sources) {
         for (Object source : sources) {
-            MethodHandle reader = source == null ? null : READERS.computeIfAbsent(source.getClass(), RecordMapper::readers).get(name);
+            MethodHandle reader = source == null ? null
+                    : READERS.computeIfAbsent(source.getClass(), RecordMapper::readers).get(name);
             if (reader != null) {
                 try {
                     return reader.invoke(source);

@@ -21,39 +21,45 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 import java.util.NoSuchElementException;
 
 import static com.bbh.itss.dso.portal.domain.shared.Failures.STALE_VERSION;
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.CONFLICT;
+import static org.springframework.http.HttpStatus.FORBIDDEN;
+import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
+import static org.springframework.http.HttpStatus.NOT_FOUND;
+import static org.springframework.http.ProblemDetail.forStatusAndDetail;
 
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(NoSuchElementException.class)
     ProblemDetail notFound(NoSuchElementException e) {
-        return problem(HttpStatus.NOT_FOUND, "Not found", e.getMessage());
+        return problem(NOT_FOUND, "Not found", e.getMessage());
     }
 
     @ExceptionHandler(SecurityException.class)
     ProblemDetail revoked(SecurityException e) {
-        return problem(HttpStatus.FORBIDDEN, "Pipeline key invalidated", e.getMessage());
+        return problem(FORBIDDEN, "Pipeline key invalidated", e.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)
     ProblemDetail conflict(IllegalStateException e) {
-        return problem(HttpStatus.CONFLICT, "Conflict", e.getMessage());
+        return problem(CONFLICT, "Conflict", e.getMessage());
     }
 
     @ExceptionHandler(OptimisticLockingFailureException.class)
     ProblemDetail staleData(OptimisticLockingFailureException e) {
-        return problem(HttpStatus.CONFLICT, "Conflict", STALE_VERSION);
+        return problem(CONFLICT, "Conflict", STALE_VERSION);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     ProblemDetail integrity(DataIntegrityViolationException e) {
-        return problem(HttpStatus.CONFLICT, "Conflict",
+        return problem(CONFLICT, "Conflict",
                 "The change violates a database constraint, most likely a duplicate name or key.");
     }
 
     @ExceptionHandler(InvalidRequestException.class)
     ProblemDetail invalid(InvalidRequestException e) {
-        ProblemDetail detail = problem(HttpStatus.BAD_REQUEST, "Validation failed", e.getMessage());
+        ProblemDetail detail = problem(BAD_REQUEST, "Validation failed", e.getMessage());
         detail.setProperty("errors", e.problems());
         return detail;
     }
@@ -61,7 +67,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(Exception.class)
     ProblemDetail unexpected(Exception e) {
         logger.error("The portal could not serve a request", e);
-        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Request failed",
+        return problem(INTERNAL_SERVER_ERROR, "Request failed",
                 "The portal could not handle the request. The failure is in the portal's log.");
     }
 
@@ -70,11 +76,11 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                                                                   HttpHeaders headers, HttpStatusCode status,
                                                                   WebRequest request) {
         MalformedBody body = MalformedBody.of(e);
-        ProblemDetail detail = problem(HttpStatus.BAD_REQUEST, "Malformed request", body.detail());
+        ProblemDetail detail = problem(BAD_REQUEST, "Malformed request", body.detail());
         if (!body.problems().isEmpty()) {
             detail.setProperty("errors", body.problems());
         }
-        return handleExceptionInternal(e, detail, headers, HttpStatus.BAD_REQUEST, request);
+        return handleExceptionInternal(e, detail, headers, BAD_REQUEST, request);
     }
 
     @Override
@@ -84,15 +90,15 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail detail = invalid(new InvalidRequestException(e.getBindingResult().getFieldErrors().stream()
                 .map(error -> new FieldProblem(error.getField(), error.getDefaultMessage()))
                 .toList()));
-        return handleExceptionInternal(e, detail, headers, HttpStatus.BAD_REQUEST, request);
+        return handleExceptionInternal(e, detail, headers, BAD_REQUEST, request);
     }
 
     @Override
     protected ResponseEntity<Object> handleTypeMismatch(TypeMismatchException e, HttpHeaders headers,
                                                         HttpStatusCode status, WebRequest request) {
-        ProblemDetail detail = problem(HttpStatus.BAD_REQUEST, "Malformed request",
+        ProblemDetail detail = problem(BAD_REQUEST, "Malformed request",
                 "The value given for " + nameOf(e) + " is not one this endpoint can read.");
-        return handleExceptionInternal(e, detail, headers, HttpStatus.BAD_REQUEST, request);
+        return handleExceptionInternal(e, detail, headers, BAD_REQUEST, request);
     }
 
     @Override
@@ -113,7 +119,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     private static ProblemDetail problem(HttpStatus status, String title, String message) {
-        ProblemDetail detail = ProblemDetail.forStatusAndDetail(status, message);
+        ProblemDetail detail = forStatusAndDetail(status, message);
         detail.setTitle(title);
         return detail;
     }

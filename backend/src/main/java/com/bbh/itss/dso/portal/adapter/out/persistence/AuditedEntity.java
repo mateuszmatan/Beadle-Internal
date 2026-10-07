@@ -7,12 +7,15 @@ import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Version;
+import lombok.Getter;
 
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
+import static java.time.temporal.ChronoUnit.MICROS;
+
 @MappedSuperclass
+@Getter
 public abstract class AuditedEntity {
 
     @Column(updatable = false)
@@ -37,23 +40,11 @@ public abstract class AuditedEntity {
 
     void touch() {
         Instant now = Timestamps.now();
-        updatedAt = updatedAt == null || now.isAfter(updatedAt) ? now : updatedAt.plus(1, ChronoUnit.MICROS);
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public long getVersion() {
-        return version;
+        updatedAt = updatedAt == null || now.isAfter(updatedAt) ? now : updatedAt.plus(1, MICROS);
     }
 
     static <E extends AuditedEntity> E current(Optional<E> found, long expectedVersion) {
-        return found.filter(entity -> entity.getVersion() == expectedVersion)
+        return found.filter(entity -> entity.version() == expectedVersion)
                 .orElseThrow(Failures::staleVersion);
     }
 }

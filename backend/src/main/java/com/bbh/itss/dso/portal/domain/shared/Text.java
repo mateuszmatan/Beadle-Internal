@@ -8,13 +8,13 @@ import java.util.List;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static lombok.AccessLevel.PRIVATE;
 import static org.apache.commons.collections4.ListUtils.emptyIfNull;
-import static org.apache.commons.lang3.StringUtils.startsWithAny;
+import static org.apache.commons.lang3.Strings.CS;
 
 @NoArgsConstructor(access = PRIVATE)
 public final class Text {
 
     public static boolean isUrl(String value) {
-        return startsWithAny(value, "http://", "https://");
+        return CS.startsWithAny(value, "http://", "https://");
     }
 
     public static int bytes(String value) {

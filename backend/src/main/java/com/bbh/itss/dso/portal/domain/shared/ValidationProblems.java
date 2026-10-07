@@ -1,11 +1,15 @@
 package com.bbh.itss.dso.portal.domain.shared;
 
 import com.bbh.itss.dso.portal.domain.shared.InvalidRequestException.FieldProblem;
+import lombok.AllArgsConstructor;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import static lombok.AccessLevel.PRIVATE;
+
+@AllArgsConstructor(access = PRIVATE)
 public class ValidationProblems {
 
     private final String prefix;
@@ -13,11 +17,6 @@ public class ValidationProblems {
 
     public ValidationProblems() {
         this("", new ArrayList<>());
-    }
-
-    private ValidationProblems(String prefix, List<FieldProblem> problems) {
-        this.prefix = prefix;
-        this.problems = problems;
     }
 
     public ValidationProblems at(String path) {

@@ -5,6 +5,10 @@ import com.bbh.itss.dso.portal.application.catalog.port.in.ProductsUseCase
 import com.bbh.itss.dso.portal.application.catalog.port.out.DepartmentRepositoryPort
 import com.bbh.itss.dso.portal.application.catalog.port.out.PipelineCountsPort
 import com.bbh.itss.dso.portal.application.catalog.port.out.ProductRepositoryPort
+import com.bbh.itss.dso.portal.application.change.port.out.ChangeProfileRepositoryPort
+import com.bbh.itss.dso.portal.application.change.port.out.JiraPort
+import com.bbh.itss.dso.portal.application.change.port.out.ProductionChangeRepositoryPort
+import com.bbh.itss.dso.portal.application.change.port.out.ServiceNowPort
 import com.bbh.itss.dso.portal.application.evidence.port.in.QueryEvidenceUseCase
 import com.bbh.itss.dso.portal.application.evidence.port.out.RunEvidencePort
 import com.bbh.itss.dso.portal.application.monitoring.port.in.MonitorPipelinesUseCase
@@ -61,6 +65,10 @@ class UseCaseConfigurationSpec extends Specification {
     PipelineRunsPort runs = Mock()
     DashboardLinksPort dashboards = Mock()
     RunEvidencePort evidence = Mock()
+    ChangeProfileRepositoryPort changeProfiles = Mock()
+    ProductionChangeRepositoryPort productionChanges = Mock()
+    JiraPort jira = Mock()
+    ServiceNowPort serviceNow = Mock()
 
     def runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(AopAutoConfiguration, TransactionAutoConfiguration))
@@ -74,6 +82,10 @@ class UseCaseConfigurationSpec extends Specification {
             .withBean(PipelineRunsPort, { runs } as Supplier<PipelineRunsPort>)
             .withBean(DashboardLinksPort, { dashboards } as Supplier<DashboardLinksPort>)
             .withBean(RunEvidencePort, { evidence } as Supplier<RunEvidencePort>)
+            .withBean(ChangeProfileRepositoryPort, { changeProfiles } as Supplier<ChangeProfileRepositoryPort>)
+            .withBean(ProductionChangeRepositoryPort, { productionChanges } as Supplier<ProductionChangeRepositoryPort>)
+            .withBean(JiraPort, { jira } as Supplier<JiraPort>)
+            .withBean(ServiceNowPort, { serviceNow } as Supplier<ServiceNowPort>)
             .withBean(KeyGenerator, { { -> 'key' } as KeyGenerator } as Supplier<KeyGenerator>)
             .withBean(Clock, { Clock.systemUTC() } as Supplier<Clock>)
 
@@ -84,7 +96,8 @@ class UseCaseConfigurationSpec extends Specification {
             assert useCases.keySet().containsAll(['globalSettingsService', 'productCatalogService', 'departmentService',
                                                   'pipelineService', 'pipelineConfigService',
                                                   'pipelineMonitoringService', 'changeEvidenceService',
-                                                  'monitoringTargetsService'])
+                                                  'monitoringTargetsService', 'changeProfileService',
+                                                  'productionChangeService'])
             useCases.values().each { useCase ->
                 assert AopUtils.isAopProxy(useCase)
                 assert (useCase as Advised).advisors*.advice.any { it instanceof TransactionInterceptor }

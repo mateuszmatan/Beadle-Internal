@@ -1,9 +1,7 @@
 package com.bbh.itss.dso.portal.adapter.in.web;
 
-import com.bbh.itss.dso.portal.domain.pipeline.KeyRevokedException;
-import com.bbh.itss.dso.portal.domain.shared.ConflictException;
 import com.bbh.itss.dso.portal.domain.shared.InvalidRequestException;
-import com.bbh.itss.dso.portal.domain.shared.NotFoundException;
+import com.bbh.itss.dso.portal.domain.shared.InvalidRequestException.FieldProblem;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -20,29 +18,31 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-import java.util.List;
+import java.util.NoSuchElementException;
+
+import static com.bbh.itss.dso.portal.domain.shared.Failures.STALE_VERSION;
 
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
-    @ExceptionHandler(NotFoundException.class)
-    ProblemDetail notFound(NotFoundException e) {
+    @ExceptionHandler(NoSuchElementException.class)
+    ProblemDetail notFound(NoSuchElementException e) {
         return problem(HttpStatus.NOT_FOUND, "Not found", e.getMessage());
     }
 
-    @ExceptionHandler(KeyRevokedException.class)
-    ProblemDetail revoked(KeyRevokedException e) {
+    @ExceptionHandler(SecurityException.class)
+    ProblemDetail revoked(SecurityException e) {
         return problem(HttpStatus.FORBIDDEN, "Pipeline key invalidated", e.getMessage());
     }
 
-    @ExceptionHandler(ConflictException.class)
-    ProblemDetail conflict(ConflictException e) {
+    @ExceptionHandler(IllegalStateException.class)
+    ProblemDetail conflict(IllegalStateException e) {
         return problem(HttpStatus.CONFLICT, "Conflict", e.getMessage());
     }
 
     @ExceptionHandler(OptimisticLockingFailureException.class)
     ProblemDetail staleData(OptimisticLockingFailureException e) {
-        return problem(HttpStatus.CONFLICT, "Conflict", ConflictException.STALE_VERSION);
+        return problem(HttpStatus.CONFLICT, "Conflict", STALE_VERSION);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
@@ -53,7 +53,9 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(InvalidRequestException.class)
     ProblemDetail invalid(InvalidRequestException e) {
-        return validationFailed(e.getMessage(), e.getProblems());
+        ProblemDetail detail = problem(HttpStatus.BAD_REQUEST, "Validation failed", e.getMessage());
+        detail.setProperty("errors", e.problems());
+        return detail;
     }
 
     @ExceptionHandler(Exception.class)
@@ -79,11 +81,9 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException e,
                                                                   HttpHeaders headers, HttpStatusCode status,
                                                                   WebRequest request) {
-        List<InvalidRequestException.FieldProblem> problems = e.getBindingResult().getFieldErrors().stream()
-                .map(error -> new InvalidRequestException.FieldProblem(error.getField(), error.getDefaultMessage()))
-                .toList();
-        ProblemDetail detail = validationFailed(problems.size() == 1 ? problems.getFirst().message()
-                : problems.size() + " fields are invalid", problems);
+        ProblemDetail detail = invalid(new InvalidRequestException(e.getBindingResult().getFieldErrors().stream()
+                .map(error -> new FieldProblem(error.getField(), error.getDefaultMessage()))
+                .toList()));
         return handleExceptionInternal(e, detail, headers, HttpStatus.BAD_REQUEST, request);
     }
 
@@ -110,13 +110,6 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         String name = e instanceof MethodArgumentTypeMismatchException mismatch ? mismatch.getName()
                 : e.getPropertyName();
         return name == null ? "a value of this request" : "'" + name + "'";
-    }
-
-    private static ProblemDetail validationFailed(String message,
-                                                  List<InvalidRequestException.FieldProblem> problems) {
-        ProblemDetail detail = problem(HttpStatus.BAD_REQUEST, "Validation failed", message);
-        detail.setProperty("errors", problems);
-        return detail;
     }
 
     private static ProblemDetail problem(HttpStatus status, String title, String message) {

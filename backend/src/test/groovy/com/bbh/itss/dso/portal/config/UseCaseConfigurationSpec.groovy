@@ -23,7 +23,6 @@ import com.bbh.itss.dso.portal.domain.pipeline.KeyGenerator
 import com.bbh.itss.dso.portal.domain.settings.GlobalSettings
 import com.bbh.itss.dso.portal.domain.settings.GlobalSettingsValues
 import com.bbh.itss.dso.portal.domain.settings.Scanner
-import com.bbh.itss.dso.portal.domain.shared.ConflictException
 import com.bbh.itss.dso.portal.domain.shared.InvalidRequestException
 import com.bbh.itss.dso.portal.support.Fixtures
 import org.springframework.aop.framework.Advised
@@ -155,7 +154,7 @@ class UseCaseConfigurationSpec extends Specification {
 
         where:
         reason                   | version | values                             || exception
-        'a concurrent change'    | 0L      | GlobalSettingsValues.bbhDefaults() || ConflictException
+        'a concurrent change'    | 0L      | GlobalSettingsValues.bbhDefaults() || IllegalStateException
         'a broken business rule' | 1L      | withoutLimit(Scanner.SAST)         || InvalidRequestException
     }
 

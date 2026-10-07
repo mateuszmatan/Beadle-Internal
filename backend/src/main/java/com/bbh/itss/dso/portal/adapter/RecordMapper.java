@@ -51,7 +51,7 @@ public final class RecordMapper {
                 }
             }
         } catch (IllegalAccessException e) {
-            throw new IllegalStateException(e);
+            throw new IllegalArgumentException(e);
         }
         return readers;
     }
@@ -115,7 +115,7 @@ public final class RecordMapper {
                 } catch (RuntimeException | Error e) {
                     throw e;
                 } catch (Throwable e) {
-                    throw new IllegalStateException(e);
+                    throw new IllegalArgumentException(e);
                 }
             }
         }
@@ -132,7 +132,7 @@ public final class RecordMapper {
                 constructor.setAccessible(true);
                 return new Shape(constructor, List.of(components), mirrorOf(type));
             } catch (NoSuchMethodException e) {
-                throw new IllegalStateException(e);
+                throw new IllegalArgumentException(e);
             }
         }
 
@@ -152,9 +152,9 @@ public final class RecordMapper {
                 return constructor.newInstance(values);
             } catch (InvocationTargetException e) {
                 throw e.getCause() instanceof RuntimeException runtime ? runtime
-                        : new IllegalStateException(e.getCause());
+                        : new IllegalArgumentException(e.getCause());
             } catch (ReflectiveOperationException e) {
-                throw new IllegalStateException(e);
+                throw new IllegalArgumentException(e);
             }
         }
     }

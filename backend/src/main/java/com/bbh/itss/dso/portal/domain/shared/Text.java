@@ -1,38 +1,27 @@
 package com.bbh.itss.dso.portal.domain.shared;
 
-import java.nio.charset.StandardCharsets;
+import lombok.NoArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
+
 import java.util.List;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static lombok.AccessLevel.PRIVATE;
+import static org.apache.commons.collections4.ListUtils.emptyIfNull;
+import static org.apache.commons.lang3.StringUtils.startsWithAny;
+
+@NoArgsConstructor(access = PRIVATE)
 public final class Text {
 
-    private Text() {
-    }
-
-    public static boolean isBlank(String value) {
-        return value == null || value.isBlank();
-    }
-
-    public static String trimToNull(String value) {
-        return isBlank(value) ? null : value.trim();
-    }
-
-    public static String orDefault(String value, String fallback) {
-        return isBlank(value) ? fallback : value.trim();
-    }
-
     public static boolean isUrl(String value) {
-        return value != null && (value.startsWith("http://") || value.startsWith("https://"));
-    }
-
-    public static String withoutTrailingSlash(String url) {
-        return url.trim().replaceAll("/+$", "");
+        return startsWithAny(value, "http://", "https://");
     }
 
     public static int bytes(String value) {
-        return value.getBytes(StandardCharsets.UTF_8).length;
+        return value.getBytes(UTF_8).length;
     }
 
-    public static String abbreviate(String text, int maxBytes) {
+    public static String abbreviateBytes(String text, int maxBytes) {
         if (text == null || bytes(text) <= maxBytes) {
             return text;
         }
@@ -51,9 +40,6 @@ public final class Text {
     }
 
     public static List<String> trimmed(List<String> values) {
-        if (values == null) {
-            return List.of();
-        }
-        return values.stream().filter(value -> !isBlank(value)).map(String::trim).toList();
+        return emptyIfNull(values).stream().filter(StringUtils::isNotBlank).map(String::trim).toList();
     }
 }

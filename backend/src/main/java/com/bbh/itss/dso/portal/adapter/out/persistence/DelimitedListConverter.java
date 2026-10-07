@@ -8,6 +8,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import static org.apache.commons.lang3.StringUtils.isBlank;
+
 public abstract class DelimitedListConverter implements AttributeConverter<List<String>, String> {
 
     private final String delimiter;
@@ -32,7 +34,7 @@ public abstract class DelimitedListConverter implements AttributeConverter<List<
 
     @Override
     public List<String> convertToEntityAttribute(String column) {
-        return Text.isBlank(column) ? List.of() : normalize(Arrays.asList(splitter.split(column)));
+        return isBlank(column) ? List.of() : normalize(Arrays.asList(splitter.split(column)));
     }
 
     private List<String> normalize(List<String> values) {

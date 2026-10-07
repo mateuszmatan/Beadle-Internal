@@ -1,9 +1,7 @@
 package com.bbh.itss.dso.portal.adapter.in.web
 
-import com.bbh.itss.dso.portal.domain.shared.ConflictException
 import com.bbh.itss.dso.portal.domain.shared.InvalidRequestException
 import com.bbh.itss.dso.portal.domain.shared.InvalidRequestException.FieldProblem
-import com.bbh.itss.dso.portal.domain.shared.NotFoundException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.MediaType
 import org.springframework.orm.ObjectOptimisticLockingFailureException
@@ -18,6 +16,8 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import spock.lang.Specification
 
+import static com.bbh.itss.dso.portal.domain.shared.Failures.STALE_VERSION
+import static com.bbh.itss.dso.portal.domain.shared.Failures.notFound
 import static com.bbh.itss.dso.portal.support.ApiJson.parse
 import static com.bbh.itss.dso.portal.support.ApiJson.toJson
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
@@ -45,13 +45,13 @@ class ApiExceptionHandlerSpec extends Specification {
 
         where:
         failure                    | answer                                                 || status | title
-        'a missing record'         | { it.notFound(NotFoundException.of('Product', 7)) }   || 404    | 'Not found'
-        'a clash with stored data' | { it.conflict(new ConflictException('code clash')) }  || 409    | 'Conflict'
+        'a missing record'         | { it.notFound(notFound('Product', 7)) }   || 404    | 'Not found'
+        'a clash with stored data' | { it.conflict(new IllegalStateException('code clash')) }  || 409    | 'Conflict'
         'a concurrent change'      | { it.staleData(new ObjectOptimisticLockingFailureException(Object, 1L)) } || 409 | 'Conflict'
         'a broken business rule'   | { it.invalid(new InvalidRequestException([PROBLEM])) } || 400   | 'Validation failed'
         'an unexpected failure'    | { it.unexpected(new IllegalStateException('at com.bbh')) } || 500 | 'Request failed'
 
-        detail << ['Product 7 does not exist', 'code clash', ConflictException.STALE_VERSION, 'is required', UNEXPECTED]
+        detail << ['Product 7 does not exist', 'code clash', STALE_VERSION, 'is required', UNEXPECTED]
         errors << [null, null, null, [PROBLEM], null]
     }
 
@@ -118,7 +118,7 @@ class ApiExceptionHandlerSpec extends Specification {
 
         @GetMapping('/api/samples/{id}')
         String read(@PathVariable('id') Long id) {
-            throw new IllegalStateException("no sample $id is loaded")
+            throw new UnsupportedOperationException("no sample $id is loaded")
         }
 
         @GetMapping('/api/samples')

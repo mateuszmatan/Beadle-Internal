@@ -153,7 +153,7 @@ class UseCaseConfigurationSpec extends Specification {
         runs.ping() >> { influx('ping', null) }
         runs.latestRuns(*_) >> { influx('latest runs', LatestRuns.none()) }
         runs.recentRuns(*_) >> { influx('recent runs', []) }
-        runs.doraPoints(*_) >> { influx('DORA points', []) }
+        runs.doraPoints(*_) >> { influx('DORA points', [:]) }
         evidence.evidenceOf(_) >> { influx('evidence', [:]) }
         dashboards.url() >> Optional.empty()
         dashboards.dashboardUrl(*_) >> Optional.empty()

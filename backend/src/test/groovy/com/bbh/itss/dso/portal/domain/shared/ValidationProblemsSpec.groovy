@@ -13,7 +13,7 @@ class ValidationProblemsSpec extends Specification {
         problems.at('services[0]').at('build').add('javaPath', 'is required')
 
         then:
-        !problems.isEmpty()
+        !problems.list().isEmpty()
         problems.list() == [new FieldProblem('code', 'is taken'),
                             new FieldProblem('services[0].build.javaPath', 'is required')]
     }
@@ -62,7 +62,7 @@ class ValidationProblemsSpec extends Specification {
         def e = InvalidRequestException.of('range', 'use 30d')
 
         then:
-        problems.isEmpty()
+        problems.list().isEmpty()
         e.message == 'use 30d'
         e.problems == [new FieldProblem('range', 'use 30d')]
     }

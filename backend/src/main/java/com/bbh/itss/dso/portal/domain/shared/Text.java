@@ -19,6 +19,14 @@ public final class Text {
         return isBlank(value) ? fallback : value.trim();
     }
 
+    public static boolean isUrl(String value) {
+        return value != null && (value.startsWith("http://") || value.startsWith("https://"));
+    }
+
+    public static String withoutTrailingSlash(String url) {
+        return url.trim().replaceAll("/+$", "");
+    }
+
     public static List<String> clean(List<String> values) {
         return trimmed(values).stream().distinct().toList();
     }

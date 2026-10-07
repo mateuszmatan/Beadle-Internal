@@ -17,49 +17,43 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class RecordMapper {
 
     private static final MethodHandles.Lookup LOOKUP = MethodHandles.lookup();
 
-    private static final ClassValue<Shape> SHAPES = new ClassValue<>() {
-        @Override
-        protected Shape computeValue(Class<?> type) {
-            return Shape.of(type);
-        }
-    };
-
-    private static final ClassValue<Map<String, MethodHandle>> READERS = new ClassValue<>() {
-        @Override
-        protected Map<String, MethodHandle> computeValue(Class<?> type) {
-            Map<String, MethodHandle> readers = new HashMap<>();
-            try {
-                for (Class<?> declaring = type; declaring != Object.class; declaring = declaring.getSuperclass()) {
-                    for (Method method : declaring.getDeclaredMethods()) {
-                        if (method.getParameterCount() == 0 && method.getReturnType() != void.class
-                                && !Modifier.isStatic(method.getModifiers())
-                                && !Modifier.isPrivate(method.getModifiers())) {
-                            method.setAccessible(true);
-                            readers.putIfAbsent(method.getName(), LOOKUP.unreflect(method));
-                        }
-                    }
-                }
-                for (Class<?> declaring = type; declaring != Object.class; declaring = declaring.getSuperclass()) {
-                    for (Field field : declaring.getDeclaredFields()) {
-                        if (!Modifier.isStatic(field.getModifiers())) {
-                            field.setAccessible(true);
-                            readers.putIfAbsent(field.getName(), LOOKUP.unreflectGetter(field));
-                        }
-                    }
-                }
-            } catch (IllegalAccessException e) {
-                throw new IllegalStateException(e);
-            }
-            return readers;
-        }
-    };
+    private static final Map<Class<?>, Shape> SHAPES = new ConcurrentHashMap<>();
+    private static final Map<Class<?>, Map<String, MethodHandle>> READERS = new ConcurrentHashMap<>();
 
     private RecordMapper() {
+    }
+
+    private static Map<String, MethodHandle> readers(Class<?> type) {
+        Map<String, MethodHandle> readers = new HashMap<>();
+        try {
+            for (Class<?> declaring = type; declaring != Object.class; declaring = declaring.getSuperclass()) {
+                for (Method method : declaring.getDeclaredMethods()) {
+                    if (method.getParameterCount() == 0 && method.getReturnType() != void.class
+                            && !Modifier.isStatic(method.getModifiers())
+                            && !Modifier.isPrivate(method.getModifiers())) {
+                        method.setAccessible(true);
+                        readers.putIfAbsent(method.getName(), LOOKUP.unreflect(method));
+                    }
+                }
+            }
+            for (Class<?> declaring = type; declaring != Object.class; declaring = declaring.getSuperclass()) {
+                for (Field field : declaring.getDeclaredFields()) {
+                    if (!Modifier.isStatic(field.getModifiers())) {
+                        field.setAccessible(true);
+                        readers.putIfAbsent(field.getName(), LOOKUP.unreflectGetter(field));
+                    }
+                }
+            }
+        } catch (IllegalAccessException e) {
+            throw new IllegalStateException(e);
+        }
+        return readers;
     }
 
     public static <T> T map(Object source, Class<T> target) {
@@ -67,7 +61,7 @@ public final class RecordMapper {
     }
 
     public static <T extends Record> T map(Class<T> target, Object... sources) {
-        return target.cast(SHAPES.get(target).build(sources));
+        return target.cast(SHAPES.computeIfAbsent(target, Shape::of).build(sources));
     }
 
     private static Object convert(Object value, Type target) {
@@ -85,9 +79,9 @@ public final class RecordMapper {
         if (!type.isRecord()) {
             return value;
         }
-        Shape shape = SHAPES.get(type);
+        Shape shape = SHAPES.computeIfAbsent(type, Shape::of);
         Object source = shape.mirrored().filter(mirrored -> !mirrored.isInstance(value))
-                .map(mirrored -> SHAPES.get(mirrored).build(value)).orElse(value);
+                .map(mirrored -> SHAPES.computeIfAbsent(mirrored, Shape::of).build(value)).orElse(value);
         return shape.build(source);
     }
 
@@ -114,7 +108,7 @@ public final class RecordMapper {
 
     private static Object read(String name, Object... sources) {
         for (Object source : sources) {
-            MethodHandle reader = source == null ? null : READERS.get(source.getClass()).get(name);
+            MethodHandle reader = source == null ? null : READERS.computeIfAbsent(source.getClass(), RecordMapper::readers).get(name);
             if (reader != null) {
                 try {
                     return reader.invoke(source);

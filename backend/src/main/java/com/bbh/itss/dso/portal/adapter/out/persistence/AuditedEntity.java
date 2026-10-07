@@ -1,5 +1,6 @@
 package com.bbh.itss.dso.portal.adapter.out.persistence;
 
+import com.bbh.itss.dso.portal.domain.shared.ConflictException;
 import com.bbh.itss.dso.portal.domain.shared.Timestamps;
 import jakarta.persistence.Column;
 import jakarta.persistence.MappedSuperclass;
@@ -9,6 +10,7 @@ import jakarta.persistence.Version;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 
 @MappedSuperclass
 public abstract class AuditedEntity {
@@ -48,5 +50,10 @@ public abstract class AuditedEntity {
 
     public long getVersion() {
         return version;
+    }
+
+    static <E extends AuditedEntity> E current(Optional<E> found, long expectedVersion) {
+        return found.filter(entity -> entity.getVersion() == expectedVersion)
+                .orElseThrow(ConflictException::staleVersion);
     }
 }

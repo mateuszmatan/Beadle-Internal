@@ -1,8 +1,11 @@
 package com.bbh.itss.dso.portal.support
 
 import java.util.concurrent.Callable
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
+
+import static java.lang.Math.ceil
+import static java.lang.System.nanoTime
+import static java.util.concurrent.Executors.newFixedThreadPool
+import static java.util.concurrent.TimeUnit.SECONDS
 
 class LatencyStats {
 
@@ -21,30 +24,30 @@ class LatencyStats {
     static LatencyStats measure(Map options, String name, Closure<Boolean> call) {
         int calls = options.calls as int
         int threads = (options.threads ?: 1) as int
-        def pool = Executors.newFixedThreadPool(threads)
+        def pool = newFixedThreadPool(threads)
         try {
             if (options.warmUp != false) {
                 pool.invokeAll((0..<Math.min(threads, calls)).collect { int index -> { -> call(index) } as Callable })*.get()
             }
-            long start = System.nanoTime()
+            long start = nanoTime()
             def futures = pool.invokeAll((0..<calls).collect { int index ->
                 { ->
-                    long begin = System.nanoTime()
+                    long begin = nanoTime()
                     boolean ok = call(index)
-                    [(System.nanoTime() - begin) / 1_000_000d, ok]
+                    [(nanoTime() - begin) / 1_000_000d, ok]
                 } as Callable<List>
             })
             def results = futures*.get()
-            double wall = (System.nanoTime() - start) / 1_000_000_000d
+            double wall = (nanoTime() - start) / 1_000_000_000d
             new LatencyStats(name, results.collect { it[0] as double }, wall, results.count { !it[1] } as int)
         } finally {
             pool.shutdownNow()
-            pool.awaitTermination(10, TimeUnit.SECONDS)
+            pool.awaitTermination(10, SECONDS)
         }
     }
 
     double percentile(double p) {
-        millis[Math.min(millis.size() - 1, Math.ceil(p / 100 * millis.size()) as int - 1)]
+        millis[Math.min(millis.size() - 1, ceil(p / 100 * millis.size()) as int - 1)]
     }
 
     double getP50() {

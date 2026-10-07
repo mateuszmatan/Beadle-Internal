@@ -1,11 +1,12 @@
 package com.bbh.itss.dso.portal.domain.catalog
 
-import com.bbh.itss.dso.portal.domain.shared.ConflictException
 import com.bbh.itss.dso.portal.domain.shared.InvalidRequestException
 import com.bbh.itss.dso.portal.domain.shared.InvalidRequestException.FieldProblem
 import spock.lang.Specification
 
 import java.util.function.Function
+
+import static com.bbh.itss.dso.portal.domain.shared.Failures.STALE_VERSION
 
 class DepartmentSpec extends Specification {
 
@@ -27,7 +28,7 @@ class DepartmentSpec extends Specification {
 
         then:
         def e = thrown(InvalidRequestException)
-        e.problems == [new FieldProblem('name', message)]
+        e.problems() == [new FieldProblem('name', message)]
 
         where:
         problem    | name      || message
@@ -41,7 +42,7 @@ class DepartmentSpec extends Specification {
         change()
 
         then:
-        def e = thrown(ConflictException)
+        def e = thrown(IllegalStateException)
         e.message == 'A department named Custody already exists'
 
         where:
@@ -60,7 +61,7 @@ class DepartmentSpec extends Specification {
         CUSTODY.rename(1L, ' ', nobody)
 
         then:
-        def e = thrown(ConflictException)
-        e.message == ConflictException.STALE_VERSION
+        def e = thrown(IllegalStateException)
+        e.message == STALE_VERSION
     }
 }

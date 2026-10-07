@@ -1,12 +1,15 @@
 package com.bbh.itss.dso.portal.domain.catalog
 
+import com.bbh.itss.dso.portal.domain.catalog.ProductDirectory.ProductIdentity
 import spock.lang.Specification
+
+import static com.bbh.itss.dso.portal.domain.catalog.ProductCode.suggest
 
 class ProductCodeSpec extends Specification {
 
     def "the code of #name is #code"() {
         expect:
-        ProductCode.suggest(name, directory([])) == code
+        suggest(name, directory([])) == code
 
         where:
         name                         || code
@@ -22,17 +25,17 @@ class ProductCodeSpec extends Specification {
 
     def "a taken code gets the first free number, whatever its case"() {
         expect:
-        ProductCode.suggest('CertScanner', directory(['certscanner', 'CERTSCANNER2'])) == 'CERTSCANNER3'
+        suggest('CertScanner', directory(['certscanner', 'CERTSCANNER2'])) == 'CERTSCANNER3'
     }
 
     def "a numbered code keeps within the code length"() {
         expect:
-        ProductCode.suggest('B' * 60, directory(['B' * 50])) == 'B' * 49 + '2'
+        suggest('B' * 60, directory(['B' * 50])) == 'B' * 49 + '2'
     }
 
     def "every suggestion is a valid product code"() {
         expect:
-        ProductCode.suggest(name, directory([])) ==~ /[A-Z][A-Z0-9_-]{1,49}/
+        suggest(name, directory([])) ==~ /[A-Z][A-Z0-9_-]{1,49}/
 
         where:
         name << ['CertScanner', 'ą', '9', '12 Monkeys', 'Ölçer', 'Straße', '---']
@@ -40,11 +43,11 @@ class ProductCodeSpec extends Specification {
 
     private static ProductDirectory directory(List<String> taken) {
         new ProductDirectory() {
-            Optional<ProductDirectory.ProductIdentity> findProductByCode(String code) {
-                taken.any { it.equalsIgnoreCase(code) } ? Optional.of(new ProductDirectory.ProductIdentity(1, code)) : Optional.empty()
+            Optional<ProductIdentity> findProductByCode(String code) {
+                taken.any { it.equalsIgnoreCase(code) } ? Optional.of(new ProductIdentity(1, code)) : Optional.empty()
             }
 
-            Optional<ProductDirectory.ProductIdentity> findProductByName(String name) {
+            Optional<ProductIdentity> findProductByName(String name) {
                 Optional.empty()
             }
 

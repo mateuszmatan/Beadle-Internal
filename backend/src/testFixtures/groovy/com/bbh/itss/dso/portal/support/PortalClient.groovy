@@ -5,14 +5,19 @@ import groovy.transform.Canonical
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
-import java.time.Duration
+
+import static com.bbh.itss.dso.portal.support.ApiJson.toJson
+import static java.net.http.HttpClient.Builder.NO_PROXY
+import static java.net.http.HttpRequest.BodyPublishers.noBody
+import static java.net.http.HttpRequest.BodyPublishers.ofString
+import static java.time.Duration.ofSeconds
 
 class PortalClient {
 
     final String baseUrl
     private final HttpClient http = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(5))
-            .proxy(HttpClient.Builder.NO_PROXY)
+            .connectTimeout(ofSeconds(5))
+            .proxy(NO_PROXY)
             .build()
 
     PortalClient(String baseUrl) {
@@ -24,14 +29,14 @@ class PortalClient {
     }
 
     Response post(String path, Object body = null) {
-        send(request(path).POST(body == null ? HttpRequest.BodyPublishers.noBody() : json(body)))
+        send(request(path).POST(body == null ? noBody() : json(body)))
     }
 
     Response postRaw(String path, String contentType, String body) {
         send(HttpRequest.newBuilder(URI.create(baseUrl + path))
-                .timeout(Duration.ofSeconds(30))
+                .timeout(ofSeconds(30))
                 .header('Content-Type', contentType)
-                .POST(HttpRequest.BodyPublishers.ofString(body)))
+                .POST(ofString(body)))
     }
 
     Response put(String path, Object body) {
@@ -44,12 +49,12 @@ class PortalClient {
 
     private HttpRequest.Builder request(String path) {
         HttpRequest.newBuilder(URI.create(baseUrl + path))
-                .timeout(Duration.ofSeconds(30))
+                .timeout(ofSeconds(30))
                 .header('Content-Type', 'application/json')
     }
 
     private static HttpRequest.BodyPublisher json(Object body) {
-        HttpRequest.BodyPublishers.ofString(ApiJson.toJson(body))
+        ofString(toJson(body))
     }
 
     private Response send(HttpRequest.Builder request) {

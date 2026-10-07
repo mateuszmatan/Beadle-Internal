@@ -28,7 +28,7 @@ class ValidationProblemsSpec extends Specification {
         then:
         def e = thrown(InvalidRequestException)
         e.message == message
-        e.problems*.field == fields
+        e.problems()*.field == fields
 
         where:
         fields           || message
@@ -64,6 +64,6 @@ class ValidationProblemsSpec extends Specification {
         then:
         problems.list().isEmpty()
         e.message == 'use 30d'
-        e.problems == [new FieldProblem('range', 'use 30d')]
+        e.problems() == [new FieldProblem('range', 'use 30d')]
     }
 }

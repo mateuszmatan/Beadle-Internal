@@ -95,12 +95,4 @@ class DemoJiraAdapterSpec extends Specification {
             issues.any { it.issue().epicKey() != null && it.fixVersion() != epics[it.issue().epicKey()].fixVersion() }
         }
     }
-
-    def "issues are read by key"() {
-        given:
-        def epic = jira.project('CERT').issues()*.issue().find { it.epicKey() == null }
-
-        expect:
-        jira.issues('CERT', [epic.key(), 'CERT-1']) == [epic]
-    }
 }

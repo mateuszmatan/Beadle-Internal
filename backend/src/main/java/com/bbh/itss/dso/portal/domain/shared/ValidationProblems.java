@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import static com.bbh.itss.dso.portal.domain.shared.Text.bytes;
+
 public class ValidationProblems {
 
     private final String prefix;
@@ -31,6 +33,13 @@ public class ValidationProblems {
     public ValidationProblems require(String field, Object value, String message) {
         if (value == null || value instanceof Collection<?> values && values.isEmpty()) {
             add(field, message);
+        }
+        return this;
+    }
+
+    public ValidationProblems fits(String field, String text, int maxBytes) {
+        if (text != null && bytes(text.trim()) > maxBytes) {
+            add(field, "is too long: it may take at most " + maxBytes + " bytes");
         }
         return this;
     }

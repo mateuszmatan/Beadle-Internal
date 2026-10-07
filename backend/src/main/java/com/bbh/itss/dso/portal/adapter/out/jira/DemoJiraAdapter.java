@@ -95,12 +95,6 @@ class DemoJiraAdapter implements JiraPort {
                 .filter(issue -> epicKeys.contains(issue.epicKey())).toList();
     }
 
-    @Override
-    public List<JiraIssue> issues(String project, Collection<String> keys) {
-        return project(project).issues().stream().map(DemoIssue::issue).filter(issue -> keys.contains(issue.key()))
-                .toList();
-    }
-
     DemoProject project(String project) {
         Random random = new Random(project.hashCode());
         LocalDate today = LocalDate.now(clock);

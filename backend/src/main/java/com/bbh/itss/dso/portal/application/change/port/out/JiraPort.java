@@ -15,6 +15,4 @@ public interface JiraPort {
     List<JiraIssue> epics(String project, String fixVersion);
 
     List<JiraIssue> stories(String project, String fixVersion, Collection<String> epicKeys);
-
-    List<JiraIssue> issues(String project, Collection<String> keys);
 }

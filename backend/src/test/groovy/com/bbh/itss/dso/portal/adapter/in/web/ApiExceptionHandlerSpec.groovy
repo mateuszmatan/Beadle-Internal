@@ -103,10 +103,14 @@ class ApiExceptionHandlerSpec extends Specification {
         'a number that is text'  | ['riskAssessment.clients': 'many']                          || 'Malformed request' | ['template.riskAssessment.clients']
     }
 
-    def "a complete change profile passes the bean validation"() {
+    def "a complete change profile with the Jira key #key passes the bean validation"() {
         expect:
         mvc.perform(post('/api/samples/change-profile').contentType(MediaType.APPLICATION_JSON)
-                .content(toJson([version: 3, template: templateJson()]))).andReturn().response.contentAsString == 'CERT'
+                .content(toJson([version: 3, template: templateJson(jiraProjectKey: key)])))
+                .andReturn().response.contentAsString == 'CERT'
+
+        where:
+        key << ['CERT', 'cert']
     }
 
     def "#request answers #status #title without naming a class or a method"() {

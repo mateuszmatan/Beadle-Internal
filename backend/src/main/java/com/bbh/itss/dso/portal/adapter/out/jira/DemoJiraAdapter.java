@@ -1,8 +1,8 @@
 package com.bbh.itss.dso.portal.adapter.out.jira;
 
 import com.bbh.itss.dso.portal.application.change.port.out.JiraPort;
-import com.bbh.itss.dso.portal.domain.change.DateRange;
 import com.bbh.itss.dso.portal.domain.change.JiraIssue;
+import com.bbh.itss.dso.portal.domain.change.JiraVersion;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
@@ -10,16 +10,20 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
+
+import static java.util.Comparator.comparing;
+import static java.util.stream.Collectors.toSet;
 
 @Component
 class DemoJiraAdapter implements JiraPort {
 
     static final int EPICS_PER_PROJECT = 8;
-    static final int DAYS_BACK = 180;
+    static final List<String> UPCOMING_STATUSES = List.of("Done", "In Review", "In Progress");
+    static final List<String> LATER_STATUSES = List.of("To Do", "In Progress");
 
     private static final Map<String, List<String>> THEMES = Map.ofEntries(
             Map.entry("Single sign-on with BBH SSO", List.of("Redirect signed-out users to the SSO login",
@@ -72,49 +76,91 @@ class DemoJiraAdapter implements JiraPort {
     }
 
     @Override
-    public List<JiraIssue> epics(String project, DateRange updated) {
-        return project(project).stream()
-                .filter(issue -> issue.epicKey() == null && updated.contains(issue.updated())).toList();
+    public List<JiraVersion> versions(String project) {
+        return project(project).versions();
     }
 
     @Override
-    public List<JiraIssue> stories(String project, Collection<String> epicKeys, DateRange updated) {
-        return project(project).stream()
-                .filter(issue -> epicKeys.contains(issue.epicKey()) && updated.contains(issue.updated())).toList();
+    public List<JiraIssue> epics(String project, String fixVersion) {
+        List<DemoIssue> issues = project(project).issues();
+        Set<String> epicKeys = issues.stream().filter(issue -> issue.in(fixVersion)).map(DemoIssue::epicKey)
+                .collect(toSet());
+        return issues.stream().map(DemoIssue::issue)
+                .filter(issue -> issue.epicKey() == null && epicKeys.contains(issue.key())).toList();
+    }
+
+    @Override
+    public List<JiraIssue> stories(String project, String fixVersion, Collection<String> epicKeys) {
+        return project(project).issues().stream().filter(issue -> issue.in(fixVersion)).map(DemoIssue::issue)
+                .filter(issue -> epicKeys.contains(issue.epicKey())).toList();
     }
 
     @Override
     public List<JiraIssue> issues(String project, Collection<String> keys) {
-        return project(project).stream().filter(issue -> keys.contains(issue.key())).toList();
+        return project(project).issues().stream().map(DemoIssue::issue).filter(issue -> keys.contains(issue.key()))
+                .toList();
     }
 
-    List<JiraIssue> project(String project) {
+    DemoProject project(String project) {
         Random random = new Random(project.hashCode());
         LocalDate today = LocalDate.now(clock);
+        List<JiraVersion> versions = versionsOf(project, today, random);
         List<String> themes = new ArrayList<>(THEMES.keySet().stream().sorted().toList());
         Collections.shuffle(themes, random);
-        List<JiraIssue> issues = new ArrayList<>();
+        List<DemoIssue> issues = new ArrayList<>();
         int number = 100 + random.nextInt(400);
-        for (String theme : themes.subList(0, EPICS_PER_PROJECT)) {
-            LocalDate epicUpdated = today.minusDays(random.nextInt(DAYS_BACK));
+        for (int index = 0; index < EPICS_PER_PROJECT; index++) {
+            String theme = themes.get(index);
+            int release = index * versions.size() / EPICS_PER_PROJECT;
             String epicKey = project + "-" + number++;
-            issues.add(new JiraIssue(epicKey, theme, status(today, epicUpdated, random), null, epicUpdated));
+            issues.add(issue(epicKey, theme, null, versions.get(release), today, random));
             for (String story : THEMES.get(theme)) {
                 if (random.nextInt(5) > 0) {
-                    LocalDate storyUpdated = epicUpdated.minusDays(random.nextInt(30));
-                    issues.add(new JiraIssue(project + "-" + number++, story, status(today, storyUpdated, random),
-                            epicKey, storyUpdated));
+                    boolean slipped = release + 1 < versions.size() && random.nextInt(4) == 0;
+                    issues.add(issue(project + "-" + number++, story, epicKey,
+                            versions.get(slipped ? release + 1 : release), today, random));
                 }
             }
         }
-        issues.sort(Comparator.comparing(JiraIssue::updated).reversed().thenComparing(JiraIssue::key));
-        return issues;
+        issues.sort(comparing((DemoIssue issue) -> issue.issue().updated()).reversed()
+                .thenComparing(issue -> issue.issue().key()));
+        return new DemoProject(versions, issues);
     }
 
-    private static String status(LocalDate today, LocalDate updated, Random random) {
-        if (updated.isAfter(today.minusDays(10))) {
-            return random.nextBoolean() ? "In Progress" : "In Review";
+    private static List<JiraVersion> versionsOf(String project, LocalDate today, Random random) {
+        String release = project + " " + (1 + random.nextInt(5)) + ".";
+        int minor = random.nextInt(4);
+        List<JiraVersion> versions = new ArrayList<>(List.of(
+                new JiraVersion(release + minor, true, today.minusDays(70 + random.nextInt(30))),
+                new JiraVersion(release + (minor + 1), true, today.minusDays(14 + random.nextInt(21))),
+                new JiraVersion(release + (minor + 2), false, today.plusDays(7 + random.nextInt(14)))));
+        if (random.nextBoolean()) {
+            versions.add(new JiraVersion(release + (minor + 3), false, null));
         }
-        return "Done";
+        return versions;
+    }
+
+    private static DemoIssue issue(String key, String summary, String epicKey, JiraVersion version,
+                                   LocalDate today, Random random) {
+        LocalDate updated = version.released() ? version.releaseDate().minusDays(random.nextInt(20))
+                : today.minusDays(random.nextInt(10));
+        String status = version.released() ? "Done" : version.releaseDate() != null
+                ? UPCOMING_STATUSES.get(random.nextInt(UPCOMING_STATUSES.size()))
+                : LATER_STATUSES.get(random.nextInt(LATER_STATUSES.size()));
+        return new DemoIssue(new JiraIssue(key, summary, status, epicKey, updated), version.name());
+    }
+
+    record DemoProject(List<JiraVersion> versions, List<DemoIssue> issues) {
+    }
+
+    record DemoIssue(JiraIssue issue, String fixVersion) {
+
+        boolean in(String version) {
+            return fixVersion.equalsIgnoreCase(version.trim());
+        }
+
+        String epicKey() {
+            return issue.epicKey() == null ? issue.key() : issue.epicKey();
+        }
     }
 }

@@ -1,7 +1,7 @@
 package com.bbh.itss.dso.portal.application.change.port.out;
 
-import com.bbh.itss.dso.portal.domain.change.DateRange;
 import com.bbh.itss.dso.portal.domain.change.JiraIssue;
+import com.bbh.itss.dso.portal.domain.change.JiraVersion;
 
 import java.util.Collection;
 import java.util.List;
@@ -10,9 +10,11 @@ public interface JiraPort {
 
     boolean connected();
 
-    List<JiraIssue> epics(String project, DateRange updated);
+    List<JiraVersion> versions(String project);
 
-    List<JiraIssue> stories(String project, Collection<String> epicKeys, DateRange updated);
+    List<JiraIssue> epics(String project, String fixVersion);
+
+    List<JiraIssue> stories(String project, String fixVersion, Collection<String> epicKeys);
 
     List<JiraIssue> issues(String project, Collection<String> keys);
 }

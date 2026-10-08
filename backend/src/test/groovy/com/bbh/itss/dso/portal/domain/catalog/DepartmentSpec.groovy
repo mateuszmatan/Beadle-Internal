@@ -53,15 +53,21 @@ class DepartmentSpec extends Specification {
     def "a rename keeps the id and the version and may change the case of the department's own name"() {
         expect:
         CUSTODY.rename(2L, ' CUSTODY ', custody) == new Department(4L, 'CUSTODY', 2)
-        CUSTODY.rename(null, 'Custody and Trust', nobody) == new Department(4L, 'Custody and Trust', 2)
+        CUSTODY.rename(2L, 'Custody and Trust', nobody) == new Department(4L, 'Custody and Trust', 2)
     }
 
-    def "a rename based on an older version is refused before the name is checked"() {
+    def "a rename #based is refused as stale before the name is checked"() {
         when:
-        CUSTODY.rename(1L, ' ', nobody)
+        CUSTODY.rename(version, ' ', nobody)
 
         then:
         def e = thrown(IllegalStateException)
         e.message == STALE_VERSION
+
+        where:
+        based                       | version
+        'on an older version'       | 1L
+        'on a version it never had' | 3L
+        'without a version'         | null
     }
 }

@@ -1,6 +1,8 @@
 package com.bbh.itss.dso.portal.adapter.out.persistence
 
 import liquibase.Liquibase
+import liquibase.Scope
+import liquibase.changelog.FastCheckService
 import liquibase.database.DatabaseFactory
 import liquibase.database.jvm.JdbcConnection
 import liquibase.resource.ClassLoaderResourceAccessor
@@ -38,6 +40,11 @@ abstract class MigrationSpecification extends Specification {
     protected int executedSince(String id) {
         jdbc.queryForObject('''SELECT COUNT(*) FROM DATABASECHANGELOG WHERE ORDEREXECUTED >=
                 (SELECT MIN(ORDEREXECUTED) FROM DATABASECHANGELOG WHERE ID LIKE ?)''', Integer, id + '%')
+    }
+
+    protected void rollBackSince(String id) {
+        liquibase.rollback(executedSince(id), '')
+        Scope.currentScope.getSingleton(FastCheckService).clearCache()
     }
 
     protected <T> T inTransaction(Closure<T> work) {

@@ -13,4 +13,10 @@ public final class Versions {
             throw staleVersion();
         }
     }
+
+    public static void requireUnchangedSince(Long expected, long changed, long current) {
+        if (expected != null && (expected < changed || expected > current)) {
+            throw staleVersion();
+        }
+    }
 }

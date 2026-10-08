@@ -39,8 +39,8 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     @ExceptionHandler(SecurityException.class)
-    ProblemDetail revoked(SecurityException e) {
-        return problem(FORBIDDEN, "Pipeline key invalidated", e.getMessage());
+    ProblemDetail forbidden(SecurityException e) {
+        return problem(FORBIDDEN, "Forbidden", e.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)
@@ -126,7 +126,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return name == null ? "a value of this request" : "'" + name + "'";
     }
 
-    private static ProblemDetail problem(HttpStatus status, String title, String message) {
+    static ProblemDetail problem(HttpStatus status, String title, String message) {
         ProblemDetail detail = forStatusAndDetail(status, message);
         detail.setTitle(title);
         return detail;

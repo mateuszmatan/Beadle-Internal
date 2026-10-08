@@ -19,7 +19,9 @@ import com.bbh.itss.dso.portal.application.monitoring.port.out.PipelineRunsPort
 import com.bbh.itss.dso.portal.application.pipeline.port.in.PipelinesUseCase
 import com.bbh.itss.dso.portal.application.pipeline.port.out.PipelineRepositoryPort
 import com.bbh.itss.dso.portal.application.settings.port.in.ManageGlobalSettingsUseCase
+import com.bbh.itss.dso.portal.application.settings.port.in.ManageServiceTemplateUseCase
 import com.bbh.itss.dso.portal.application.settings.port.out.GlobalSettingsRepositoryPort
+import com.bbh.itss.dso.portal.application.settings.port.out.ServiceTemplateRepositoryPort
 import com.bbh.itss.dso.portal.application.user.port.out.SignedInUserPort
 import com.bbh.itss.dso.portal.domain.monitoring.LatestRuns
 import com.bbh.itss.dso.portal.domain.pipeline.KeyGenerator
@@ -78,6 +80,7 @@ class UseCaseConfigurationSpec extends Specification {
     JiraPort jira = Mock()
     ServiceNowPort serviceNow = Mock()
     ProTechLookupPort lookups = Mock()
+    ServiceTemplateRepositoryPort templates = Mock()
 
     def runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(AopAutoConfiguration, TransactionAutoConfiguration))
@@ -97,6 +100,7 @@ class UseCaseConfigurationSpec extends Specification {
             .withBean(JiraPort, { jira } as Supplier<JiraPort>)
             .withBean(ServiceNowPort, { serviceNow } as Supplier<ServiceNowPort>)
             .withBean(ProTechLookupPort, { lookups } as Supplier<ProTechLookupPort>)
+            .withBean(ServiceTemplateRepositoryPort, { templates } as Supplier<ServiceTemplateRepositoryPort>)
             .withBean(SignedInUserPort, { { -> 'Mateusz Matan' } as SignedInUserPort } as Supplier<SignedInUserPort>)
             .withBean(KeyGenerator, { { -> 'key' } as KeyGenerator } as Supplier<KeyGenerator>)
             .withBean(Clock, { systemUTC() } as Supplier<Clock>)
@@ -110,7 +114,7 @@ class UseCaseConfigurationSpec extends Specification {
                                                   'pipelineMonitoringService', 'changeEvidenceService',
                                                   'monitoringTargetsService', 'changeProfileService',
                                                   'productionChangeService', 'changeOptionsService',
-                                                  'lookupService', 'signedInUserService'])
+                                                  'lookupService', 'signedInUserService', 'serviceTemplateService'])
             useCases.values().each { useCase ->
                 assert isAopProxy(useCase)
                 assert (useCase as Advised).advisors*.advice.any { it instanceof TransactionInterceptor }
@@ -208,15 +212,18 @@ class UseCaseConfigurationSpec extends Specification {
         3 * pipelines.sharedMetricsTags() >> ([] as Set)
     }
 
-    def "the catalog and pipeline queries run in read-only transactions, also when they read the settings"() {
+    def "the catalog, pipeline and service template queries run in read-only transactions, also when they read the settings"() {
         when:
         runner.run { ApplicationContext context ->
             context.getBean(ProductsUseCase).list(null)
             context.getBean(PipelinesUseCase).listForProduct(5L)
+            context.getBean(ManageServiceTemplateUseCase).current()
         }
 
         then:
-        transactions.log == ['begin read-only', 'commit', 'begin read-only', 'begin read-only', 'commit', 'commit']
+        transactions.log == ['begin read-only', 'commit', 'begin read-only', 'begin read-only', 'commit', 'commit',
+                             'begin read-only', 'commit']
+        1 * templates.load() >> Optional.empty()
         1 * products.servicesPerProduct() >> [:]
         1 * pipelineCounts.pipelinesPerProduct() >> [:]
         1 * pipelineCounts.activePipelinesPerProduct() >> [:]

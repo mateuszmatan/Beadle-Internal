@@ -18,6 +18,7 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import java.io.UncheckedIOException;
 import java.util.NoSuchElementException;
 
 import static com.bbh.itss.dso.portal.domain.shared.Failures.STALE_VERSION;
@@ -26,6 +27,7 @@ import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
+import static org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE;
 import static org.springframework.http.ProblemDetail.forStatusAndDetail;
 
 @RestControllerAdvice
@@ -55,6 +57,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     ProblemDetail integrity(DataIntegrityViolationException e) {
         return problem(CONFLICT, "Conflict",
                 "The change violates a database constraint, most likely a duplicate name or key.");
+    }
+
+    @ExceptionHandler(UncheckedIOException.class)
+    ProblemDetail unavailable(UncheckedIOException e) {
+        logger.warn("A system the portal relies on could not be reached: " + e.getMessage());
+        return problem(SERVICE_UNAVAILABLE, "Service Unavailable", e.getMessage());
     }
 
     @ExceptionHandler(InvalidRequestException.class)

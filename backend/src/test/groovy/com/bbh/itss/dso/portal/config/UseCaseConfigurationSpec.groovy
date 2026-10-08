@@ -6,6 +6,9 @@ import com.bbh.itss.dso.portal.application.catalog.port.out.ChangeCountsPort
 import com.bbh.itss.dso.portal.application.catalog.port.out.DepartmentRepositoryPort
 import com.bbh.itss.dso.portal.application.catalog.port.out.PipelineCountsPort
 import com.bbh.itss.dso.portal.application.catalog.port.out.ProductRepositoryPort
+import com.bbh.itss.dso.portal.application.change.port.in.ChangeIntegrations
+import com.bbh.itss.dso.portal.application.change.port.in.ProductionChangesUseCase
+import com.bbh.itss.dso.portal.application.change.port.out.ChangeProductsPort
 import com.bbh.itss.dso.portal.application.change.port.out.ChangeProfileRepositoryPort
 import com.bbh.itss.dso.portal.application.change.port.out.JiraPort
 import com.bbh.itss.dso.portal.application.change.port.out.ProTechLookupPort
@@ -75,6 +78,7 @@ class UseCaseConfigurationSpec extends Specification {
     PipelineRunsPort runs = Mock()
     DashboardLinksPort dashboards = Mock()
     RunEvidencePort evidence = Mock()
+    ChangeProductsPort changeProducts = Mock()
     ChangeProfileRepositoryPort changeProfiles = Mock()
     ProductionChangeRepositoryPort productionChanges = Mock()
     JiraPort jira = Mock()
@@ -95,6 +99,7 @@ class UseCaseConfigurationSpec extends Specification {
             .withBean(PipelineRunsPort, { runs } as Supplier<PipelineRunsPort>)
             .withBean(DashboardLinksPort, { dashboards } as Supplier<DashboardLinksPort>)
             .withBean(RunEvidencePort, { evidence } as Supplier<RunEvidencePort>)
+            .withBean(ChangeProductsPort, { changeProducts } as Supplier<ChangeProductsPort>)
             .withBean(ChangeProfileRepositoryPort, { changeProfiles } as Supplier<ChangeProfileRepositoryPort>)
             .withBean(ProductionChangeRepositoryPort, { productionChanges } as Supplier<ProductionChangeRepositoryPort>)
             .withBean(JiraPort, { jira } as Supplier<JiraPort>)
@@ -210,6 +215,23 @@ class UseCaseConfigurationSpec extends Specification {
         1 * pipelines.load(20L) >> Optional.of(pipeline)
         1 * pipelines.findByProductId(5L) >> [pipeline]
         3 * pipelines.sharedMetricsTags() >> ([] as Set)
+    }
+
+    def "Beadle asks Jira and ProTech whether they are connected with no transaction"() {
+        given:
+        ChangeIntegrations integrations = null
+        jira.connected() >> { calls << 'Jira ' + transactionState(); true }
+        serviceNow.connected() >> { calls << 'ProTech ' + transactionState(); false }
+
+        when:
+        runner.run { ApplicationContext context ->
+            integrations = context.getBean(ProductionChangesUseCase).integrations()
+        }
+
+        then:
+        integrations == new ChangeIntegrations(true, false)
+        calls == ['Jira without transaction', 'ProTech without transaction']
+        transactions.log == []
     }
 
     def "the catalog, pipeline and service template queries run in read-only transactions, also when they read the settings"() {

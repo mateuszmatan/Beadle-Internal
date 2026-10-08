@@ -49,4 +49,17 @@ class AuditedEntitySpec extends Specification {
         fresh.updatedAt() != null
         fresh.createdAt() == null
     }
+
+    def "creating keeps a creation time that was set before, as for a change raised in the past"() {
+        given:
+        def raised = Instant.parse('2026-10-05T09:00:00Z')
+        entity.createdAt(raised)
+
+        when:
+        entity.onCreate()
+
+        then:
+        entity.createdAt() == raised
+        entity.updatedAt().isAfter(raised)
+    }
 }

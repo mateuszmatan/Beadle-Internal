@@ -18,6 +18,7 @@ import static com.bbh.itss.dso.portal.domain.shared.Failures.STALE_VERSION
 import static com.bbh.itss.dso.portal.domain.shared.Failures.notFound
 import static com.bbh.itss.dso.portal.support.ApiJson.parse
 import static com.bbh.itss.dso.portal.support.ApiJson.toJson
+import static com.bbh.itss.dso.portal.support.ChangeFixtures.tasksJson
 import static com.bbh.itss.dso.portal.support.ChangeFixtures.templateJson
 import static org.springframework.http.MediaType.APPLICATION_JSON
 import static org.springframework.http.MediaType.TEXT_PLAIN
@@ -50,9 +51,11 @@ class ApiExceptionHandlerSpec extends Specification {
         'a concurrent change'      | { it.staleData(new ObjectOptimisticLockingFailureException(Object, 1L)) } || 409 | 'Conflict'
         'a broken business rule'   | { it.invalid(new InvalidRequestException([PROBLEM])) } || 400   | 'Validation failed'
         'an unexpected failure'    | { it.unexpected(new IllegalStateException('at com.bbh')) } || 500 | 'Request failed'
+        'an unreachable system'    | { it.unavailable(new UncheckedIOException('ProTech timed out', new IOException())) } || 503 | 'Service Unavailable'
 
-        detail << ['Product 7 does not exist', 'code clash', STALE_VERSION, 'is required', UNEXPECTED]
-        errors << [null, null, null, [PROBLEM], null]
+        detail << ['Product 7 does not exist', 'code clash', STALE_VERSION, 'is required', UNEXPECTED,
+                   'ProTech timed out']
+        errors << [null, null, null, [PROBLEM], null, null]
     }
 
     def "a violated database constraint is 409 without the constraint's name"() {
@@ -86,7 +89,7 @@ class ApiExceptionHandlerSpec extends Specification {
     def "a change profile with #refusal is refused against the path of each field"() {
         when:
         def response = mvc.perform(post('/api/samples/change-profile').contentType(APPLICATION_JSON)
-                .content(toJson([version: null, template: templateJson(edits)]))).andReturn().response
+                .content(toJson([version: null, template: templateJson(edits), tasks: tasks]))).andReturn().response
         def problem = parse(response.contentAsString)
 
         then:
@@ -95,17 +98,21 @@ class ApiExceptionHandlerSpec extends Specification {
         problem.errors*.field.sort() == fields
 
         where:
-        refusal                  | edits                                                       || title               | fields
-        'nested broken values'   | ['privilegedAccess.required': true, 'privilegedAccess.users': (1..3).collect { [user: "U$it", account: it == 3 ? ' ' : "adm_u$it"] }, 'planning.backoutPlan': 'x' * 2001, 'riskAssessment.bbhUsers': -1, 'timing.installationStart': '6pm'] || 'Validation failed' | ['template.planning.backoutPlan', 'template.privilegedAccess.users[2].account', 'template.riskAssessment.bbhUsers', 'template.timing.installationStart']
-        'too many users'         | ['privilegedAccess.users': (1..8).collect { [user: "U$it", account: "adm_u$it"] }, 'timing.installationHours': 73, jiraProjectKey: 'ce-rt'] || 'Validation failed' | ['template.jiraProjectKey', 'template.privilegedAccess.users', 'template.timing.installationHours']
-        'missing sections'       | [planning: null, timing: null, downtime: null]              || 'Validation failed' | ['template.downtime', 'template.planning', 'template.timing']
-        'a number that is text'  | ['riskAssessment.clients': 'many']                          || 'Malformed request' | ['template.riskAssessment.clients']
+        refusal                  | edits                                                       | tasks       || title               | fields
+        'nested broken values'   | ['privilegedAccess.required': true, 'privilegedAccess.users': (1..3).collect { [user: "U$it", account: it == 3 ? ' ' : "adm_u$it"] }, 'planning.backoutPlan': 'x' * 2001, 'riskAssessment.bbhUsers': -1, 'timing.installationStart': '6pm'] | tasksJson() || 'Validation failed' | ['template.planning.backoutPlan', 'template.privilegedAccess.users[2].account', 'template.riskAssessment.bbhUsers', 'template.timing.installationStart']
+        'too many users'         | ['privilegedAccess.users': (1..8).collect { [user: "U$it", account: "adm_u$it"] }, 'timing.installationHours': 73, jiraProjectKey: 'ce-rt'] | tasksJson() || 'Validation failed' | ['template.jiraProjectKey', 'template.privilegedAccess.users', 'template.timing.installationHours']
+        'missing sections'       | [planning: null, timing: null, downtime: null]              | tasksJson() || 'Validation failed' | ['template.downtime', 'template.planning', 'template.timing']
+        'a number that is text'  | ['riskAssessment.clients': 'many']                          | tasksJson() || 'Malformed request' | ['template.riskAssessment.clients']
+        'no tasks'               | [:]                                                         | []          || 'Validation failed' | ['tasks']
+        'missing tasks'          | [:]                                                         | null        || 'Validation failed' | ['tasks']
+        'broken tasks'           | [:]                                                         | [[shortDescription: ' ', description: 'x' * 4001], null] || 'Validation failed' | ['tasks[0].description', 'tasks[0].shortDescription', 'tasks[1]']
+        'too many tasks'         | [:]                                                         | tasksJson(51) || 'Validation failed' | ['tasks']
     }
 
     def "a complete change profile with the Jira key #key passes the bean validation"() {
         expect:
         mvc.perform(post('/api/samples/change-profile').contentType(APPLICATION_JSON)
-                .content(toJson([version: 3, template: templateJson(jiraProjectKey: key)])))
+                .content(toJson([version: 3, template: templateJson(jiraProjectKey: key), tasks: tasksJson(1)])))
                 .andReturn().response.contentAsString == 'CERT'
 
         where:

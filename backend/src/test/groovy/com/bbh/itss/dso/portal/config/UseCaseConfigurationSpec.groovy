@@ -19,6 +19,7 @@ import com.bbh.itss.dso.portal.application.pipeline.port.in.PipelinesUseCase
 import com.bbh.itss.dso.portal.application.pipeline.port.out.PipelineRepositoryPort
 import com.bbh.itss.dso.portal.application.settings.port.in.ManageGlobalSettingsUseCase
 import com.bbh.itss.dso.portal.application.settings.port.out.GlobalSettingsRepositoryPort
+import com.bbh.itss.dso.portal.application.user.port.out.SignedInUserPort
 import com.bbh.itss.dso.portal.domain.monitoring.LatestRuns
 import com.bbh.itss.dso.portal.domain.pipeline.KeyGenerator
 import com.bbh.itss.dso.portal.domain.settings.GlobalSettings
@@ -93,6 +94,7 @@ class UseCaseConfigurationSpec extends Specification {
             .withBean(ProductionChangeRepositoryPort, { productionChanges } as Supplier<ProductionChangeRepositoryPort>)
             .withBean(JiraPort, { jira } as Supplier<JiraPort>)
             .withBean(ServiceNowPort, { serviceNow } as Supplier<ServiceNowPort>)
+            .withBean(SignedInUserPort, { { -> 'Mateusz Matan' } as SignedInUserPort } as Supplier<SignedInUserPort>)
             .withBean(KeyGenerator, { { -> 'key' } as KeyGenerator } as Supplier<KeyGenerator>)
             .withBean(Clock, { systemUTC() } as Supplier<Clock>)
 
@@ -104,7 +106,7 @@ class UseCaseConfigurationSpec extends Specification {
                                                   'pipelineService', 'pipelineConfigService',
                                                   'pipelineMonitoringService', 'changeEvidenceService',
                                                   'monitoringTargetsService', 'changeProfileService',
-                                                  'productionChangeService'])
+                                                  'productionChangeService', 'signedInUserService'])
             useCases.values().each { useCase ->
                 assert isAopProxy(useCase)
                 assert (useCase as Advised).advisors*.advice.any { it instanceof TransactionInterceptor }

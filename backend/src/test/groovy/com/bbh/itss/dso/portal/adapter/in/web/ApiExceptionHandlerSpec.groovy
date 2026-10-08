@@ -99,10 +99,10 @@ class ApiExceptionHandlerSpec extends Specification {
 
         where:
         refusal                  | edits                                                       | tasks       || title               | fields
-        'nested broken values'   | ['privilegedAccess.required': true, 'privilegedAccess.users': (1..3).collect { [user: "U$it", account: it == 3 ? ' ' : "adm_u$it"] }, 'planning.backoutPlan': 'x' * 2001, 'riskAssessment.bbhUsers': -1, 'timing.installationStart': '6pm'] | tasksJson() || 'Validation failed' | ['template.planning.backoutPlan', 'template.privilegedAccess.users[2].account', 'template.riskAssessment.bbhUsers', 'template.timing.installationStart']
+        'nested broken values'   | ['privilegedAccess.required': true, 'privilegedAccess.users': (1..3).collect { [user: "U$it", account: it == 3 ? ' ' : "adm_u$it"] }, 'planning.backoutPlan': 'x' * 2001, requestedFor: 'x' * 201, 'timing.installationStart': '6pm'] | tasksJson() || 'Validation failed' | ['template.planning.backoutPlan', 'template.privilegedAccess.users[2].account', 'template.requestedFor', 'template.timing.installationStart']
         'too many users'         | ['privilegedAccess.users': (1..8).collect { [user: "U$it", account: "adm_u$it"] }, 'timing.installationHours': 73, jiraProjectKey: 'ce-rt'] | tasksJson() || 'Validation failed' | ['template.jiraProjectKey', 'template.privilegedAccess.users', 'template.timing.installationHours']
         'missing sections'       | [planning: null, timing: null, downtime: null]              | tasksJson() || 'Validation failed' | ['template.downtime', 'template.planning', 'template.timing']
-        'a number that is text'  | ['riskAssessment.clients': 'many']                          | tasksJson() || 'Malformed request' | ['template.riskAssessment.clients']
+        'a number that is text'  | ['timing.installationHours': 'many']                        | tasksJson() || 'Malformed request' | ['template.timing.installationHours']
         'no tasks'               | [:]                                                         | []          || 'Validation failed' | ['tasks']
         'missing tasks'          | [:]                                                         | null        || 'Validation failed' | ['tasks']
         'broken tasks'           | [:]                                                         | [[shortDescription: ' ', description: 'x' * 4001], null] || 'Validation failed' | ['tasks[0].description', 'tasks[0].shortDescription', 'tasks[1]']

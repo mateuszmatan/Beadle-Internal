@@ -2,6 +2,7 @@ package com.bbh.itss.dso.portal.config
 
 import com.bbh.itss.dso.portal.application.UseCase
 import com.bbh.itss.dso.portal.application.catalog.port.in.ProductsUseCase
+import com.bbh.itss.dso.portal.application.catalog.port.out.ChangeCountsPort
 import com.bbh.itss.dso.portal.application.catalog.port.out.DepartmentRepositoryPort
 import com.bbh.itss.dso.portal.application.catalog.port.out.PipelineCountsPort
 import com.bbh.itss.dso.portal.application.catalog.port.out.ProductRepositoryPort
@@ -65,6 +66,7 @@ class UseCaseConfigurationSpec extends Specification {
     ProductRepositoryPort products = Mock()
     DepartmentRepositoryPort departments = Mock()
     PipelineCountsPort pipelineCounts = Mock()
+    ChangeCountsPort changeCounts = Mock()
     PipelineRepositoryPort pipelines = Mock()
     PipelineRunsPort runs = Mock()
     DashboardLinksPort dashboards = Mock()
@@ -82,6 +84,7 @@ class UseCaseConfigurationSpec extends Specification {
             .withBean(ProductRepositoryPort, { products } as Supplier<ProductRepositoryPort>)
             .withBean(DepartmentRepositoryPort, { departments } as Supplier<DepartmentRepositoryPort>)
             .withBean(PipelineCountsPort, { pipelineCounts } as Supplier<PipelineCountsPort>)
+            .withBean(ChangeCountsPort, { changeCounts } as Supplier<ChangeCountsPort>)
             .withBean(PipelineRepositoryPort, { pipelines } as Supplier<PipelineRepositoryPort>)
             .withBean(PipelineRunsPort, { runs } as Supplier<PipelineRunsPort>)
             .withBean(DashboardLinksPort, { dashboards } as Supplier<DashboardLinksPort>)

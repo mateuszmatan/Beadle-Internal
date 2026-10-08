@@ -43,4 +43,17 @@ abstract class MigrationSpecification extends Specification {
     protected <T> T inTransaction(Closure<T> work) {
         new TransactionTemplate(transactionManager).execute { work() }
     }
+
+    protected List<String> tables() {
+        jdbc.queryForList('SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES', String)
+    }
+
+    protected List<String> columns(String table) {
+        jdbc.queryForList('SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ?', String, table)
+    }
+
+    protected boolean nullable(String table, String column) {
+        jdbc.queryForObject('SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ? AND COLUMN_NAME = ?',
+                String, table, column) == 'YES'
+    }
 }

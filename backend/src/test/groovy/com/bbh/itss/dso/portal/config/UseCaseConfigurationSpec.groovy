@@ -109,8 +109,8 @@ class UseCaseConfigurationSpec extends Specification {
                                                   'pipelineService', 'pipelineConfigService',
                                                   'pipelineMonitoringService', 'changeEvidenceService',
                                                   'monitoringTargetsService', 'changeProfileService',
-                                                  'productionChangeService', 'lookupService',
-                                                  'signedInUserService'])
+                                                  'productionChangeService', 'changeOptionsService',
+                                                  'lookupService', 'signedInUserService'])
             useCases.values().each { useCase ->
                 assert isAopProxy(useCase)
                 assert (useCase as Advised).advisors*.advice.any { it instanceof TransactionInterceptor }

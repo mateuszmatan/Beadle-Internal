@@ -8,6 +8,7 @@ import com.bbh.itss.dso.portal.application.catalog.port.out.PipelineCountsPort
 import com.bbh.itss.dso.portal.application.catalog.port.out.ProductRepositoryPort
 import com.bbh.itss.dso.portal.application.change.port.out.ChangeProfileRepositoryPort
 import com.bbh.itss.dso.portal.application.change.port.out.JiraPort
+import com.bbh.itss.dso.portal.application.change.port.out.ProTechLookupPort
 import com.bbh.itss.dso.portal.application.change.port.out.ProductionChangeRepositoryPort
 import com.bbh.itss.dso.portal.application.change.port.out.ServiceNowPort
 import com.bbh.itss.dso.portal.application.evidence.port.in.QueryEvidenceUseCase
@@ -76,6 +77,7 @@ class UseCaseConfigurationSpec extends Specification {
     ProductionChangeRepositoryPort productionChanges = Mock()
     JiraPort jira = Mock()
     ServiceNowPort serviceNow = Mock()
+    ProTechLookupPort lookups = Mock()
 
     def runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(AopAutoConfiguration, TransactionAutoConfiguration))
@@ -94,6 +96,7 @@ class UseCaseConfigurationSpec extends Specification {
             .withBean(ProductionChangeRepositoryPort, { productionChanges } as Supplier<ProductionChangeRepositoryPort>)
             .withBean(JiraPort, { jira } as Supplier<JiraPort>)
             .withBean(ServiceNowPort, { serviceNow } as Supplier<ServiceNowPort>)
+            .withBean(ProTechLookupPort, { lookups } as Supplier<ProTechLookupPort>)
             .withBean(SignedInUserPort, { { -> 'Mateusz Matan' } as SignedInUserPort } as Supplier<SignedInUserPort>)
             .withBean(KeyGenerator, { { -> 'key' } as KeyGenerator } as Supplier<KeyGenerator>)
             .withBean(Clock, { systemUTC() } as Supplier<Clock>)
@@ -106,7 +109,8 @@ class UseCaseConfigurationSpec extends Specification {
                                                   'pipelineService', 'pipelineConfigService',
                                                   'pipelineMonitoringService', 'changeEvidenceService',
                                                   'monitoringTargetsService', 'changeProfileService',
-                                                  'productionChangeService', 'signedInUserService'])
+                                                  'productionChangeService', 'lookupService',
+                                                  'signedInUserService'])
             useCases.values().each { useCase ->
                 assert isAopProxy(useCase)
                 assert (useCase as Advised).advisors*.advice.any { it instanceof TransactionInterceptor }

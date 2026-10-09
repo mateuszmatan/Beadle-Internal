@@ -54,6 +54,9 @@ def npmSettings = [
         'npm.https.proxy': 'npm_config_https_proxy',
         'npm.no.proxy'   : 'npm_config_noproxy',
         'npm.loglevel'   : 'npm_config_loglevel']
+def designSystemPackages = (findProperty('designSystem.packages') ?: '@v6/v6-themes@21 @v6/v6-table @v6/v6-icons').toString().tokenize()
+def angularConfiguration = bbhNetwork ? 'production' : 'production,public'
+def agGridLicenseKey = providers.gradleProperty('agGridLicenseKey').orElse(providers.environmentVariable('AG_GRID_LICENSE_KEY')).getOrElse('')
 def npmEnvironment = bbhNetwork
         ? npmSettings.findAll { setting, variable -> findProperty(setting) && (setting != 'npm.cafile' || file(findProperty(setting)).isFile()) }
                 .collectEntries { setting, variable -> [variable, findProperty(setting)] }
@@ -77,6 +80,8 @@ project(':frontend') {
             fileTree('src') { exclude 'smokeTest/**', 'regressionTest/**', 'performanceTest/**', 'testFixtures/**' },
             'public', 'angular.json', 'tsconfig.json', 'tsconfig.app.json', 'tsconfig.spec.json', 'package.json', 'package-lock.json')
 
+    def npmInstalled = layout.buildDirectory.file('npm/installed.txt')
+
     tasks.register('installNpmCIDeps', Exec) {
         group = 'build'
         description = 'npm ci (uses package-lock.json)'
@@ -84,19 +89,37 @@ project(':frontend') {
         environment npmEnvironment
         inputs.files("package.json", "package-lock.json", ".npmrc")
         commandLine = npmCmd + ['ci', '--no-audit', '--no-fund', '--verbose']
-        outputs.file("node_modules/.package-lock.json")
+        outputs.file(npmInstalled)
+        outputs.upToDateWhen { file('node_modules').isDirectory() }
+        doLast { npmInstalled.get().asFile.text = 'npm ci' }
+    }
+
+    tasks.register('installDesignSystem', Exec) {
+        dependsOn(":frontend:installNpmCIDeps")
+        onlyIf { bbhNetwork }
+        group = 'build'
+        description = 'Install the BBH Design System (@v6) packages from the BBH npm registry next to the locked dependencies'
+        workingDir = project.projectDir
+        environment npmEnvironment
+        inputs.files("package.json", "package-lock.json", ".npmrc")
+        inputs.property('packages', designSystemPackages)
+        commandLine = npmCmd + ['install', '--no-save', '--no-audit', '--no-fund'] + designSystemPackages
+        outputs.dir("node_modules/@v6")
     }
 
     tasks.register('buildAngular', Exec) {
-        dependsOn(":frontend:installNpmCIDeps")
+        dependsOn(":frontend:installDesignSystem")
         group = 'build'
-        description = 'Build Angular (production) using npx ng'
+        description = "Build Angular ($angularConfiguration) using npx ng"
         workingDir = project.projectDir
         environment npmEnvironment
         inputs.files(angularSources).withPathSensitivity(PathSensitivity.RELATIVE)
-        commandLine = npxCmd + ['ng', 'build', '--configuration=production']
+        inputs.property('configuration', angularConfiguration)
+        inputs.property('agGridLicensed', agGridLicenseKey ? agGridLicenseKey.digest('SHA-256') : '')
+        commandLine = npxCmd + ['ng', 'build', "--configuration=$angularConfiguration"] +
+                (agGridLicenseKey ? ["--define=AG_GRID_LICENSE_KEY=\"$agGridLicenseKey\"".toString()] : [])
         outputs.dir("dist")
-        doFirst { logger.lifecycle("Executing: npx ng build --configuration=production") }
+        doFirst { logger.lifecycle("Executing: npx ng build --configuration=$angularConfiguration") }
     }
 
     tasks.register('testAngular', Exec) {

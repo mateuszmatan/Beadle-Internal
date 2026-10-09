@@ -1,34 +1,31 @@
 pluginManagement {
     repositories {
+        if (providers.gradleProperty('bbhNetwork').getOrElse('true') != 'false') {
+            maven { url = 'https://tools.bbh.com/nexus/content/groups/public' }
+            maven { url = uri("https://tools.bbh.com/nexus/repository/gradle-plugins/") }
+            maven { url = uri("https://tools.bbh.com/nexus/repository/maven-public/") }
+        }
         gradlePluginPortal()
-        mavenCentral()
     }
-}
-
-plugins {
-    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
 }
 
 dependencyResolutionManagement {
     repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
     repositories {
-        mavenCentral()
-        ivy {
-            name = 'Node.js'
-            url = providers.gradleProperty('nodeDistBaseUrl').getOrElse('https://nodejs.org/dist/')
-            patternLayout {
-                artifact 'v[revision]/[artifact](-v[revision]-[classifier]).[ext]'
+        if (providers.gradleProperty('bbhNetwork').getOrElse('true') != 'false') {
+            maven {
+                url = uri("http://tools.bbh.com/nexus/content/groups/public")
+                allowInsecureProtocol = true
             }
-            metadataSources {
-                artifact()
-            }
-            content {
-                includeModule('org.nodejs', 'node')
-            }
+            maven { url = uri("https://tools.bbh.com/nexus/repository/gradle-plugins/") }
+            maven { url = uri("https://tools.bbh.com/nexus/repository/maven-public/") }
+            maven { url = uri("https://tools.bbh.com/nexus/repository/maven-central/") }
+        } else {
+            mavenCentral()
         }
     }
 }
 
 rootProject.name = 'dso-portal'
 
-include 'gui', 'backend'
+include 'backend', 'frontend'

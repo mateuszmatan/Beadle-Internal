@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=registry.access.redhat.com/ubi9/openjdk-21-runtime:latest
+ARG BASE_IMAGE=registry.access.redhat.com/ubi9/openjdk-17-runtime:latest
 
 FROM ${BASE_IMAGE} AS layers
 USER 0

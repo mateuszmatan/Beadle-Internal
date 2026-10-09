@@ -1,0 +1,184 @@
+plugins {
+    alias(libs.plugins.spring.boot) apply false
+    alias(libs.plugins.spring.dependency.management) apply false
+    alias(libs.plugins.sonarqube)
+}
+
+allprojects {
+    group = 'com.bbh.itss.dso'
+    version = findProperty('artifactVersion') ?: '0.1.0-SNAPSHOT'
+}
+
+subprojects {
+    apply plugin: 'base'
+
+    plugins.withType(JavaBasePlugin).configureEach {
+        java {
+            toolchain {
+                languageVersion = JavaLanguageVersion.of(17)
+            }
+        }
+    }
+}
+
+sonar {
+    properties {
+        property "sonar.host.url", "https://tools.bbh.com/sonar"
+        property "sonar.token", System.getenv("SONAR_AUTH_TOKEN")
+        property "sonar.projectKey", "DSOMgmtPortal"
+        property "sonar.projectName", "DSOMgmtPortal"
+    }
+}
+
+tasks.named("sonar").configure {
+    dependsOn(":backend:classes", ":backend:jacocoTestReport")
+    dependsOn(":frontend:testAngular")
+}
+
+def bbhNetwork = providers.gradleProperty('bbhNetwork').getOrElse('true') != 'false'
+def skipFrontend = providers.gradleProperty('skipFrontend').map { it != 'false' }.getOrElse(false)
+
+def isWindows = System.getProperty('os.name').toLowerCase().contains('windows')
+def nodeCommand = { String name ->
+    def configured = findProperty("${name}.executable")
+    configured && file(configured).isFile() ? [configured] : isWindows ? ['cmd', '/c', name] : [name]
+}
+def npmCmd = nodeCommand('npm')
+def npxCmd = nodeCommand('npx')
+
+def npmSettings = [
+        'npm.registry'   : 'npm_config_registry',
+        'npm.strictSsl'  : 'npm_config_strict_ssl',
+        'npm.cafile'     : 'npm_config_cafile',
+        'npm.http.proxy' : 'npm_config_proxy',
+        'npm.https.proxy': 'npm_config_https_proxy',
+        'npm.no.proxy'   : 'npm_config_noproxy',
+        'npm.loglevel'   : 'npm_config_loglevel']
+def npmEnvironment = bbhNetwork
+        ? npmSettings.findAll { setting, variable -> findProperty(setting) && (setting != 'npm.cafile' || file(findProperty(setting)).isFile()) }
+                .collectEntries { setting, variable -> [variable, findProperty(setting)] }
+        : [npm_config_registry: findProperty('npm.publicRegistry') ?: 'https://registry.npmjs.org/']
+
+project(':frontend') {
+    apply plugin: 'groovy'
+    apply plugin: 'java-test-fixtures'
+
+    sonar {
+        properties {
+            property "sonar.sources", "src"
+            property "sonar.tests", "src"
+            property "sonar.test.inclusions", "**/*.spec.ts"
+            property "sonar.exclusions", "**/node_modules/**,**/dist/**"
+            property "sonar.javascript.lcov.reportPaths", "${project.projectDir}/coverage/**/lcov.info"
+        }
+    }
+
+    def angularSources = files(
+            fileTree('src') { exclude 'smokeTest/**', 'regressionTest/**', 'performanceTest/**', 'testFixtures/**' },
+            'public', 'angular.json', 'tsconfig.json', 'tsconfig.app.json', 'tsconfig.spec.json', 'package.json', 'package-lock.json')
+
+    tasks.register('installNpmCIDeps', Exec) {
+        group = 'build'
+        description = 'npm ci (uses package-lock.json)'
+        workingDir = project.projectDir
+        environment npmEnvironment
+        inputs.files("package.json", "package-lock.json", ".npmrc")
+        commandLine = npmCmd + ['ci', '--no-audit', '--no-fund', '--verbose']
+        outputs.file("node_modules/.package-lock.json")
+    }
+
+    tasks.register('buildAngular', Exec) {
+        dependsOn(":frontend:installNpmCIDeps")
+        group = 'build'
+        description = 'Build Angular (production) using npx ng'
+        workingDir = project.projectDir
+        environment npmEnvironment
+        inputs.files(angularSources).withPathSensitivity(PathSensitivity.RELATIVE)
+        commandLine = npxCmd + ['ng', 'build', '--configuration=production']
+        outputs.dir("dist")
+        doFirst { logger.lifecycle("Executing: npx ng build --configuration=production") }
+    }
+
+    tasks.register('testAngular', Exec) {
+        dependsOn(":frontend:buildAngular")
+        group = 'verification'
+        description = 'Run the Angular unit tests (Vitest on jsdom) with coverage via npx ng; fails below the thresholds in angular.json'
+        workingDir = project.projectDir
+        environment npmEnvironment
+        inputs.files(angularSources).withPathSensitivity(PathSensitivity.RELATIVE)
+        commandLine = npxCmd + ['ng', 'test', '--watch=false', '--coverage']
+        outputs.dir("coverage")
+        doFirst { logger.lifecycle("Executing: npx ng test --watch=false --coverage") }
+    }
+
+    tasks.register('copyToBackend', Sync) {
+        group = 'build'
+        description = 'Copy built Angular dist to backend static resources'
+        dependsOn 'buildAngular'
+        from "dist"
+        into file("${project(':backend').projectDir}/src/main/resources/static")
+    }
+
+    tasks.named('assemble') {
+        dependsOn 'buildAngular'
+    }
+
+    tasks.named('test') {
+        dependsOn 'testAngular'
+    }
+
+    tasks.named('jar') {
+        enabled = false
+    }
+
+    tasks.named('clean') {
+        delete 'dist', 'coverage', '.angular'
+    }
+}
+
+project(':backend') {
+    apply plugin: 'groovy'
+    apply plugin: 'jacoco'
+    apply plugin: 'java-test-fixtures'
+    apply plugin: 'org.springframework.boot'
+    apply plugin: 'io.spring.dependency-management'
+    apply plugin: 'maven-publish'
+
+    sonar {
+        properties {
+            property "sonar.java.binaries", "build/classes/java/main"
+            property "sonar.groovy.binaries", "build/classes/groovy/test"
+            property "sonar.coverage.jacoco.xmlReportPaths", "build/reports/jacoco/test/jacocoTestReport.xml"
+        }
+    }
+
+    tasks.named('processResources') {
+        mustRunAfter ':frontend:copyToBackend'
+    }
+
+    if (!skipFrontend) {
+        tasks.matching { it.name in ['bootJar', 'bootRun', 'smokeTest'] }.configureEach {
+            dependsOn ':frontend:copyToBackend'
+        }
+    }
+
+    publishing {
+        publications {
+            portal(MavenPublication) {
+                artifactId = 'dso-portal'
+                artifact tasks.named('bootJar')
+            }
+        }
+        repositories {
+            maven {
+                name = 'bbhNexus'
+                url = uri(version.toString().endsWith('SNAPSHOT') ? findProperty('nexus.snapshotsUrl') : findProperty('nexus.releasesUrl'))
+                credentials(PasswordCredentials)
+            }
+        }
+    }
+
+    tasks.named('publish') {
+        dependsOn ':backend:bootJar'
+    }
+}

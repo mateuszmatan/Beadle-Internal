@@ -10,7 +10,7 @@ public class InvalidRequestException extends IllegalArgumentException {
     private final List<FieldProblem> problems;
 
     public InvalidRequestException(List<FieldProblem> problems) {
-        super(problems.size() == 1 ? problems.getFirst().message() : problems.size() + " fields are invalid");
+        super(problems.size() == 1 ? problems.get(0).message() : problems.size() + " fields are invalid");
         this.problems = List.copyOf(problems);
     }
 

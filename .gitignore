@@ -3,7 +3,7 @@
 .idea/
 *.iml
 .vscode/*
-!gui/.vscode/
+!frontend/.vscode/
 
 .DS_Store
 backend/data/
@@ -12,3 +12,5 @@ data/
 .gradle/
 build/
 .kotlin/
+backend/src/main/resources/static/
+frontend/node_modules/

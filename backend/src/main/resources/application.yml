@@ -51,8 +51,13 @@ dso:
     bucket: ${INFLUX_BUCKET:DORA-metrics}
     token: ${INFLUX_TOKEN:}
   grafana:
-    dashboard-url: ${GRAFANA_DASHBOARD_URL:}
-    security-dashboard-url: ${GRAFANA_SECURITY_DASHBOARD_URL:}
+    instances:
+      - name: ${GRAFANA_NAME:Grafana}
+        dashboard-url: ${GRAFANA_DASHBOARD_URL:}
+        security-dashboard-url: ${GRAFANA_SECURITY_DASHBOARD_URL:}
+      - name: ${GRAFANA_2_NAME:Grafana 2}
+        dashboard-url: ${GRAFANA_2_DASHBOARD_URL:}
+        security-dashboard-url: ${GRAFANA_2_SECURITY_DASHBOARD_URL:}
   demo-data: false
 ---
 spring:

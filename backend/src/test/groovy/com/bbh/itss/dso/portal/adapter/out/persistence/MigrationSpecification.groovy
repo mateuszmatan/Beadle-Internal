@@ -29,12 +29,16 @@ abstract class MigrationSpecification extends Specification {
 
     def setup() {
         System.setProperty('liquibase.analytics.enabled', 'false')
-        liquibase = new Liquibase('db/changelog/db.changelog-master.yaml', new ClassLoaderResourceAccessor(),
-                DatabaseFactory.instance.findCorrectDatabaseImplementation(new JdbcConnection(dataSource.connection)))
+        liquibase = changelog()
     }
 
     def cleanup() {
         liquibase.close()
+    }
+
+    protected Liquibase changelog() {
+        new Liquibase('db/changelog/db.changelog-master.yaml', new ClassLoaderResourceAccessor(),
+                DatabaseFactory.instance.findCorrectDatabaseImplementation(new JdbcConnection(dataSource.connection)))
     }
 
     protected int executedSince(String id) {

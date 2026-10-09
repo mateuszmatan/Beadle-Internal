@@ -190,8 +190,8 @@ class UseCaseConfigurationSpec extends Specification {
         runs.recentRuns(*_) >> { influx('recent runs', []) }
         runs.doraPoints(*_) >> { influx('DORA points', [:]) }
         evidence.evidenceOf(_) >> { influx('evidence', [:]) }
-        dashboards.url() >> Optional.empty()
-        dashboards.dashboardUrl(*_) >> Optional.empty()
+        dashboards.instances() >> []
+        dashboards.dashboards(*_) >> []
         def product = Fixtures.product(id: 5L, services: [[id: 10L, name: 'gui']])
         def pipeline = Fixtures.pipeline(id: 20L, productId: 5L, serviceId: 10L)
 

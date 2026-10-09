@@ -67,14 +67,19 @@ class ApplicationProfilesSpec extends Specification {
 
         then:
         ['url', 'token', 'org', 'bucket'].collect { env.getProperty("dso.influx.$it") } == influx
-        ['dashboard-url', 'security-dashboard-url'].collect { env.getProperty("dso.grafana.$it") } == grafana
+        (0..1).collectMany { instance ->
+            ['name', 'dashboard-url', 'security-dashboard-url'].collect { env.getProperty("dso.grafana.instances[$instance].$it") }
+        } == grafana
 
         where:
         variables << [[:], [INFLUX_URL: 'https://influx.bbh.com', INFLUX_TOKEN: 'token', INFLUX_ORG: 'BBH',
                             INFLUX_BUCKET: 'metrics', GRAFANA_DASHBOARD_URL: 'https://grafana.bbh.com/d/adzfc54123/p',
-                            GRAFANA_SECURITY_DASHBOARD_URL: 'https://grafana.bbh.com/d/ad2trcm/s']]
+                            GRAFANA_SECURITY_DASHBOARD_URL: 'https://grafana.bbh.com/d/ad2trcm/s', GRAFANA_2_NAME: 'Grafana prod',
+                            GRAFANA_2_DASHBOARD_URL: 'https://grafana-prod.bbh.com/d/adzfc54123/p']]
         influx << [['', '', 'DevSecOps', 'DORA-metrics'], ['https://influx.bbh.com', 'token', 'BBH', 'metrics']]
-        grafana << [['', ''], ['https://grafana.bbh.com/d/adzfc54123/p', 'https://grafana.bbh.com/d/ad2trcm/s']]
+        grafana << [['Grafana', '', '', 'Grafana 2', '', ''],
+                    ['Grafana', 'https://grafana.bbh.com/d/adzfc54123/p', 'https://grafana.bbh.com/d/ad2trcm/s',
+                     'Grafana prod', 'https://grafana-prod.bbh.com/d/adzfc54123/p', '']]
     }
 
     private static Environment environment(List<String> profiles, Map<String, String> variables) {

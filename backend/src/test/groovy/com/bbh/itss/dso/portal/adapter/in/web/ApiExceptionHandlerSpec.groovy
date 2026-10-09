@@ -105,7 +105,7 @@ class ApiExceptionHandlerSpec extends Specification {
         'a number that is text'  | ['timing.installationHours': 'many']                        | tasksJson() || 'Malformed request' | ['template.timing.installationHours']
         'no tasks'               | [:]                                                         | []          || 'Validation failed' | ['tasks']
         'missing tasks'          | [:]                                                         | null        || 'Validation failed' | ['tasks']
-        'broken tasks'           | [:]                                                         | [[shortDescription: ' ', description: 'x' * 4001], null] || 'Validation failed' | ['tasks[0].description', 'tasks[0].shortDescription', 'tasks[1]']
+        'broken tasks'           | [:]                                                         | [[shortDescription: ' ', description: 'x' * 4001, assignedTo: 'x' * 201], null] || 'Validation failed' | ['tasks[0].assignedTo', 'tasks[0].assignmentGroup', 'tasks[0].description', 'tasks[0].shortDescription', 'tasks[1]']
         'too many tasks'         | [:]                                                         | tasksJson(51) || 'Validation failed' | ['tasks']
     }
 

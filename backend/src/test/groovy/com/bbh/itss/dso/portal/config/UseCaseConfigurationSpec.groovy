@@ -10,6 +10,7 @@ import com.bbh.itss.dso.portal.application.change.port.in.ChangeIntegrations
 import com.bbh.itss.dso.portal.application.change.port.in.ProductionChangesUseCase
 import com.bbh.itss.dso.portal.application.change.port.out.ChangeProductsPort
 import com.bbh.itss.dso.portal.application.change.port.out.ChangeProfileRepositoryPort
+import com.bbh.itss.dso.portal.application.change.port.out.CyberTrackPort
 import com.bbh.itss.dso.portal.application.change.port.out.JiraPort
 import com.bbh.itss.dso.portal.application.change.port.out.ProTechLookupPort
 import com.bbh.itss.dso.portal.application.change.port.out.ProductionChangeRepositoryPort
@@ -83,6 +84,7 @@ class UseCaseConfigurationSpec extends Specification {
     ProductionChangeRepositoryPort productionChanges = Mock()
     JiraPort jira = Mock()
     ServiceNowPort serviceNow = Mock()
+    CyberTrackPort cyberTrack = Mock()
     ProTechLookupPort lookups = Mock()
     ServiceTemplateRepositoryPort templates = Mock()
 
@@ -104,6 +106,7 @@ class UseCaseConfigurationSpec extends Specification {
             .withBean(ProductionChangeRepositoryPort, { productionChanges } as Supplier<ProductionChangeRepositoryPort>)
             .withBean(JiraPort, { jira } as Supplier<JiraPort>)
             .withBean(ServiceNowPort, { serviceNow } as Supplier<ServiceNowPort>)
+            .withBean(CyberTrackPort, { cyberTrack } as Supplier<CyberTrackPort>)
             .withBean(ProTechLookupPort, { lookups } as Supplier<ProTechLookupPort>)
             .withBean(ServiceTemplateRepositoryPort, { templates } as Supplier<ServiceTemplateRepositoryPort>)
             .withBean(SignedInUserPort, { { -> 'Mateusz Matan' } as SignedInUserPort } as Supplier<SignedInUserPort>)
@@ -217,11 +220,12 @@ class UseCaseConfigurationSpec extends Specification {
         3 * pipelines.sharedMetricsTags() >> ([] as Set)
     }
 
-    def "Beadle asks Jira and ProTech whether they are connected with no transaction"() {
+    def "Beadle asks Jira, ProTech and CyberTrack whether they are connected with no transaction"() {
         given:
         ChangeIntegrations integrations = null
         jira.connected() >> { calls << 'Jira ' + transactionState(); true }
         serviceNow.connected() >> { calls << 'ProTech ' + transactionState(); false }
+        cyberTrack.connected() >> { calls << 'CyberTrack ' + transactionState(); true }
 
         when:
         runner.run { ApplicationContext context ->
@@ -229,8 +233,8 @@ class UseCaseConfigurationSpec extends Specification {
         }
 
         then:
-        integrations == new ChangeIntegrations(true, false)
-        calls == ['Jira without transaction', 'ProTech without transaction']
+        integrations == new ChangeIntegrations(true, false, true)
+        calls == ['Jira without transaction', 'ProTech without transaction', 'CyberTrack without transaction']
         transactions.log == []
     }
 

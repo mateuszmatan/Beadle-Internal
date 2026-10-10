@@ -58,6 +58,11 @@ dso:
       - name: ${GRAFANA_2_NAME:Grafana 2}
         dashboard-url: ${GRAFANA_2_DASHBOARD_URL:}
         security-dashboard-url: ${GRAFANA_2_SECURITY_DASHBOARD_URL:}
+  cybertrack:
+    url: ${CYBERTRACK_URL:}
+    token: ${CYBERTRACK_TOKEN:}
+    project-key: ${CYBERTRACK_PROJECT_KEY:SCP}
+    issue-type: ${CYBERTRACK_ISSUE_TYPE:Task}
   demo-data: false
 ---
 spring:

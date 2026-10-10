@@ -33,6 +33,9 @@ spec:
             - secretRef:
                 name: dso-portal-influx
                 optional: true
+            - secretRef:
+                name: dso-portal-cybertrack
+                optional: true
           env:
             - name: MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED
               value: "true"

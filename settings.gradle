@@ -55,4 +55,4 @@ dependencyResolutionManagement {
 
 rootProject.name = 'bbh-devsecops'
 
-include 'common-backend', 'common-gui', 'beadle-backend', 'beadle-gui', 'dso-backend', 'dso-gui'
+include 'common-backend', 'common-gui', 'beadle-backend', 'beadle-gui', 'dso-backend', 'dso-gui', 'backend'

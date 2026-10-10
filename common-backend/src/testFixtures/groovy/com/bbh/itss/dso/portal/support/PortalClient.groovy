@@ -6,7 +6,7 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 
-import static com.bbh.itss.dso.portal.support.ApiJson.toJson
+import static com.bbh.itss.dso.portal.support.Json.toJson
 import static java.net.http.HttpClient.Builder.NO_PROXY
 import static java.net.http.HttpRequest.BodyPublishers.noBody
 import static java.net.http.HttpRequest.BodyPublishers.ofString
@@ -69,7 +69,7 @@ class PortalClient {
         String body
 
         Object getJson() {
-            ApiJson.parse(body)
+            Json.parse(body)
         }
 
         String header(String name) {

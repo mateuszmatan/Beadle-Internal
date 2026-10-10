@@ -25,6 +25,9 @@ subprojects {
                 languageVersion = JavaLanguageVersion.of(17)
             }
         }
+        tasks.withType(JavaCompile).configureEach {
+            options.compilerArgs << '-parameters'
+        }
     }
 
     ext.forward = { Test task, String... names ->
@@ -181,7 +184,7 @@ configure(subprojects.findAll { it.name.endsWith('-gui') }) { gui ->
             [regressionTest: 'Runs the user journeys of the interface in a browser against a stubbed API.',
              smokeTest     : 'Opens every page of the interface in a browser; -Dsmoke.baseUrl checks a deployed application.',
              performanceTest: 'Measures load and render times of the interface on a large catalogue.'].each { suiteName, text ->
-                if (file("src/$suiteName").isDirectory()) {
+                if (gui.file("src/$suiteName").isDirectory()) {
                     register(suiteName, JvmTestSuite) {
                         useJUnitJupiter(libs.versions.junit)
                         dependencies {
@@ -194,8 +197,8 @@ configure(subprojects.findAll { it.name.endsWith('-gui') }) { gui ->
                                 shouldRunAfter 'testAngular'
                                 inputs.dir(distDir).withPathSensitivity(PathSensitivity.RELATIVE)
                                 systemProperty 'frontend.dist', distDir.asFile.absolutePath
-                                systemProperty 'frontend.reports', layout.buildDirectory.dir('reports/frontend').get().asFile.absolutePath
-                                systemProperty 'performance.report', layout.buildDirectory.file("reports/performance/${gui.name}-performance-report.md").get().asFile.absolutePath
+                                systemProperty 'frontend.reports', gui.layout.buildDirectory.dir('reports/frontend').get().asFile.absolutePath
+                                systemProperty 'performance.report', gui.layout.buildDirectory.file("reports/performance/${gui.name}-performance-report.md").get().asFile.absolutePath
                                 forward(it, 'frontend.browser', 'frontend.headed', 'smoke.baseUrl', 'performance.factor')
                                 testLogging {
                                     events 'failed'
@@ -247,6 +250,7 @@ configure(subprojects.findAll { it.name.endsWith('-backend') }) { backend ->
         testFixturesApi platform(libs.spock.bom)
         testFixturesApi libs.spock.core
         testFixturesApi libs.spock.spring
+        testFixturesApi libs.archunit.junit5
     }
 
     sonar {
@@ -279,7 +283,6 @@ configure(subprojects.findAll { it.name.endsWith('-backend') }) { backend ->
             test {
                 dependencies {
                     implementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
-                    implementation libs.archunit.junit5
                 }
                 targets.configureEach {
                     testTask.configure {
@@ -291,7 +294,7 @@ configure(subprojects.findAll { it.name.endsWith('-backend') }) { backend ->
             [regressionTest : 'Runs the API end to end on H2 in Oracle mode.',
              smokeTest      : 'Starts the application and checks health, the API and the UI.',
              performanceTest: 'Measures the p95 latencies of the main calls on a large catalogue.'].each { suiteName, text ->
-                if (file("src/$suiteName").isDirectory()) {
+                if (backend.file("src/$suiteName").isDirectory()) {
                     register(suiteName, JvmTestSuite) {
                         dependencies {
                             implementation project()
@@ -302,8 +305,8 @@ configure(subprojects.findAll { it.name.endsWith('-backend') }) { backend ->
                                 description = text
                                 shouldRunAfter tasks.named('test')
                                 extensions.getByType(JacocoTaskExtension).enabled = false
-                                systemProperty 'regression.expectedDir', file('src/regressionTest/resources/regression').absolutePath
-                                systemProperty 'performance.report', layout.buildDirectory.file("reports/performance/${backend.name}-performance-report.md").get().asFile.absolutePath
+                                systemProperty 'regression.expectedDir', backend.file('src/regressionTest/resources/regression').absolutePath
+                                systemProperty 'performance.report', backend.layout.buildDirectory.file("reports/performance/${backend.name}-performance-report.md").get().asFile.absolutePath
                                 forward(it, 'regression.updateExpected', 'smoke.baseUrl', 'smoke.ui', 'performance.factor')
                                 if (suiteName != 'regressionTest') {
                                     outputs.upToDateWhen { false }

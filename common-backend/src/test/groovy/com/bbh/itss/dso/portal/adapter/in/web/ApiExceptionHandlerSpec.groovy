@@ -16,10 +16,8 @@ import spock.lang.Specification
 
 import static com.bbh.itss.dso.portal.domain.shared.Failures.STALE_VERSION
 import static com.bbh.itss.dso.portal.domain.shared.Failures.notFound
-import static com.bbh.itss.dso.portal.support.ApiJson.parse
-import static com.bbh.itss.dso.portal.support.ApiJson.toJson
-import static com.bbh.itss.dso.portal.support.ChangeFixtures.tasksJson
-import static com.bbh.itss.dso.portal.support.ChangeFixtures.templateJson
+import static com.bbh.itss.dso.portal.support.Json.parse
+import static com.bbh.itss.dso.portal.support.Json.toJson
 import static org.springframework.http.MediaType.APPLICATION_JSON
 import static org.springframework.http.MediaType.TEXT_PLAIN
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
@@ -70,7 +68,7 @@ class ApiExceptionHandlerSpec extends Specification {
 
     def "bean validation errors are listed per field"() {
         when:
-        def response = mvc.perform(json(toJson([type: 'FULL', agentLabels: labels]))).andReturn().response
+        def response = mvc.perform(json(toJson([day: 'FRIDAY', labels: labels]))).andReturn().response
 
         then:
         response.status == 400
@@ -81,42 +79,9 @@ class ApiExceptionHandlerSpec extends Specification {
         }
 
         where:
-        labels          || detail                   | fields
-        []              || 'add at least one Jenkins agent label' | ['agentLabels']
-        ['a', 'b,c']    || 'must be a Jenkins label or label expression such as linux && docker, without commas' | ['agentLabels[1]']
-    }
-
-    def "a change profile with #refusal is refused against the path of each field"() {
-        when:
-        def response = mvc.perform(post('/api/samples/change-profile').contentType(APPLICATION_JSON)
-                .content(toJson([version: null, template: templateJson(edits), tasks: tasks]))).andReturn().response
-        def problem = parse(response.contentAsString)
-
-        then:
-        response.status == 400
-        problem.title == title
-        problem.errors*.field.sort() == fields
-
-        where:
-        refusal                  | edits                                                       | tasks       || title               | fields
-        'nested broken values'   | ['privilegedAccess.required': true, 'privilegedAccess.users': (1..3).collect { [user: "U$it", account: it == 3 ? ' ' : "adm_u$it"] }, 'planning.backoutPlan': 'x' * 2001, requestedFor: 'x' * 201, 'timing.installationStart': '6pm'] | tasksJson() || 'Validation failed' | ['template.planning.backoutPlan', 'template.privilegedAccess.users[2].account', 'template.requestedFor', 'template.timing.installationStart']
-        'too many users'         | ['privilegedAccess.users': (1..8).collect { [user: "U$it", account: "adm_u$it"] }, 'timing.installationHours': 73, jiraProjectKey: 'ce-rt'] | tasksJson() || 'Validation failed' | ['template.jiraProjectKey', 'template.privilegedAccess.users', 'template.timing.installationHours']
-        'missing sections'       | [planning: null, timing: null, downtime: null]              | tasksJson() || 'Validation failed' | ['template.downtime', 'template.planning', 'template.timing']
-        'a number that is text'  | ['timing.installationHours': 'many']                        | tasksJson() || 'Malformed request' | ['template.timing.installationHours']
-        'no tasks'               | [:]                                                         | []          || 'Validation failed' | ['tasks']
-        'missing tasks'          | [:]                                                         | null        || 'Validation failed' | ['tasks']
-        'broken tasks'           | [:]                                                         | [[shortDescription: ' ', description: 'x' * 4001, assignedTo: 'x' * 201], null] || 'Validation failed' | ['tasks[0].assignedTo', 'tasks[0].assignmentGroup', 'tasks[0].description', 'tasks[0].shortDescription', 'tasks[1]']
-        'too many tasks'         | [:]                                                         | tasksJson(51) || 'Validation failed' | ['tasks']
-    }
-
-    def "a complete change profile with the Jira key #key passes the bean validation"() {
-        expect:
-        mvc.perform(post('/api/samples/change-profile').contentType(APPLICATION_JSON)
-                .content(toJson([version: 3, template: templateJson(jiraProjectKey: key), tasks: tasksJson(1)])))
-                .andReturn().response.contentAsString == 'CERT'
-
-        where:
-        key << ['CERT', 'cert']
+        labels       || detail                   | fields
+        []           || 'add at least one label' | ['labels']
+        ['a', 'b,c'] || 'must not contain commas' | ['labels[1]']
     }
 
     def "#request answers #status #title without naming a class or a method"() {
@@ -137,12 +102,12 @@ class ApiExceptionHandlerSpec extends Specification {
         'a failing controller'   | get('/api/samples/7')                             || 500    | 'Request failed'         | UNEXPECTED
         'no body'                | json('')                                          || 400    | 'Malformed request'      | 'The request body is missing.'
         'a body that is no JSON' | json('{"type":')                                  || 400    | 'Malformed request'      | 'The request body is not valid JSON.'
-        'a body of another shape'| json('["FULL"]')                                  || 400    | 'Malformed request'      | 'The request body does not have the shape this endpoint expects.'
+        'a body of another shape'| json('["FRIDAY"]')                                  || 400    | 'Malformed request'      | 'The request body does not have the shape this endpoint expects.'
         'a path value'           | get('/api/samples/undefined')                     || 400    | 'Malformed request'      | "The value given for 'id' is not one this endpoint can read."
         'a query value'          | get('/api/samples').param('size', 'big')          || 400    | 'Malformed request'      | "The value given for 'size' is not one this endpoint can read."
         'no query value'         | get('/api/samples')                               || 400    | 'Bad Request'            | "Required parameter 'size' is not present."
         'another method'         | post('/api/samples/7')                            || 405    | 'Method Not Allowed'     | "Method 'POST' is not supported."
-        'another content type'   | post('/api/samples').contentType(TEXT_PLAIN).content('FULL') || 415 | 'Unsupported Media Type' | "Content-Type 'text/plain' is not supported."
+        'another content type'   | post('/api/samples').contentType(TEXT_PLAIN).content('FRIDAY') || 415 | 'Unsupported Media Type' | "Content-Type 'text/plain' is not supported."
     }
 
     private static MockHttpServletRequestBuilder json(String body) {
@@ -162,14 +127,9 @@ class ApiExceptionHandlerSpec extends Specification {
             "$size samples"
         }
 
-        @PostMapping('/api/samples/change-profile')
-        String profile(@jakarta.validation.Valid @RequestBody ChangeProfileRequest request) {
-            request.toTemplate().jiraProjectKey()
-        }
-
         @PostMapping('/api/samples')
-        String create(@jakarta.validation.Valid @RequestBody PipelineRequest request) {
-            request.type().name()
+        String create(@jakarta.validation.Valid @RequestBody SampleRequest request) {
+            request.day().name()
         }
     }
 }

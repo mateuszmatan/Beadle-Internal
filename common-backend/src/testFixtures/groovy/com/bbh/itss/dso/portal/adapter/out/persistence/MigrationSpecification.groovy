@@ -37,8 +37,12 @@ abstract class MigrationSpecification extends Specification {
         liquibase.close()
     }
 
+    protected String changelogFile() {
+        'db/changelog/history.yaml'
+    }
+
     protected Liquibase changelog() {
-        new Liquibase('db/changelog/db.changelog-master.yaml', new ClassLoaderResourceAccessor(),
+        new Liquibase(changelogFile(), new ClassLoaderResourceAccessor(),
                 DatabaseFactory.instance.findCorrectDatabaseImplementation(new JdbcConnection(dataSource.connection)))
     }
 

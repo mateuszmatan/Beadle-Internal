@@ -1,5 +1,6 @@
 package com.bbh.itss.dso.portal.adapter.out.persistence
 
+import com.zaxxer.hikari.HikariDataSource
 import liquibase.Liquibase
 import liquibase.Scope
 import liquibase.changelog.FastCheckService
@@ -49,6 +50,14 @@ abstract class MigrationSpecification extends Specification {
     protected void rollBackSince(String id) {
         liquibase.rollback(executedSince(id), '')
         Scope.currentScope.getSingleton(FastCheckService).clearCache()
+    }
+
+    protected void reopen() {
+        liquibase.close()
+        jdbc.execute('SHUTDOWN')
+        dataSource.unwrap(HikariDataSource).hikariPoolMXBean.softEvictConnections()
+        Scope.currentScope.getSingleton(FastCheckService).clearCache()
+        liquibase = changelog()
     }
 
     protected <T> T inTransaction(Closure<T> work) {

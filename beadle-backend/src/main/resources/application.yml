@@ -26,6 +26,8 @@ logging:
     com.bbh.itss.dso: INFO
 
 dso:
+  gui:
+    pages: changes, new-change, admin
   cybertrack:
     url: ${CYBERTRACK_URL:}
     token: ${CYBERTRACK_TOKEN:}

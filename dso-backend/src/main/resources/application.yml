@@ -24,6 +24,8 @@ logging:
     com.bbh.itss.dso: INFO
 
 dso:
+  gui:
+    pages: pipelines, self-service, monitoring, admin, products, settings
   influx:
     url: ${INFLUX_URL:}
     org: ${INFLUX_ORG:DevSecOps}
@@ -51,3 +53,11 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+---
+spring:
+  config:
+    activate:
+      on-profile: rd
+logging:
+  level:
+    com.bbh.itss.dso: DEBUG

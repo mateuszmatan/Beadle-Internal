@@ -1,11 +1,11 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: dso-portal
+  name: beadle
 spec:
   to:
     kind: Service
-    name: dso-portal
+    name: beadle
   port:
     targetPort: http
   tls:

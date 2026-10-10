@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: dso-portal
+  name: beadle
 spec:
   replicas: 1
   revisionHistoryLimit: 5
@@ -18,23 +18,20 @@ spec:
           type: RuntimeDefault
       terminationGracePeriodSeconds: 45
       containers:
-        - name: dso-portal
-          image: dso-portal
+        - name: beadle
+          image: beadle
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
-              containerPort: 8080
+              containerPort: 8081
               protocol: TCP
           envFrom:
             - configMapRef:
-                name: dso-portal-config
+                name: beadle-config
             - secretRef:
-                name: dso-portal-db
+                name: beadle-db
             - secretRef:
-                name: dso-portal-influx
-                optional: true
-            - secretRef:
-                name: dso-portal-cybertrack
+                name: beadle-cybertrack
                 optional: true
           env:
             - name: MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED

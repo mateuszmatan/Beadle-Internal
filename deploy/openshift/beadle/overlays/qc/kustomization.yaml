@@ -3,7 +3,7 @@ kind: Kustomization
 resources:
   - ../../base
 configMapGenerator:
-  - name: dso-portal-config
+  - name: beadle-config
     behavior: merge
     literals:
-      - SPRING_PROFILES_ACTIVE=rd
+      - SPRING_PROFILES_ACTIVE=qc

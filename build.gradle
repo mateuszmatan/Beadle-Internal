@@ -106,7 +106,7 @@ configure(subprojects.findAll { it.name.endsWith('-gui') }) { gui ->
 
     def sources = files(fileTree('src') { exclude 'smokeTest/**', 'regressionTest/**', 'performanceTest/**', 'testFixtures/**' },
             fileTree(rootProject.file('common-gui')) { include 'src/**', 'public/**'; exclude 'src/testFixtures/**' },
-            'tsconfig.app.json', 'tsconfig.spec.json', 'tsconfig.lib.json', 'ng-package.json', workspaceFiles)
+            'tsconfig.app.json', 'tsconfig.spec.json', 'tsconfig.lib.json', workspaceFiles)
 
     dependencies {
         testFixturesApi platform(libs.groovy.bom)

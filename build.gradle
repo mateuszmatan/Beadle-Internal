@@ -352,13 +352,13 @@ configure(subprojects.findAll { it.name.endsWith('-backend') }) { backend ->
     }
 }
 
-applications.each { name, application ->
-    project(":${application.backend}") { backend ->
+applications.each { appName, app ->
+    project(":${app.backend}") { backend ->
         apply plugin: 'org.springframework.boot'
         apply plugin: 'maven-publish'
 
         base {
-            archivesName = application.jar
+            archivesName = app.jar
         }
 
         dependencies {
@@ -366,7 +366,7 @@ applications.each { name, application ->
             testFixturesApi testFixtures(project(':common-backend'))
         }
 
-        def gui = project(":${application.gui}")
+        def gui = project(":${app.gui}")
         if (!skipGui) {
             tasks.named('processResources', ProcessResources) {
                 from(gui.tasks.named('buildAngular')) {
@@ -385,8 +385,8 @@ applications.each { name, application ->
 
         publishing {
             publications {
-                application(MavenPublication) {
-                    artifactId = application.jar
+                create('application', MavenPublication) {
+                    artifactId = app.jar
                     artifact tasks.named('bootJar')
                 }
             }
@@ -404,10 +404,10 @@ applications.each { name, application ->
         }
     }
 
-    tasks.register("${name}Jar") {
+    tasks.register("${appName}Jar") {
         group = 'build'
-        description = "Builds the ${application.jar} jar: the ${application.backend} service with the ${application.gui} interface inside"
-        dependsOn ":${application.backend}:bootJar"
+        description = "Builds the ${app.jar} jar: the ${app.backend} service with the ${app.gui} interface inside"
+        dependsOn ":${app.backend}:bootJar"
     }
 }
 

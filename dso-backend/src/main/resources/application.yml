@@ -1,44 +1,23 @@
 spring:
   application:
     name: dso-portal
-  profiles:
-    default: local
-    group:
-      rd: oracle
-      qc: oracle
-      prod: oracle
+  config:
+    import: classpath:bbh-devsecops-common.yml
+  datasource:
+    url: jdbc:h2:file:${DSO_DATA_DIR:${user.home}/bbh-devsecops/dso-portal}/dso-portal;MODE=Oracle;DEFAULT_NULL_ORDERING=HIGH;AUTO_SERVER=TRUE
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
   jpa:
-    open-in-view: false
     hibernate:
-      ddl-auto: validate
-    properties:
-      hibernate:
-        jdbc:
-          time_zone: UTC
-        type:
-          preferred_instant_jdbc_type: TIMESTAMP
-          preferred_boolean_jdbc_type: INTEGER
-        default_batch_fetch_size: 50
-  liquibase:
-    change-log: classpath:db/changelog/db.changelog-master.yaml
-    analytics-enabled: false
-  web:
-    resources:
-      cache:
-        cachecontrol:
-          no-cache: true
+      ddl-auto: none
 
 server:
   port: ${PORT:8080}
 
 management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
   endpoint:
     health:
-      show-details: never
+      show-details: always
 
 logging:
   level:
@@ -58,25 +37,6 @@ dso:
       - name: ${GRAFANA_2_NAME:Grafana 2}
         dashboard-url: ${GRAFANA_2_DASHBOARD_URL:}
         security-dashboard-url: ${GRAFANA_2_SECURITY_DASHBOARD_URL:}
-  demo-data: false
----
-spring:
-  config:
-    activate:
-      on-profile: local
-  datasource:
-    url: ${DB_URL:jdbc:h2:file:./data/dso-portal;MODE=Oracle;DEFAULT_NULL_ORDERING=HIGH;AUTO_SERVER=TRUE}
-    username: ${DB_USERNAME:sa}
-    password: ${DB_PASSWORD:}
-  jpa:
-    hibernate:
-      ddl-auto: none
-management:
-  endpoint:
-    health:
-      show-details: always
-dso:
-  demo-data: ${DSO_DEMO_DATA:true}
 ---
 spring:
   config:
@@ -88,35 +48,6 @@ spring:
     password: ${DB_PASSWORD}
     hikari:
       maximum-pool-size: ${DB_POOL_SIZE:10}
----
-spring:
-  config:
-    activate:
-      on-profile: rd
-  datasource:
-    hikari:
-      maximum-pool-size: ${DB_POOL_SIZE:5}
-management:
-  endpoint:
-    health:
-      show-details: always
-logging:
-  level:
-    com.bbh.itss.dso: DEBUG
----
-spring:
-  config:
-    activate:
-      on-profile: qc
-management:
-  endpoint:
-    health:
-      show-details: always
----
-spring:
-  config:
-    activate:
-      on-profile: prod
-  datasource:
-    hikari:
-      maximum-pool-size: ${DB_POOL_SIZE:20}
+  jpa:
+    hibernate:
+      ddl-auto: validate

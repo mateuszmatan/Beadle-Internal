@@ -414,6 +414,81 @@ applications.each { appName, app ->
     }
 }
 
+project(':backend') { launcher ->
+    apply plugin: 'groovy'
+    apply plugin: 'jacoco'
+
+    dependencies {
+        testImplementation platform(libs.groovy.bom)
+        testImplementation libs.groovy
+        testImplementation platform(libs.spock.bom)
+        testImplementation libs.spock.core
+    }
+
+    jacoco {
+        toolVersion = libs.versions.jacoco.get()
+    }
+
+    testing {
+        suites {
+            test {
+                useJUnitJupiter(libs.versions.junit)
+                targets.configureEach {
+                    testTask.configure {
+                        jvmArgs '-XX:+EnableDynamicAgentLoading'
+                        finalizedBy tasks.named('jacocoTestReport')
+                        testLogging {
+                            events 'failed'
+                            exceptionFormat = 'full'
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    tasks.named('jacocoTestCoverageVerification') {
+        violationRules {
+            rule {
+                element = 'BUNDLE'
+                limit {
+                    counter = 'LINE'
+                    value = 'COVEREDRATIO'
+                    minimum = providers.gradleProperty('coverage.minimum').getOrElse('0.60') as BigDecimal
+                }
+            }
+        }
+    }
+
+    tasks.named('check') {
+        dependsOn tasks.named('jacocoTestCoverageVerification')
+    }
+
+    tasks.named('jar') {
+        enabled = false
+    }
+
+    def bootJar = tasks.register('bootJar', Jar) {
+        group = 'build'
+        description = 'Builds backend/build/libs/dso-portal-<version>.jar: a launcher that starts the DevSecOps Management Portal and Beadle together, each from its own jar inside'
+        archiveBaseName = 'dso-portal'
+        manifest {
+            attributes 'Main-Class': 'com.bbh.itss.dso.launcher.Launcher'
+        }
+        from sourceSets.main.output
+        applications.each { appName, app ->
+            from(project(":${app.backend}").tasks.named('bootJar')) {
+                into 'applications'
+                rename { "${app.jar}.jar" }
+            }
+        }
+    }
+
+    tasks.named('assemble') {
+        dependsOn bootJar
+    }
+}
+
 tasks.named('sonar').configure {
     dependsOn subprojects.findAll { it.name.endsWith('-backend') }.collect { "${it.path}:jacocoTestReport" }
     dependsOn subprojects.findAll { it.name.endsWith('-gui') }.collect { "${it.path}:testAngular" }

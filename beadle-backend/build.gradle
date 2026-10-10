@@ -1,0 +1,5 @@
+description = 'Beadle service: ProTech changes, change tasks, change templates and their products'
+
+dependencies {
+    runtimeOnly 'com.oracle.database.jdbc:ojdbc11'
+}

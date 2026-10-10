@@ -3,14 +3,20 @@
 .idea/
 *.iml
 .vscode/*
-!frontend/.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 
 .DS_Store
-backend/data/
+Thumbs.db
 data/
 
 .gradle/
 build/
 .kotlin/
-backend/src/main/resources/static/
-frontend/node_modules/
+
+node_modules/
+.angular/
+dist/
+coverage/

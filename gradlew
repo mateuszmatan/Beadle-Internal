@@ -210,10 +210,23 @@ DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
 #   * For example: A user cannot expect ${Hostname} to be expanded, as it is an environment variable and will be
 #     treated as '${Hostname}' itself on the command line.
 
+WRAPPER_JAR=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
+DISTRIBUTION_URL=$( sed -n 's/^distributionUrl=//p' "$APP_HOME/gradle/wrapper/gradle-wrapper.properties" | tr -d '\\\r' )
+if command -v curl >/dev/null 2>&1 &&
+    ! curl --noproxy '*' -fksI -o /dev/null --connect-timeout 3 --max-time 6 "$DISTRIBUTION_URL"
+then
+    PUBLIC_WRAPPER=$APP_HOME/.gradle/public-wrapper/gradle/wrapper
+    mkdir -p "$PUBLIC_WRAPPER"
+    cp "$WRAPPER_JAR" "$PUBLIC_WRAPPER/gradle-wrapper.jar"
+    sed "s#^distributionUrl=.*#distributionUrl=https\\\\://services.gradle.org/distributions/${DISTRIBUTION_URL##*/}#" \
+        "$APP_HOME/gradle/wrapper/gradle-wrapper.properties" > "$PUBLIC_WRAPPER/gradle-wrapper.properties"
+    WRAPPER_JAR=$PUBLIC_WRAPPER/gradle-wrapper.jar
+fi
+
 set -- \
         "-Dorg.gradle.appname=$APP_BASE_NAME" \
         -classpath "$CLASSPATH" \
-        -jar "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" \
+        -jar "$WRAPPER_JAR" \
         "$@"
 
 # Stop when "xargs" is not available.

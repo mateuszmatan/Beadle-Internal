@@ -19,6 +19,7 @@ class DepartmentSpec extends Specification {
         expect:
         Department.create('  AI Lab ', nobody) == new Department(null, 'AI Lab', 0)
         Department.create('D' * 100, nobody).name().length() == 100
+        Department.create('Ł' * 50, nobody).name().length() == 50
         new Department(1L, null, 0).name() == null
     }
 
@@ -31,10 +32,11 @@ class DepartmentSpec extends Specification {
         e.problems() == [new FieldProblem('name', message)]
 
         where:
-        problem    | name      || message
-        'missing'  | null      || 'must not be blank'
-        'blank'    | '   '     || 'must not be blank'
-        'too long' | 'D' * 101 || 'must be at most 100 characters'
+        problem                          | name              || message
+        'missing'                        | null              || 'must not be blank'
+        'blank'                          | '   '             || 'must not be blank'
+        'too long'                       | 'D' * 101         || 'is too long: it may take at most 100 bytes'
+        'short in characters, not bytes' | 'Księgowość ' * 9 || 'is too long: it may take at most 100 bytes'
     }
 
     def "a name another department uses, in any case, is refused"() {

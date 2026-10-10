@@ -32,23 +32,12 @@ class ApplicationProfilesSpec extends Specification {
                 'jdbc:h2:file:/application/data/dso-portal;MODE=Oracle;DEFAULT_NULL_ORDERING=HIGH;AUTO_SERVER=TRUE'
     }
 
-    def "the oracle profile is only used when it is switched on together with the database address"() {
-        when:
-        def env = environment(['oracle'], ORACLE)
+    def "the portal stays on its H2 file whatever profile is switched on: no profile connects it to Oracle"() {
+        expect:
+        environment([profile], ORACLE).getProperty('spring.datasource.url').startsWith('jdbc:h2:file:')
 
-        then:
-        env.getProperty('spring.datasource.url') == ORACLE.DB_URL
-        env.getProperty('spring.datasource.username') == 'DSO_PORTAL'
-        env.getProperty('spring.datasource.password') == 'secret'
-        env.getProperty('spring.jpa.hibernate.ddl-auto') == 'validate'
-        env.getProperty('spring.datasource.hikari.maximum-pool-size') == '10'
-
-        when:
-        environment(['oracle'], [:]).getProperty('spring.datasource.url')
-
-        then:
-        def e = thrown(IllegalArgumentException)
-        e.message.contains('DB_URL')
+        where:
+        profile << ['rd', 'qc', 'prod', 'oracle']
     }
 
     def "InfluxDB and Grafana are links to their own servers, given by the environment"() {

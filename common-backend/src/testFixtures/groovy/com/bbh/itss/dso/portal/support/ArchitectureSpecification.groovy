@@ -48,13 +48,11 @@ abstract class ArchitectureSpecification extends Specification {
             .collect { Location.of(it.protectionDomain.codeSource.location) })
 
     @Shared
-    List<ArchRule> rules = sharedRules() + applicationRules()
+    List<ArchRule> rules = sharedRules()
 
     abstract Class<?> application()
 
-    List<ArchRule> applicationRules() {
-        []
-    }
+    abstract String httpAdapter()
 
     def "the import covers the application and the code it shares"() {
         expect:
@@ -97,6 +95,9 @@ abstract class ArchitectureSpecification extends Specification {
              [Entity, Embeddable, MappedSuperclass, Converter].any { type.isAnnotatedWith(it) } ||
                      type.isAssignableTo(Repository)
          }).should().resideInAPackage(PERSISTENCE),
+         noClasses().that().resideOutsideOfPackage(httpAdapter())
+                 .should().dependOnClassesThat()
+                 .resideInAnyPackage('org.springframework.web.client..', 'java.net.http..'),
          slices().matching('com.bbh.itss.dso.portal.domain.(*)..').should().beFreeOfCycles(),
          slices().matching('com.bbh.itss.dso.portal.application.(**)').should().beFreeOfCycles(),
          slices().matching('com.bbh.itss.dso.portal.adapter.(**)').should().beFreeOfCycles(),

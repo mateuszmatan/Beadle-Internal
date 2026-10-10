@@ -8,4 +8,9 @@ class ArchitectureSpec extends ArchitectureSpecification {
     Class<?> application() {
         BeadleApplication
     }
+
+    @Override
+    String httpAdapter() {
+        'com.bbh.itss.dso.portal.adapter.out.jira..'
+    }
 }

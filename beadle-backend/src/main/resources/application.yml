@@ -26,6 +26,11 @@ logging:
     com.bbh.itss.dso: INFO
 
 dso:
+  cybertrack:
+    url: ${CYBERTRACK_URL:}
+    token: ${CYBERTRACK_TOKEN:}
+    project-key: ${CYBERTRACK_PROJECT_KEY:SCP}
+    issue-type: ${CYBERTRACK_ISSUE_TYPE:Task}
   demo-data: false
 ---
 spring:

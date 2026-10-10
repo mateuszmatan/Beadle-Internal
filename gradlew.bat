@@ -74,7 +74,12 @@ set CLASSPATH=
 
 
 @rem Execute Gradle
-"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" -jar "%APP_HOME%\gradle\wrapper\gradle-wrapper.jar" %*
+set WRAPPER_JAR=%APP_HOME%\gradle\wrapper\gradle-wrapper.jar
+set PUBLIC_WRAPPER=%APP_HOME%\.gradle\public-wrapper\gradle\wrapper
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Get-Content -LiteralPath '%APP_HOME%\gradle\wrapper\gradle-wrapper.properties'; $url = (($p | Where-Object { $_ -like 'distributionUrl=*' }) -replace '^distributionUrl=', '') -replace '\\', ''; try { [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }; $request = [Net.WebRequest]::Create($url); $request.Method = 'HEAD'; $request.Proxy = $null; $request.Timeout = 6000; $request.GetResponse().Close(); exit 0 } catch { New-Item -ItemType Directory -Force -Path '%PUBLIC_WRAPPER%' | Out-Null; Copy-Item -Force -LiteralPath '%WRAPPER_JAR%' -Destination '%PUBLIC_WRAPPER%'; $p -replace '^distributionUrl=.*/', 'distributionUrl=https\://services.gradle.org/distributions/' | Set-Content -LiteralPath '%PUBLIC_WRAPPER%\gradle-wrapper.properties'; exit 1 }"
+if %ERRORLEVEL% equ 1 set WRAPPER_JAR=%PUBLIC_WRAPPER%\gradle-wrapper.jar
+
+"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" -jar "%WRAPPER_JAR%" %*
 
 :end
 @rem End local scope for the variables with windows NT shell

@@ -1,0 +1,49 @@
+spring:
+  application:
+    name: dso-portal
+  config:
+    import: classpath:bbh-devsecops-common.yml
+  datasource:
+    url: jdbc:h2:file:${DSO_DATA_DIR:${user.home}/bbh-devsecops/dso-portal}/dso-portal;MODE=Oracle;DEFAULT_NULL_ORDERING=HIGH;AUTO_SERVER=TRUE
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: none
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.bbh.itss.dso: INFO
+
+dso:
+  gui:
+    pages: pipelines, self-service, monitoring, admin, products, settings
+  influx:
+    url: ${INFLUX_URL:}
+    org: ${INFLUX_ORG:DevSecOps}
+    bucket: ${INFLUX_BUCKET:DORA-metrics}
+    token: ${INFLUX_TOKEN:}
+  grafana:
+    instances:
+      - name: ${GRAFANA_NAME:Grafana}
+        dashboard-url: ${GRAFANA_DASHBOARD_URL:}
+        security-dashboard-url: ${GRAFANA_SECURITY_DASHBOARD_URL:}
+      - name: ${GRAFANA_2_NAME:Grafana 2}
+        dashboard-url: ${GRAFANA_2_DASHBOARD_URL:}
+        security-dashboard-url: ${GRAFANA_2_SECURITY_DASHBOARD_URL:}
+---
+spring:
+  config:
+    activate:
+      on-profile: rd
+logging:
+  level:
+    com.bbh.itss.dso: DEBUG

@@ -29,8 +29,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import static com.bbh.itss.beadle.internal.domain.calllog.CallLogEntry.CORRELATION_MAX;
 import static com.bbh.itss.beadle.internal.domain.calllog.CallLogEntry.MESSAGE_MAX;
 import static com.bbh.itss.beadle.internal.domain.calllog.CallLogEntry.TARGET_MAX;
+import static com.bbh.itss.beadle.internal.domain.calllog.CallLogEntry.USER_MAX;
 import static com.bbh.itss.beadle.internal.domain.calllog.ExternalSystem.CONFLUENCE;
 import static com.bbh.itss.beadle.internal.domain.calllog.ExternalSystem.CYBERTRACK;
 import static com.bbh.itss.beadle.internal.domain.calllog.ExternalSystem.GUI;
@@ -99,7 +101,8 @@ class CallLogInterceptor implements MethodInterceptor {
     private void record(ExternalSystem system, Method method, Object[] arguments, Instant at, long started,
                         Outcome outcome, String message) {
         Caller caller = CallerContext.current();
-        CallLogEntry entry = new CallLogEntry(null, at, caller.user(), caller.correlationId(), system,
+        CallLogEntry entry = new CallLogEntry(null, at, abbreviateBytes(caller.user(), USER_MAX),
+                abbreviateBytes(caller.correlationId(), CORRELATION_MAX), system,
                 method.getName(), targetOf(arguments), outcome, abbreviateBytes(message, MESSAGE_MAX),
                 (System.nanoTime() - started) / 1_000_000);
         try {

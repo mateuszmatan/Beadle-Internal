@@ -14,6 +14,7 @@ public final class CallerContext {
     public static final String USER_HEADER = "X-Beadle-User";
     public static final String CORRELATION_HEADER = "X-Correlation-Id";
     public static final String SYSTEM_USER = "system";
+    public static final String UNKNOWN_USER = "unknown";
 
     private static final ThreadLocal<Caller> CURRENT = new ThreadLocal<>();
 

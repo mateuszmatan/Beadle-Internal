@@ -14,10 +14,15 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.UUID;
 
+import static com.bbh.itss.beadle.internal.application.calllog.CallerContext.CORRELATION_HEADER;
+import static com.bbh.itss.beadle.internal.application.calllog.CallerContext.UNKNOWN_USER;
+import static com.bbh.itss.beadle.internal.application.calllog.CallerContext.USER_HEADER;
+import static com.bbh.itss.beadle.internal.domain.calllog.CallLogEntry.CORRELATION_MAX;
+import static com.bbh.itss.beadle.internal.domain.calllog.CallLogEntry.USER_MAX;
+import static com.bbh.itss.beadle.internal.domain.shared.Text.abbreviateBytes;
+import static com.bbh.itss.beadle.internal.domain.shared.Text.bytes;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.security.MessageDigest.isEqual;
-import static com.bbh.itss.beadle.internal.application.calllog.CallerContext.CORRELATION_HEADER;
-import static com.bbh.itss.beadle.internal.application.calllog.CallerContext.USER_HEADER;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.removeStart;
 import static org.apache.commons.lang3.StringUtils.trimToEmpty;
@@ -25,9 +30,16 @@ import static org.apache.commons.lang3.StringUtils.trimToNull;
 import static org.springframework.core.Ordered.HIGHEST_PRECEDENCE;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 import static org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON_VALUE;
 
+/**
+ * Lets through the calls that carry the Beadle service token and runs each one as the caller its headers name:
+ * {@code X-Beadle-User} (cut to what the call log holds, {@value CallerContext#UNKNOWN_USER} when missing) and
+ * {@code X-Correlation-Id} (a fresh one when missing). A correlation id longer than the call log and the followed
+ * tickets hold is refused rather than cut, since Beadle-GUI matches the callbacks by it.
+ */
 @Slf4j
 @Component
 @Order(HIGHEST_PRECEDENCE)
@@ -36,8 +48,12 @@ public class ServiceTokenFilter extends OncePerRequestFilter {
     public static final String OPEN_PATH = "/actuator/health";
     public static final String BEARER = "Bearer ";
     public static final String DETAIL = "The call needs the Beadle service token as Authorization: Bearer <token>.";
+    public static final String CORRELATION_TOO_LONG = "is too long: it may take at most " + CORRELATION_MAX + " bytes";
     static final String PROBLEM = "{\"title\":\"Unauthorized\",\"status\":401,\"detail\":\""
             + DETAIL + "\"}";
+    static final String CORRELATION_PROBLEM = "{\"title\":\"Validation failed\",\"status\":400,\"detail\":\""
+            + CORRELATION_HEADER + " " + CORRELATION_TOO_LONG + "\",\"problems\":[{\"field\":\"" + CORRELATION_HEADER
+            + "\",\"message\":\"" + CORRELATION_TOO_LONG + "\"}]}";
 
     private final byte[] token;
 
@@ -57,26 +73,35 @@ public class ServiceTokenFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        if (accepts(request.getHeader(AUTHORIZATION))) {
-            CallerContext.set(callerOf(request));
-            try {
-                chain.doFilter(request, response);
-            } finally {
-                CallerContext.clear();
-            }
+        if (!accepts(request.getHeader(AUTHORIZATION))) {
+            response.setHeader(WWW_AUTHENTICATE, "Bearer");
+            problem(response, UNAUTHORIZED.value(), PROBLEM);
             return;
         }
-        response.setStatus(UNAUTHORIZED.value());
-        response.setHeader(WWW_AUTHENTICATE, "Bearer");
-        response.setContentType(APPLICATION_PROBLEM_JSON_VALUE);
-        response.setCharacterEncoding(UTF_8.name());
-        response.getWriter().write(PROBLEM);
+        String correlationId = trimToNull(request.getHeader(CORRELATION_HEADER));
+        if (correlationId != null && bytes(correlationId) > CORRELATION_MAX) {
+            problem(response, BAD_REQUEST.value(), CORRELATION_PROBLEM);
+            return;
+        }
+        CallerContext.set(new Caller(userOf(request), correlationId == null ? UUID.randomUUID().toString()
+                : correlationId));
+        try {
+            chain.doFilter(request, response);
+        } finally {
+            CallerContext.clear();
+        }
     }
 
-    static Caller callerOf(HttpServletRequest request) {
-        String correlationId = trimToNull(request.getHeader(CORRELATION_HEADER));
-        return new Caller(trimToNull(request.getHeader(USER_HEADER)),
-                correlationId == null ? UUID.randomUUID().toString() : correlationId);
+    private static String userOf(HttpServletRequest request) {
+        String user = trimToNull(request.getHeader(USER_HEADER));
+        return user == null ? UNKNOWN_USER : abbreviateBytes(user, USER_MAX);
+    }
+
+    private static void problem(HttpServletResponse response, int status, String problem) throws IOException {
+        response.setStatus(status);
+        response.setContentType(APPLICATION_PROBLEM_JSON_VALUE);
+        response.setCharacterEncoding(UTF_8.name());
+        response.getWriter().write(problem);
     }
 
     boolean accepts(String authorization) {

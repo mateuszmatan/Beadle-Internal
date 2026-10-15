@@ -125,6 +125,21 @@ class CallLogConfigurationSpec extends Specification {
         }
     }
 
+    def "a caller longer than the call log holds is cut to its columns rather than losing the row"() {
+        given:
+        CallerContext.set(new Caller('u' * 250, 'c' * 120))
+
+        expect:
+        runner.run { ApplicationContext context ->
+            assert context.getBean(JiraPort).versions('CERT') == [version()]
+            with(recorded[0]) {
+                assert userName() == 'u' * (CallLogEntry.USER_MAX - 3) + '...'
+                assert correlationId() == 'c' * (CallLogEntry.CORRELATION_MAX - 3) + '...'
+            }
+            true
+        }
+    }
+
     def "a call log that cannot be written never fails the call"() {
         given:
         callLogDown = true

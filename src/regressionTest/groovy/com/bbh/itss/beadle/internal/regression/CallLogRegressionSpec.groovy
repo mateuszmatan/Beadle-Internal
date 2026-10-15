@@ -5,6 +5,8 @@ import com.bbh.itss.beadle.internal.support.BeadleInternalSpecification
 import java.time.Duration
 import java.time.Instant
 
+import static com.bbh.itss.beadle.internal.support.Fixtures.ticketJson
+
 class CallLogRegressionSpec extends BeadleInternalSpecification {
 
     def "every call to a system fills the call log, newest first, with who caused it and how it went"() {
@@ -56,6 +58,37 @@ class CallLogRegressionSpec extends BeadleInternalSpecification {
         then:
         logged.userName == USER
         logged.correlationId ==~ /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/
+    }
+
+    def "a user too long for the call log is cut to it, and a call without a user is logged as unknown"() {
+        given:
+        def longUser = anonymous.withHeaders([Authorization: "Bearer $TOKEN".toString(), 'X-Beadle-User': 'u' * 250,
+                                              'X-Correlation-Id': correlationId])
+        def noUser = anonymous.withHeaders([Authorization: "Bearer $TOKEN".toString(), 'X-Correlation-Id': correlationId])
+
+        when:
+        def first = longUser.get('/api/internal/qtest/projects')
+        def second = noUser.get('/api/internal/qtest/projects/1/test-cycles')
+
+        then:
+        first.status == 200
+        second.status == 200
+        callLog()*.userName == ['u' * 197 + '...', 'unknown']
+    }
+
+    def "a correlation id too long to be logged and passed on is refused before any system is called"() {
+        given:
+        def caller = anonymous.withHeaders([Authorization: "Bearer $TOKEN".toString(), 'X-Beadle-User': USER,
+                                            'X-Correlation-Id': 'c' * 120])
+
+        when:
+        def response = caller.post('/api/internal/cybertrack/tickets', ticketJson(changeNumber: 'CHG0031999'))
+
+        then:
+        response.status == 400
+        response.json.problems == [[field: 'X-Correlation-Id', message: 'is too long: it may take at most 100 bytes']]
+        callLog('c' * 120) == []
+        callLog('c' * 97 + '...') == []
     }
 
     def "a call log query with #problem is refused naming the field"() {

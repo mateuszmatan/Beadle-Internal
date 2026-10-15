@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Component
@@ -28,6 +29,18 @@ class TrackedTicketPersistenceAdapter implements TrackedTicketPort {
     @Override
     public void save(TrackedTicket ticket) {
         tickets.save(TrackedTicketEntity.of(ticket));
+    }
+
+    @Override
+    public Optional<TrackedTicket> openFor(String changeNumber) {
+        try {
+            return tickets.findFirstByChangeNumberAndClosedAtIsNullOrderByCreatedAtDesc(changeNumber)
+                    .map(TrackedTicketEntity::toDomain);
+        } catch (RuntimeException e) {
+            log.warn("The open CyberTrack ticket of {} could not be looked up, so a new one is raised: {}",
+                    changeNumber, e.getMessage());
+            return Optional.empty();
+        }
     }
 
     @Override

@@ -69,6 +69,32 @@ class TrackedTicketPersistenceAdapterSpec extends Specification {
         adapter.open() == [trackedTicket(demo: true, misses: 2)]
     }
 
+    def "the open ticket of a change is the newest one not closed, with its link"() {
+        given:
+        adapter.track(trackedTicket(key: 'SCP-1', createdAt: CREATED.minusSeconds(60), closedAt: CREATED))
+        adapter.track(trackedTicket(key: 'SCP-2', createdAt: CREATED))
+        adapter.track(trackedTicket(key: 'SCP-3', createdAt: CREATED.plusSeconds(60)))
+        adapter.track(trackedTicket(key: 'SCP-4', createdAt: CREATED.plusSeconds(120), changeNumber: 'CHG0031002'))
+
+        expect:
+        adapter.openFor('CHG0031001') == Optional.of(trackedTicket(key: 'SCP-3', createdAt: CREATED.plusSeconds(60)))
+        adapter.openFor('CHG0031002').get().key() == 'SCP-4'
+        adapter.openFor('CHG0031003') == Optional.empty()
+        jdbc.queryForMap("SELECT CHANGE_NUMBER, TICKET_URL FROM BEADLE_INTERNAL_CYBERTRACK_TICKET WHERE TICKET_KEY = 'SCP-3'") ==
+                [CHANGE_NUMBER: 'CHG0031001', TICKET_URL: 'https://cybertrack.bbh.com/browse/SCP-1234']
+    }
+
+    def "a change whose open ticket cannot be looked up has none"() {
+        given:
+        jdbc.execute('ALTER TABLE BEADLE_INTERNAL_CYBERTRACK_TICKET RENAME COLUMN CHANGE_NUMBER TO CHANGE_NO')
+
+        expect:
+        adapter.openFor('CHG0031001') == Optional.empty()
+
+        cleanup:
+        jdbc.execute('ALTER TABLE BEADLE_INTERNAL_CYBERTRACK_TICKET RENAME COLUMN CHANGE_NO TO CHANGE_NUMBER')
+    }
+
     def "the open tickets come oldest first"() {
         given:
         adapter.track(trackedTicket(key: 'SCP-3', createdAt: CREATED.plusSeconds(60)))

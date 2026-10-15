@@ -45,7 +45,8 @@ class Fixtures {
     }
 
     static TrackedTicket trackedTicket(Map changes = [:]) {
-        copy(changes, new TrackedTicket('SCP-1234', 'To Do', 'corr-1', CREATED, CREATED, null, null, false, 0))
+        copy(changes, new TrackedTicket('SCP-1234', 'To Do', 'corr-1', CREATED, CREATED, null, null, false, 0, 'CHG0031001',
+                'https://cybertrack.bbh.com/browse/SCP-1234'))
     }
 
     static StatusCallback statusCallback(Map changes = [:]) {

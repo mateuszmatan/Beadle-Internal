@@ -20,7 +20,8 @@ class CyberTrackTicketMigrationSpec extends MigrationSpecification {
     static final List<String> COLUMNS_002 = ['TICKET_KEY', 'STATUS', 'CORRELATION_ID', 'CREATED_AT', 'LAST_SEEN_AT',
                                              'LAST_EVENT_AT', 'CLOSED_AT']
     static final List<String> COLUMNS_003 = COLUMNS_002 + ['DEMO']
-    static final List<String> COLUMNS = COLUMNS_003 + ['MISSES']
+    static final List<String> COLUMNS_004 = COLUMNS_003 + ['MISSES']
+    static final List<String> COLUMNS = COLUMNS_004 + ['CHANGE_NUMBER', 'TICKET_URL']
     static final String INSERT = "INSERT INTO $TABLE (TICKET_KEY, STATUS, CORRELATION_ID, CREATED_AT) VALUES (?, 'To Do', 'corr-1', ?)"
 
     def setup() {
@@ -91,7 +92,7 @@ class CyberTrackTicketMigrationSpec extends MigrationSpecification {
         liquibase.update('')
 
         then:
-        columns(TABLE).take(COLUMNS.size()) == COLUMNS
+        columns(TABLE).take(COLUMNS_004.size()) == COLUMNS_004
         !nullable(TABLE, 'MISSES')
         jdbc.queryForObject("SELECT MISSES FROM $TABLE WHERE TICKET_KEY = 'SCP-1234'", Integer) == 0
 
@@ -100,6 +101,30 @@ class CyberTrackTicketMigrationSpec extends MigrationSpecification {
 
         then:
         columns(TABLE) == COLUMNS_003
+    }
+
+    def "005 keeps the change and the link of a ticket, unknown for a ticket followed before it, and rolls back to 004"() {
+        given:
+        liquibase.update('')
+        rollBackSince('005-')
+        jdbc.update(INSERT, 'SCP-1234', new java.sql.Timestamp(0))
+
+        when:
+        liquibase.update('')
+
+        then:
+        columns(TABLE) == COLUMNS
+        ['CHANGE_NUMBER', 'TICKET_URL'].every { nullable(TABLE, it) }
+        'IX_BEADLE_INTERNAL_CYBERTRACK_TICKET_CHANGE' in indexes(TABLE)
+        jdbc.queryForMap("SELECT CHANGE_NUMBER, TICKET_URL FROM $TABLE WHERE TICKET_KEY = 'SCP-1234'") ==
+                [CHANGE_NUMBER: null, TICKET_URL: null]
+
+        when:
+        rollBackSince('005-')
+
+        then:
+        columns(TABLE) == COLUMNS_004
+        !('IX_BEADLE_INTERNAL_CYBERTRACK_TICKET_CHANGE' in indexes(TABLE))
     }
 
     def "a ticket is followed once and always has a key and a creation time"() {

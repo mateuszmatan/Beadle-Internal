@@ -11,10 +11,11 @@ class CyberTrackRegressionSpec extends BeadleInternalSpecification {
     static final Duration STEP = Duration.ofMinutes(2)
 
     def conditions = new PollingConditions(timeout: 45, delay: 0.5)
+    String changeNumber = 'CHG' + (1_000_000 + new Random().nextInt(9_000_000))
 
-    def "a secure coding ticket is created in the SCP project and read back as To Do"() {
+    def "a secure coding ticket is created in the SCP project, answered at once and read back as To Do"() {
         when:
-        def created = api.post('/api/internal/cybertrack/tickets', ticketJson())
+        def created = api.post('/api/internal/cybertrack/tickets', ticket())
 
         then:
         created.status == 201
@@ -29,12 +30,28 @@ class CyberTrackRegressionSpec extends BeadleInternalSpecification {
         read.status == 200
         read.json == [key: created.json.key, status: 'To Do', url: null, updated: clock.instant().toString()]
 
-        and: 'the creation and the reads are in the call log of the request, the ticket is followed from To Do'
+        and: 'the creation is the only call before the answer, the ticket is followed until the poll tells its status'
         callLog()*.subMap('system', 'operation', 'target', 'outcome', 'userName') == [
-                [system: 'CYBERTRACK', operation: 'create', target: 'CHG0031001', outcome: 'SUCCESS', userName: USER],
-                [system: 'CYBERTRACK', operation: 'read', target: created.json.key, outcome: 'SUCCESS', userName: USER],
+                [system: 'CYBERTRACK', operation: 'create', target: changeNumber, outcome: 'SUCCESS', userName: USER],
                 [system: 'CYBERTRACK', operation: 'read', target: created.json.key, outcome: 'SUCCESS', userName: USER]]
-        followed(created.json.key as String) == [STATUS: 'To Do', CORRELATION_ID: correlationId, CLOSED: false]
+        followed(created.json.key as String).subMap('CORRELATION_ID', 'CHANGE_NUMBER', 'CLOSED') ==
+                [CORRELATION_ID: correlationId, CHANGE_NUMBER: changeNumber, CLOSED: false]
+    }
+
+    def "a change asking again for its secure coding ticket gets the one already raised"() {
+        given:
+        def first = api.post('/api/internal/cybertrack/tickets', ticket())
+
+        when:
+        def again = api.post('/api/internal/cybertrack/tickets', ticket())
+        def other = api.post('/api/internal/cybertrack/tickets', ticket(changeNumber: changeNumber + '1'))
+
+        then:
+        first.status == 201
+        again.status == 201
+        again.json == first.json
+        other.json.key != first.json.key
+        callLog().findAll { it.operation == 'create' }*.target == [changeNumber, changeNumber + '1']
     }
 
     def "a ticket request with #problem is refused naming the fields, without calling CyberTrack"() {
@@ -68,16 +85,24 @@ class CyberTrackRegressionSpec extends BeadleInternalSpecification {
     def "Beadle-GUI hears of every status a ticket moves to, with the service token and the correlation id of its creation"() {
         given:
         Instant createdAt = clock.instant()
-        String key = api.post('/api/internal/cybertrack/tickets', ticketJson()).json.key
+        String key = api.post('/api/internal/cybertrack/tickets', ticket()).json.key
+
+        expect: 'the first poll tells the status the ticket starts in'
+        conditions.eventually {
+            assert GUI.callbacksFor(key)*.body*.status == ['To Do']
+        }
+        GUI.callbacksFor(key).first().body == [system: 'CYBERTRACK', key: key, status: 'To Do', at: createdAt.toString(),
+                                               correlationId: correlationId]
+        followed(key).STATUS == 'To Do'
 
         when:
         clock.advance(STEP)
 
         then:
         conditions.eventually {
-            assert GUI.callbacksFor(key)*.body*.status == ['In Progress']
+            assert GUI.callbacksFor(key)*.body*.status == ['To Do', 'In Progress']
         }
-        with(GUI.callbacksFor(key).first()) {
+        with(GUI.callbacksFor(key)[1]) {
             method == 'POST'
             path == '/api/callbacks/internal'
             header('Authorization') == "Bearer $TOKEN".toString()
@@ -95,39 +120,44 @@ class CyberTrackRegressionSpec extends BeadleInternalSpecification {
 
         then:
         conditions.eventually {
-            assert GUI.callbacksFor(key)*.body*.status == ['In Progress', 'Done']
+            assert GUI.callbacksFor(key)*.body*.status == ['To Do', 'In Progress', 'Done']
         }
-        GUI.callbacksFor(key)[1].body.at == (createdAt + STEP.multipliedBy(2)).toString()
-        followed(key) == [STATUS: 'Done', CORRELATION_ID: correlationId, CLOSED: true]
+        GUI.callbacksFor(key)[2].body.at == (createdAt + STEP.multipliedBy(2)).toString()
+        followed(key).subMap('STATUS', 'CORRELATION_ID', 'CLOSED') == [STATUS: 'Done', CORRELATION_ID: correlationId, CLOSED: true]
 
         and: 'the callbacks are in the call log of the creation, as calls of the system to Beadle-GUI'
         callLog().findAll { it.system == 'GUI' }*.subMap('userName', 'operation', 'target', 'outcome') == [
+                [userName: 'system', operation: 'notify', target: "$key To Do".toString(), outcome: 'SUCCESS'],
                 [userName: 'system', operation: 'notify', target: "$key In Progress".toString(), outcome: 'SUCCESS'],
                 [userName: 'system', operation: 'notify', target: "$key Done".toString(), outcome: 'SUCCESS']]
     }
 
     def "a callback Beadle-GUI did not take is sent again on the next tick"() {
         given:
-        String key = api.post('/api/internal/cybertrack/tickets', ticketJson()).json.key
+        String key = api.post('/api/internal/cybertrack/tickets', ticket()).json.key
         GUI.refuse(key, 1)
 
-        when:
-        clock.advance(STEP)
-
-        then:
+        expect:
         conditions.eventually {
             assert GUI.callbacksFor(key)*.status == [503, 202]
         }
-        GUI.callbacksFor(key)*.body*.status == ['In Progress', 'In Progress']
-        followed(key).STATUS == 'In Progress'
+        GUI.callbacksFor(key)*.body*.status == ['To Do', 'To Do']
+        followed(key).STATUS == 'To Do'
         callLog().findAll { it.system == 'GUI' }*.outcome == ['FAILURE', 'SUCCESS']
         callLog().find { it.system == 'GUI' }.message.startsWith("Beadle-GUI could not take the callback for $key: 503")
     }
 
     private Map followed(String key) {
-        def row = jdbc.queryForMap('''SELECT STATUS, CORRELATION_ID, CLOSED_AT FROM BEADLE_INTERNAL_CYBERTRACK_TICKET
-                WHERE TICKET_KEY = ?''', key)
-        [STATUS: row.STATUS, CORRELATION_ID: row.CORRELATION_ID, CLOSED: row.CLOSED_AT != null]
+        def row = jdbc.queryForMap('''SELECT STATUS, CORRELATION_ID, CHANGE_NUMBER, CLOSED_AT
+                FROM BEADLE_INTERNAL_CYBERTRACK_TICKET WHERE TICKET_KEY = ?''', key)
+        [STATUS: row.STATUS, CORRELATION_ID: row.CORRELATION_ID, CHANGE_NUMBER: row.CHANGE_NUMBER, CLOSED: row.CLOSED_AT != null]
+    }
+
+    /**
+     * A ticket request for the change of this feature, so that no feature gets the ticket another one raised.
+     */
+    private Map ticket(Map changes = [:]) {
+        ticketJson([changeNumber: changeNumber] + changes)
     }
 
     private static Map ticketJson(Map changes = [:]) {

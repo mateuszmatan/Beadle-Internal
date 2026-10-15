@@ -30,7 +30,7 @@ reached or refuses the call answers `502` naming the system and its reason.
 | `GET /api/internal/jira/projects/{key}/versions` | the versions of a project, unreleased first |
 | `GET /api/internal/jira/projects/{key}/epics?fixVersion=` | the epics of a FixVersion |
 | `GET /api/internal/jira/projects/{key}/stories?fixVersion=&epicKeys=` | the stories of chosen epics, with their `epicKey` |
-| `POST /api/internal/cybertrack/tickets` | `201` the key (`SCP-123`) and link of the new secure coding ticket |
+| `POST /api/internal/cybertrack/tickets` | `201` the key (`SCP-123`) and link of the new secure coding ticket, answered straight after its creation; a change whose ticket is still followed gets that ticket again instead of a second one |
 | `GET /api/internal/cybertrack/tickets/{key}` | the status of a ticket and when it last changed |
 | `GET /api/internal/confluence/pages?spaceKey=&title=` | the pages of a space with that title, without their body |
 | `GET /api/internal/confluence/pages/{id}` | a page with its body in storage format |
@@ -45,18 +45,21 @@ reached or refuses the call answers `502` naming the system and its reason.
 
 ### Callbacks to Beadle-GUI
 
-A CyberTrack ticket created through the API is written down in `BEADLE_INTERNAL_CYBERTRACK_TICKET` with the status it
-was created in and the correlation id of the user action. A scheduled poll reads the open tickets in one call, every
-10 seconds while the demo adapter moves tickets on its clock (To Do, In Progress, Done, two minutes per step) and
-every `beadle.cybertrack.poll` once CyberTrack is configured, and for every ticket that moved posts
-`{"system": "CYBERTRACK", "key", "status", "at", "correlationId"}` to `{beadle.gui.url}/api/callbacks/internal` with
-the service token and `X-Beadle-User: system`. A ticket that reached a final status (`beadle.cybertrack.closed-statuses`, by
-default Done, Closed, Resolved, Cancelled, Canceled, Rejected, Won't Do) is no longer followed, nor one that the poll
-did not find `beadle.cybertrack.max-misses` times in a row (deleted, or out of reach of the service account), which
-is logged as dropped. A callback Beadle-GUI does not take is logged and sent again on the next tick; the poll never
-fails a request. Each ticket remembers whether the demo made it up: the real CyberTrack is never asked about a demo
-key, which may belong to another ticket there, nor the demo about a real one, so the open tickets of the other kind
-are dropped with a warning once `CYBERTRACK_URL` is set or cleared.
+A CyberTrack ticket created through the API is written down in `BEADLE_INTERNAL_CYBERTRACK_TICKET` with its change,
+its link and the correlation id of the user action, and answered at once: the creation is the only call to CyberTrack
+within the request, and the first poll tells Beadle-GUI the status the ticket starts in. A second request for a
+change whose ticket is still followed (Beadle-GUI retrying after its own time-out) is answered with that ticket. A
+scheduled poll reads the open tickets in one call, every 10 seconds while the demo adapter moves tickets on its clock
+(To Do, In Progress, Done, two minutes per step) and every `beadle.cybertrack.poll` once CyberTrack is configured,
+and for every ticket that moved posts `{"system": "CYBERTRACK", "key", "status", "at", "correlationId"}` to
+`{beadle.gui.url}/api/callbacks/internal` with the service token and `X-Beadle-User: system`. A ticket that reached a
+final status (`beadle.cybertrack.closed-statuses`, by default Done, Closed, Resolved, Cancelled, Canceled, Rejected,
+Won't Do) is no longer followed, nor one that the poll did not find `beadle.cybertrack.max-misses` times in a row
+(deleted, or out of reach of the service account), which is logged as dropped. A callback Beadle-GUI does not take is
+logged and sent again on the next tick; the poll never fails a request. Each ticket remembers whether the demo made
+it up: the real CyberTrack is never asked about a demo key, which may belong to another ticket there, nor the demo
+about a real one, so the open tickets of the other kind are dropped with a warning once `CYBERTRACK_URL` is set or
+cleared.
 
 ### Call log
 

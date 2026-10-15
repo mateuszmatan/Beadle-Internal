@@ -13,14 +13,15 @@ class TrackedTicketSpec extends Specification {
 
     static final Instant LATER = Instant.parse('2026-10-15T09:30:00Z')
 
-    def "a created ticket is followed from the status it was created in, seen then if CyberTrack told it"() {
+    def "a created ticket is followed without a status until the first poll tells it, with its change and link"() {
+        given:
+        def created = new CreatedTicket('SCP-1234', 'https://cybertrack.bbh.com/browse/SCP-1234')
+
         expect:
-        TrackedTicket.created('SCP-1234', 'To Do', 'corr-1', CREATED, false, DEFAULT) == trackedTicket()
-        TrackedTicket.created('SCP-1234', null, 'corr-1', CREATED, false, DEFAULT) == trackedTicket(status: null, lastSeenAt: null)
-        TrackedTicket.created('SCP-1234', 'To Do', 'corr-1', CREATED, true, DEFAULT) == trackedTicket(demo: true)
-        TrackedTicket.created('SCP-1234', 'To Do', 'corr-1', CREATED, false, DEFAULT).open()
-        !TrackedTicket.created('SCP-1234', 'Done', 'corr-1', CREATED, false, DEFAULT).open()
-        TrackedTicket.created('SCP-1234', 'Remediated', 'corr-1', CREATED, false, new FollowUp(['Remediated'], 3)).closedAt() == CREATED
+        TrackedTicket.created(created, 'CHG0031001', 'corr-1', CREATED, false) == trackedTicket(status: null, lastSeenAt: null)
+        TrackedTicket.created(created, 'CHG0031001', 'corr-1', CREATED, true) == trackedTicket(status: null, lastSeenAt: null, demo: true)
+        TrackedTicket.created(created, 'CHG0031001', 'corr-1', CREATED, false).open()
+        trackedTicket().asCreated() == created
     }
 
     def "a ticket moved when CyberTrack tells another status than the last one Beadle-GUI knows"() {

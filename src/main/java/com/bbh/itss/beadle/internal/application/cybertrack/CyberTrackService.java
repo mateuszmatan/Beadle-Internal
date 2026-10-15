@@ -8,14 +8,14 @@ import com.bbh.itss.beadle.internal.application.cybertrack.port.out.CyberTrackPo
 import com.bbh.itss.beadle.internal.application.cybertrack.port.out.TrackedTicketPort;
 import com.bbh.itss.beadle.internal.domain.cybertrack.CreatedTicket;
 import com.bbh.itss.beadle.internal.domain.cybertrack.CyberTrackTicket;
-import com.bbh.itss.beadle.internal.domain.cybertrack.FollowUp;
 import com.bbh.itss.beadle.internal.domain.cybertrack.SecureCodingTicket;
 import com.bbh.itss.beadle.internal.domain.cybertrack.TrackedTicket;
 import lombok.RequiredArgsConstructor;
 
-import java.io.UncheckedIOException;
 import java.time.Clock;
-import java.util.NoSuchElementException;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import static com.bbh.itss.beadle.internal.domain.shared.Failures.notFound;
 import static com.bbh.itss.beadle.internal.domain.shared.Timestamps.now;
@@ -29,20 +29,30 @@ public class CyberTrackService implements CyberTrackUseCase {
 
     private final CyberTrackPort cyberTrack;
     private final TrackedTicketPort tracked;
-    private final FollowUp followUp;
     private final Clock clock;
+    private final ConcurrentMap<String, Object> changes = new ConcurrentHashMap<>();
 
     /**
-     * Creates the ticket and follows it from the status it was created in, so that Beadle-GUI hears of its next
-     * status; when that status cannot be read now, the first status read later is reported.
+     * Raises the secure coding ticket of a change once: while a ticket raised for the same change is still followed,
+     * a second request (Beadle-GUI retrying after its own time-out) gets that ticket instead of a new one. The answer
+     * comes straight after the creation, which is the only call made to CyberTrack; the poll tells Beadle-GUI the
+     * status the ticket starts in.
      */
     @Override
     @WithoutTransaction
     public CreatedTicket create(SecureCodingTicket ticket) {
-        CreatedTicket created = cyberTrack.create(ticket);
-        tracked.track(TrackedTicket.created(created.key(), statusOf(created.key()),
-                CallerContext.current().correlationId(), now(clock), !cyberTrack.connected(), followUp));
-        return created;
+        synchronized (changes.computeIfAbsent(ticket.changeNumber(), change -> new Object())) {
+            boolean demo = !cyberTrack.connected();
+            Optional<TrackedTicket> raised = tracked.openFor(ticket.changeNumber())
+                    .filter(open -> open.demo() == demo);
+            if (raised.isPresent()) {
+                return raised.get().asCreated();
+            }
+            CreatedTicket created = cyberTrack.create(ticket);
+            tracked.track(TrackedTicket.created(created, ticket.changeNumber(), CallerContext.current().correlationId(),
+                    now(clock), demo));
+            return created;
+        }
     }
 
     @Override
@@ -53,13 +63,5 @@ public class CyberTrackService implements CyberTrackUseCase {
             throw notFound(TICKET, key);
         }
         return cyberTrack.read(trimmed);
-    }
-
-    private String statusOf(String key) {
-        try {
-            return cyberTrack.read(key).status();
-        } catch (UncheckedIOException | NoSuchElementException e) {
-            return null;
-        }
     }
 }

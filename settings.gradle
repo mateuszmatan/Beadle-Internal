@@ -1,56 +1,75 @@
 import static java.net.Proxy.NO_PROXY
 
 pluginManagement {
-    def bbhNexus = 'https://tools.bbh.com/nexus'
-    def reachable = { String url ->
-        try {
-            def connection = (HttpURLConnection) new URL(url).openConnection(NO_PROXY)
-            connection.requestMethod = 'HEAD'
-            connection.connectTimeout = 3000
-            connection.readTimeout = 5000
-            connection.responseCode < 400
-        } catch (IOException ignored) {
-            false
-        }
+  def bbhNexus = 'https://tools.bbh.com/nexus'
+  def bbhNexusHttp = 'http://tools.bbh.com/nexus'
+  def reachable = { String url ->
+    try {
+      def connection = (HttpURLConnection) new URL(url).openConnection(NO_PROXY)
+      connection.requestMethod = 'HEAD'
+      connection.connectTimeout = 3000
+      connection.readTimeout = 5000
+      def code = connection.responseCode
+      logger.lifecycle("BBH network check: $url -> HTTP $code")
+      code < 400
+    } catch (IOException e) {
+      logger.lifecycle("BBH network check: $url -> ${e.class.simpleName}: ${e.message}")
+      false
     }
-    def wrapperProperties = new Properties()
-    file('gradle/wrapper/gradle-wrapper.properties').withInputStream { wrapperProperties.load(it) }
-    def bbhNetwork = providers.gradleProperty('bbhNetwork').map { it != 'false' }
-            .getOrElse(reachable(wrapperProperties.getProperty('distributionUrl')))
-    gradle.ext.bbhNetwork = bbhNetwork
-    gradle.ext.bbhRepositories = { RepositoryHandler repositories ->
-        if (bbhNetwork) {
-            repositories.maven {
-                url = uri("http://tools.bbh.com/nexus/content/groups/public")
-                allowInsecureProtocol = true
-            }
-            repositories.maven { url = uri("$bbhNexus/repository/gradle-plugins/") }
-            repositories.maven { url = uri("$bbhNexus/repository/maven-public/") }
-            repositories.maven { url = uri("$bbhNexus/repository/maven-central/") }
-        } else {
-            repositories.mavenCentral()
-        }
+  }
+  def bbhNetwork = providers.gradleProperty('bbhNetwork').map { it != 'false' }
+    .getOrElse(reachable("$bbhNexus/repository/gradle-plugins/") || reachable("$bbhNexusHttp/content/groups/public/"))
+  gradle.ext.bbhNetwork = bbhNetwork
+  gradle.ext.bbhRepositories = { RepositoryHandler repositories, boolean plugins ->
+    if (bbhNetwork) {
+      repositories.maven {
+        url = uri("$bbhNexusHttp/content/groups/public")
+        allowInsecureProtocol = true
+      }
+      repositories.maven { url = uri("$bbhNexus/repository/gradle-plugins/") }
+      repositories.maven { url = uri("$bbhNexus/repository/maven-public/") }
+      repositories.maven { url = uri("$bbhNexus/repository/maven-central/") }
+    } else {
+      if (plugins) {
+        repositories.gradlePluginPortal()
+      }
+      repositories.mavenCentral()
     }
-    if (!bbhNetwork) {
-        ['http', 'https'].each { scheme ->
-            if (System.getProperty("${scheme}.proxyHost") == providers.gradleProperty('bbh.proxyHost').getOrElse('njproxy')) {
-                System.clearProperty("${scheme}.proxyHost")
-                System.clearProperty("${scheme}.proxyPort")
-            }
-        }
-        logger.lifecycle('The BBH Nexus is out of reach: plugins and libraries come from the Gradle Plugin Portal and Maven Central, npm packages from registry.npmjs.org.')
+  }
+  if (!bbhNetwork) {
+    ['http', 'https'].each { scheme ->
+      if (System.getProperty("${scheme}.proxyHost") == providers.gradleProperty('bbh.proxyHost').getOrElse('njproxy')) {
+        System.clearProperty("${scheme}.proxyHost")
+        System.clearProperty("${scheme}.proxyPort")
+      }
     }
-    repositories {
-        gradle.ext.bbhRepositories(it)
-        gradlePluginPortal()
+    logger.lifecycle('The BBH Nexus is out of reach: plugins and libraries come from the Gradle Plugin Portal and Maven Central, npm packages from registry.npmjs.org.')
+  } else {
+    logger.lifecycle('Using the BBH Nexus for plugins and libraries.')
+  }
+
+  repositories {
+    maven { url = 'https://tools.bbh.com/nexus/content/groups/public' }
+    maven { url = uri("https://tools.bbh.com/nexus/repository/gradle-plugins/") }
+    maven { url = uri("https://tools.bbh.com/nexus/repository/maven-public/") }
+    maven { url = uri("https://tools.bbh.com/nexus/repository/EXT_Cloudera") }
+    gradle.ext.bbhRepositories(it, true)
+  }
+
+  resolutionStrategy {
+    eachPlugin {
+      if (requested.id.id == 'org.springframework.boot') {
+        useModule("org.springframework.boot:spring-boot-gradle-plugin:${requested.version}")
+      }
     }
+  }
 }
 
 dependencyResolutionManagement {
-    repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
-    repositories {
-        gradle.ext.bbhRepositories(it)
-    }
+  repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
+  repositories {
+    gradle.ext.bbhRepositories(it, false)
+  }
 }
 
 rootProject.name = 'bbh-devsecops'

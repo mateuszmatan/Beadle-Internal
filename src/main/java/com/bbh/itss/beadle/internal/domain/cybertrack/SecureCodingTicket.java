@@ -1,5 +1,6 @@
 package com.bbh.itss.beadle.internal.domain.cybertrack;
 
+import com.bbh.itss.beadle.internal.domain.shared.CallTarget;
 import com.bbh.itss.beadle.internal.domain.shared.ValidationProblems;
 
 import java.time.LocalDate;
@@ -12,7 +13,7 @@ import static org.apache.commons.lang3.ObjectUtils.getIfNull;
 import static org.apache.commons.lang3.StringUtils.trimToNull;
 
 public record SecureCodingTicket(String changeNumber, String applicationName, LocalDate implementationDate,
-                                 SecureCoding inputs) {
+                                 SecureCoding inputs) implements CallTarget {
 
     public static final int SUMMARY_MAX = 255;
     public static final int CHANGE_NUMBER_MAX = 40;
@@ -57,5 +58,10 @@ public record SecureCodingTicket(String changeNumber, String applicationName, Lo
 
     private String ticketDate() {
         return implementationDate == null ? null : TICKET_DATE.format(implementationDate);
+    }
+
+    @Override
+    public String callTarget() {
+        return changeNumber;
     }
 }

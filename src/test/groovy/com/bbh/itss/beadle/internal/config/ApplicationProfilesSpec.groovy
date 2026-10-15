@@ -24,7 +24,7 @@ class ApplicationProfilesSpec extends Specification {
         env.getProperty('spring.datasource.url') == "jdbc:h2:file:${System.getProperty('user.home')}/bbh-devsecops/beadle-internal/beadle-internal;MODE=Oracle;DEFAULT_NULL_ORDERING=HIGH;AUTO_SERVER=TRUE"
         environment([], [BEADLE_INTERNAL_DATA_DIR: '/var/beadle-internal']).getProperty('spring.datasource.url')
                 .startsWith('jdbc:h2:file:/var/beadle-internal/beadle-internal;')
-        env.getProperty('spring.jpa.hibernate.ddl-auto') == 'validate'
+        env.getProperty('spring.jpa.hibernate.ddl-auto') == 'none'
         env.getProperty('spring.liquibase.change-log') == 'classpath:db/changelog/db.changelog-master.yaml'
         env.getProperty('spring.liquibase.analytics-enabled') == 'false'
         env.getProperty('management.endpoint.health.show-details') == 'always'

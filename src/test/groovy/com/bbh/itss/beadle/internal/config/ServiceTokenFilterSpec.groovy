@@ -1,5 +1,7 @@
 package com.bbh.itss.beadle.internal.config
 
+import com.bbh.itss.beadle.internal.application.calllog.CallerContext
+import com.bbh.itss.beadle.internal.domain.calllog.Caller
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RestController
@@ -62,6 +64,28 @@ class ServiceTokenFilterSpec extends Specification {
         token << [null, '', '  ']
     }
 
+    def "an accepted call runs as the user and correlation id of its headers, cleared afterwards"() {
+        when:
+        def response = mvc.perform(get('/api/internal/caller').header('Authorization', 'Bearer ' + TOKEN)
+                .header('X-Beadle-User', ' Mateusz Matan ').header('X-Correlation-Id', 'corr-1')).andReturn().response
+
+        then:
+        response.contentAsString == 'Mateusz Matan/corr-1'
+        CallerContext.current() == Caller.NONE
+    }
+
+    def "a call without the headers gets a fresh correlation id and no user"() {
+        when:
+        def first = mvc.perform(get('/api/internal/caller').header('Authorization', 'Bearer ' + TOKEN)).andReturn().response
+        def second = mvc.perform(get('/api/internal/caller').header('Authorization', 'Bearer ' + TOKEN)
+                .header('X-Beadle-User', ' ').header('X-Correlation-Id', '')).andReturn().response
+
+        then:
+        first.contentAsString ==~ /null\/[0-9a-f-]{36}/
+        second.contentAsString ==~ /null\/[0-9a-f-]{36}/
+        first.contentAsString != second.contentAsString
+    }
+
     private static MockMvc mvc(String token) {
         standaloneSetup(new OpenController()).addFilters(new ServiceTokenFilter(new ServiceTokenProperties(token))).build()
     }
@@ -73,6 +97,12 @@ class ServiceTokenFilterSpec extends Specification {
                      '/actuator/info', '/actuator/healthcheck', '/anything'])
         String answer() {
             'ok'
+        }
+
+        @GetMapping('/api/internal/caller')
+        String caller() {
+            def caller = CallerContext.current()
+            "${caller.user()}/${caller.correlationId()}"
         }
     }
 }

@@ -1,1 +1,4 @@
-databaseChangeLog: []
+databaseChangeLog:
+  - include:
+      file: oracle/001-call-log.sql
+      relativeToChangelogFile: true

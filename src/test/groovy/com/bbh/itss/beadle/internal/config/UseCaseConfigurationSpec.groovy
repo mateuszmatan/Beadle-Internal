@@ -1,6 +1,8 @@
 package com.bbh.itss.beadle.internal.config
 
 import com.bbh.itss.beadle.internal.application.UseCase
+import com.bbh.itss.beadle.internal.application.calllog.CallLogService
+import com.bbh.itss.beadle.internal.application.calllog.port.out.CallLogPort
 import com.bbh.itss.beadle.internal.application.confluence.ConfluenceService
 import com.bbh.itss.beadle.internal.application.confluence.port.out.ConfluencePort
 import com.bbh.itss.beadle.internal.application.cybertrack.CyberTrackService
@@ -45,6 +47,7 @@ class UseCaseConfigurationSpec extends Specification {
             .withBean(CyberTrackPort, { [connected: { true }] as CyberTrackPort } as Supplier<CyberTrackPort>)
             .withBean(ConfluencePort, { [connected: { false }] as ConfluencePort } as Supplier<ConfluencePort>)
             .withBean(QTestPort, { [connected: { true }] as QTestPort } as Supplier<QTestPort>)
+            .withBean(CallLogPort, { [:] as CallLogPort } as Supplier<CallLogPort>)
 
     def "the use case advisor puts a transaction interceptor around every @UseCase bean"() {
         expect:
@@ -54,7 +57,7 @@ class UseCaseConfigurationSpec extends Specification {
             assert (advisor.advice as TransactionInterceptor).transactionAttributeSource instanceof UseCaseTransactionAttributeSource
             def useCases = context.getBeansWithAnnotation(UseCase).values()
             assert useCases.collect { AopUtils.getTargetClass(it) }.toSet() ==
-                    [JiraService, CyberTrackService, ConfluenceService, QTestService, StatusService].toSet()
+                    [JiraService, CyberTrackService, ConfluenceService, QTestService, StatusService, CallLogService].toSet()
             assert useCases.every { AopUtils.isAopProxy(it) }
         }
     }

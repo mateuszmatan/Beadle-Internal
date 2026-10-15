@@ -1,5 +1,7 @@
 package com.bbh.itss.beadle.internal.config;
 
+import com.bbh.itss.beadle.internal.application.calllog.CallerContext;
+import com.bbh.itss.beadle.internal.domain.calllog.Caller;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -10,12 +12,16 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.security.MessageDigest.isEqual;
+import static com.bbh.itss.beadle.internal.application.calllog.CallerContext.CORRELATION_HEADER;
+import static com.bbh.itss.beadle.internal.application.calllog.CallerContext.USER_HEADER;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.removeStart;
 import static org.apache.commons.lang3.StringUtils.trimToEmpty;
+import static org.apache.commons.lang3.StringUtils.trimToNull;
 import static org.springframework.core.Ordered.HIGHEST_PRECEDENCE;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
@@ -52,7 +58,12 @@ public class ServiceTokenFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         if (accepts(request.getHeader(AUTHORIZATION))) {
-            chain.doFilter(request, response);
+            CallerContext.set(callerOf(request));
+            try {
+                chain.doFilter(request, response);
+            } finally {
+                CallerContext.clear();
+            }
             return;
         }
         response.setStatus(UNAUTHORIZED.value());
@@ -60,6 +71,12 @@ public class ServiceTokenFilter extends OncePerRequestFilter {
         response.setContentType(APPLICATION_PROBLEM_JSON_VALUE);
         response.setCharacterEncoding(UTF_8.name());
         response.getWriter().write(PROBLEM);
+    }
+
+    static Caller callerOf(HttpServletRequest request) {
+        String correlationId = trimToNull(request.getHeader(CORRELATION_HEADER));
+        return new Caller(trimToNull(request.getHeader(USER_HEADER)),
+                correlationId == null ? UUID.randomUUID().toString() : correlationId);
     }
 
     boolean accepts(String authorization) {

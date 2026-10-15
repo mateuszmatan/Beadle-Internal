@@ -1,12 +1,13 @@
 package com.bbh.itss.beadle.internal.domain.confluence;
 
+import com.bbh.itss.beadle.internal.domain.shared.CallTarget;
 import com.bbh.itss.beadle.internal.domain.shared.ValidationProblems;
 
 import static com.bbh.itss.beadle.internal.domain.confluence.NewConfluencePage.REQUIRED;
 import static com.bbh.itss.beadle.internal.domain.confluence.NewConfluencePage.TITLE_MAX;
 import static org.apache.commons.lang3.StringUtils.trimToNull;
 
-public record ConfluencePageUpdate(String title, String body, Integer version) {
+public record ConfluencePageUpdate(String title, String body, Integer version) implements CallTarget {
 
     public static final String VERSION_MESSAGE = "must be the version being replaced, 1 or more";
 
@@ -29,5 +30,10 @@ public record ConfluencePageUpdate(String title, String body, Integer version) {
 
     public boolean replaces(ConfluencePage page) {
         return version != null && version == page.version();
+    }
+
+    @Override
+    public String callTarget() {
+        return title;
     }
 }

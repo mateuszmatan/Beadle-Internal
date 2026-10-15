@@ -1,5 +1,6 @@
 package com.bbh.itss.beadle.internal.support
 
+import com.bbh.itss.beadle.internal.domain.calllog.CallLogEntry
 import com.bbh.itss.beadle.internal.domain.confluence.ConfluencePage
 import com.bbh.itss.beadle.internal.domain.confluence.ConfluencePageUpdate
 import com.bbh.itss.beadle.internal.domain.confluence.NewConfluencePage
@@ -14,6 +15,9 @@ import com.bbh.itss.beadle.internal.domain.qtest.QTestRun
 
 import java.time.Instant
 import java.time.LocalDate
+
+import static com.bbh.itss.beadle.internal.domain.calllog.ExternalSystem.JIRA
+import static com.bbh.itss.beadle.internal.domain.calllog.Outcome.SUCCESS
 
 class Fixtures {
 
@@ -86,6 +90,10 @@ class Fixtures {
 
     static QTestRun run(Map changes = [:]) {
         copy(changes, new QTestRun(100L, 'Sign in with SSO', 'TR-100', 'Passed', UPDATED))
+    }
+
+    static CallLogEntry callLogEntry(Map changes = [:]) {
+        copy(changes, new CallLogEntry(1L, UPDATED, 'Mateusz Matan', 'corr-1', JIRA, 'versions', 'CERT', SUCCESS, null, 12L))
     }
 
     static <T extends Record> T copy(Map changes, T record) {

@@ -9,16 +9,21 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.net.URLEncoder;
+
 import static com.bbh.itss.beadle.internal.adapter.out.http.ExternalSystems.client;
 import static com.bbh.itss.beadle.internal.adapter.out.http.ExternalSystems.refusal;
 import static com.bbh.itss.beadle.internal.application.calllog.CallerContext.CORRELATION_HEADER;
 import static com.bbh.itss.beadle.internal.application.calllog.CallerContext.SYSTEM_USER;
 import static com.bbh.itss.beadle.internal.application.calllog.CallerContext.USER_HEADER;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 
 /**
  * Tells Beadle-GUI that a ticket it had created moved, with the service token every call between the Beadle
- * services carries; Beadle-GUI answers {@code 202}.
+ * services carries, {@code system} as {@code X-Beadle-User}, percent-encoded in UTF-8 as the
+ * contract has every value of that header, and the correlation id of the action that created the ticket;
+ * Beadle-GUI answers {@code 202}.
  */
 @Component
 class GuiCallbackClient implements CallbackPort {
@@ -47,7 +52,7 @@ class GuiCallbackClient implements CallbackPort {
     }
 
     private static void caller(HttpHeaders headers, StatusCallback callback) {
-        headers.set(USER_HEADER, SYSTEM_USER);
+        headers.set(USER_HEADER, URLEncoder.encode(SYSTEM_USER, UTF_8));
         if (callback.correlationId() != null) {
             headers.set(CORRELATION_HEADER, callback.correlationId());
         }

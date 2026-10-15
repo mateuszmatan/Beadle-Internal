@@ -38,8 +38,8 @@ reached or refuses the call answers `502` naming the system and its reason.
 | `PUT /api/internal/confluence/pages/{id}` | the page one version up; `409` when `version` is not the current one |
 | `GET /api/internal/qtest/projects` | the qTest projects |
 | `GET /api/internal/qtest/projects/{id}/test-cycles` | the test cycles of a project, flat: those under the root then those of each release, each followed by the cycles nested in it |
-| `GET /api/internal/qtest/projects/{id}/test-runs?cycleId=` | the test runs of a cycle and of the cycles and suites in it, with their latest result and when it ended (or started) |
-| `GET /api/internal/qtest/projects/{id}/test-cycles/{cycleId}/summary` | the runs of a cycle counted by result |
+| `GET /api/internal/qtest/projects/{id}/test-runs?cycleId=` | the test runs of a cycle and of the cycles and suites in it, with their latest result and when it ended (or started); the last result is read only for runs that were executed or have no status |
+| `GET /api/internal/qtest/projects/{id}/test-cycles/{cycleId}/summary` | the runs of a cycle counted by result, from the Status of each run without a call per run |
 | `GET /api/internal/call-log?correlationId=&from=&to=&page=0&size=50` | the call log, newest first, for diagnosis |
 | `GET /actuator/health` | open, without a token |
 
@@ -132,6 +132,8 @@ refuse to start while a system's URL is blank, unless its `<SYSTEM>_DEMO=true` a
 | `beadle.qtest.url` | `QTEST_URL` | blank: demo | qTest |
 | `beadle.qtest.token` | `QTEST_TOKEN` | blank | bearer token of the Beadle service account in qTest |
 | `beadle.qtest.demo` | `QTEST_DEMO` | `false` | `true` lets `rd`, `qc` and `prod` start with a blank `QTEST_URL`, on the demo |
+| `beadle.qtest.concurrency` | `QTEST_CONCURRENCY` | `8` | the most qTest reads under way at once across all requests (last results of runs, cycles of releases), 1 to 50 |
+| `beadle.qtest.budget` | `QTEST_BUDGET` | `20s` | the longest a list of cycles or runs, or a summary, may take before it is refused with a `502`, below the 30 s Beadle-GUI waits |
 
 The other variables: `PORT` (`8082`), `SPRING_PROFILES_ACTIVE` (`local`), `BEADLE_INTERNAL_DATA_DIR` (the H2 folder
 of the `local` profile, `~/bbh-devsecops/beadle-internal`), `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` and

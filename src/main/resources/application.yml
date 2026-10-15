@@ -69,6 +69,8 @@ beadle:
     url: ${QTEST_URL:}
     token: ${QTEST_TOKEN:}
     demo: ${QTEST_DEMO:false}
+    concurrency: ${QTEST_CONCURRENCY:8}
+    budget: ${QTEST_BUDGET:20s}
 ---
 spring:
   config:

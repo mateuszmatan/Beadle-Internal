@@ -40,6 +40,8 @@ class ApplicationProfilesSpec extends Specification {
         env.getProperty('beadle.cybertrack.closed-statuses') == "Done,Closed,Resolved,Cancelled,Canceled,Rejected,Won't Do"
         env.getProperty('beadle.cybertrack.max-misses') == '12'
         env.getProperty('beadle.jira.epic-link-field') == 'customfield_10014'
+        env.getProperty('beadle.qtest.concurrency') == '8'
+        env.getProperty('beadle.qtest.budget') == '20s'
         env.getProperty('spring.http.clients.connect-timeout') == '5s'
         env.getProperty('spring.http.clients.read-timeout') == '30s'
     }
@@ -53,7 +55,7 @@ class ApplicationProfilesSpec extends Specification {
                                    CYBERTRACK_POLL: 'PT1M', CYBERTRACK_CLOSED_STATUSES: 'Remediated,Risk Accepted',
                                    CYBERTRACK_MAX_MISSES: '3', CONFLUENCE_URL: 'https://confluence.bbh.com',
                                    CONFLUENCE_TOKEN: 'confluence-token', QTEST_URL: 'https://qtest.bbh.com',
-                                   QTEST_TOKEN: 'qtest-token'])
+                                   QTEST_TOKEN: 'qtest-token', QTEST_CONCURRENCY: '4', QTEST_BUDGET: '15s'])
 
         then:
         env.getProperty('beadle.services.token') == 'shared-secret'
@@ -68,6 +70,8 @@ class ApplicationProfilesSpec extends Specification {
         env.getProperty('beadle.cybertrack.closed-statuses') == 'Remediated,Risk Accepted'
         env.getProperty('beadle.cybertrack.max-misses') == '3'
         env.getProperty('beadle.jira.epic-link-field') == 'customfield_10008'
+        env.getProperty('beadle.qtest.concurrency') == '4'
+        env.getProperty('beadle.qtest.budget') == '15s'
     }
 
     def "the #profile profile runs on the Oracle database given by the environment"() {

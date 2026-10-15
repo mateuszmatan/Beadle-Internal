@@ -34,12 +34,15 @@ class ApplicationProfilesSpec extends Specification {
         env.getProperty('beadle.cybertrack.project-key') == 'SCP'
         env.getProperty('beadle.cybertrack.issue-type') == 'Task'
         env.getProperty('beadle.cybertrack.poll') == 'PT5M'
+        env.getProperty('beadle.jira.epic-link-field') == 'customfield_10014'
+        env.getProperty('spring.http.clients.connect-timeout') == '5s'
+        env.getProperty('spring.http.clients.read-timeout') == '30s'
     }
 
     def "the service token, Beadle-GUI and the external systems are given by the environment"() {
         when:
         def env = environment([], [BEADLE_SERVICE_TOKEN: 'shared-secret', BEADLE_GUI_URL: 'http://beadle:8081',
-                                   JIRA_URL: 'https://jira.bbh.com', JIRA_TOKEN: 'jira-token',
+                                   JIRA_URL: 'https://jira.bbh.com', JIRA_TOKEN: 'jira-token', JIRA_EPIC_LINK_FIELD: 'customfield_10008',
                                    CYBERTRACK_URL: 'https://cybertrack.bbh.com', CYBERTRACK_TOKEN: 'cybertrack-token',
                                    CYBERTRACK_PROJECT_KEY: 'SEC', CYBERTRACK_ISSUE_TYPE: 'Security Task',
                                    CYBERTRACK_POLL: 'PT1M', CONFLUENCE_URL: 'https://confluence.bbh.com',
@@ -56,6 +59,7 @@ class ApplicationProfilesSpec extends Specification {
         env.getProperty('beadle.cybertrack.project-key') == 'SEC'
         env.getProperty('beadle.cybertrack.issue-type') == 'Security Task'
         env.getProperty('beadle.cybertrack.poll') == 'PT1M'
+        env.getProperty('beadle.jira.epic-link-field') == 'customfield_10008'
     }
 
     def "the #profile profile runs on the Oracle database given by the environment"() {

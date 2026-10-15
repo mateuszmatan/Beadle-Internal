@@ -21,6 +21,10 @@ spring:
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
     analytics-enabled: false
+  http:
+    clients:
+      connect-timeout: 5s
+      read-timeout: 30s
 
 server:
   port: ${PORT:8082}
@@ -46,6 +50,7 @@ beadle:
   jira:
     url: ${JIRA_URL:}
     token: ${JIRA_TOKEN:}
+    epic-link-field: ${JIRA_EPIC_LINK_FIELD:customfield_10014}
   cybertrack:
     url: ${CYBERTRACK_URL:}
     token: ${CYBERTRACK_TOKEN:}

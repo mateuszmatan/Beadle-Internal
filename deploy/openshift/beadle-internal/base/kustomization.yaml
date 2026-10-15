@@ -15,6 +15,7 @@ configMapGenerator:
       - SPRING_PROFILES_ACTIVE=rd
       - BEADLE_GUI_URL=http://beadle:8081
       - JIRA_URL=
+      - JIRA_EPIC_LINK_FIELD=customfield_10014
       - CYBERTRACK_URL=
       - CYBERTRACK_PROJECT_KEY=SCP
       - CYBERTRACK_ISSUE_TYPE=Task

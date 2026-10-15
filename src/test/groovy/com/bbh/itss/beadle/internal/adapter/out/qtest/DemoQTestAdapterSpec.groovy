@@ -2,7 +2,9 @@ package com.bbh.itss.beadle.internal.adapter.out.qtest
 
 import com.bbh.itss.beadle.internal.application.qtest.port.out.QTestPort
 import com.bbh.itss.beadle.internal.domain.qtest.QTestSummary
+import org.springframework.boot.autoconfigure.AutoConfigurations
 import org.springframework.boot.context.properties.EnableConfigurationProperties
+import org.springframework.boot.restclient.autoconfigure.RestClientAutoConfiguration
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import org.springframework.context.annotation.Import
 import spock.lang.Specification
@@ -79,7 +81,9 @@ class DemoQTestAdapterSpec extends Specification {
 
     def "the demo is used only while the qTest URL is blank"() {
         given:
-        def runner = new ApplicationContextRunner().withUserConfiguration(Adapters)
+        def runner = new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(RestClientAutoConfiguration))
+                .withUserConfiguration(Adapters)
                 .withBean(java.time.Clock, { fixed(NOW, UTC) } as java.util.function.Supplier<java.time.Clock>)
 
         expect:
@@ -91,11 +95,11 @@ class DemoQTestAdapterSpec extends Specification {
         properties                                  || types
         []                                          || [DemoQTestAdapter]
         ['beadle.qtest.url=']                       || [DemoQTestAdapter]
-        ['beadle.qtest.url=https://qtest.bbh.com']  || []
+        ['beadle.qtest.url=https://qtest.bbh.com']  || [QTestAdapter]
     }
 
     @EnableConfigurationProperties(QTestProperties)
-    @Import(DemoQTestAdapter)
+    @Import([DemoQTestAdapter, QTestAdapter])
     static class Adapters {
     }
 }

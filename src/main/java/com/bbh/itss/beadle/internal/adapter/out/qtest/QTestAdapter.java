@@ -13,6 +13,8 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,6 +24,7 @@ import static com.bbh.itss.beadle.internal.adapter.out.http.ExternalSystems.time
 import static com.bbh.itss.beadle.internal.adapter.out.qtest.QTestProperties.CONFIGURED;
 import static com.bbh.itss.beadle.internal.domain.qtest.QTestSummary.UNEXECUTED;
 import static com.bbh.itss.beadle.internal.domain.shared.Failures.notFound;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 
 @Component
@@ -37,6 +40,13 @@ class QTestAdapter implements QTestPort {
     };
     private static final ParameterizedTypeReference<List<Cycle>> CYCLES = new ParameterizedTypeReference<>() {
     };
+    private static final ParameterizedTypeReference<List<Release>> RELEASES = new ParameterizedTypeReference<>() {
+    };
+    static final String CYCLES_UNDER = "/api/v3/projects/{id}/test-cycles?parentId={parent}&parentType={type}"
+            + "&expand=descendants";
+    static final long ROOT_ID = 0;
+    static final String ROOT = "root";
+    static final String RELEASE = "release";
 
     private final RestClient client;
 
@@ -61,18 +71,47 @@ class QTestAdapter implements QTestPort {
         }
     }
 
+    /**
+     * The test cycles under the project root, then those of each release, each followed by the cycles nested in it.
+     * qTest answers only the cycles right under the parent it is given unless asked for their descendants, and keeps
+     * the cycles of a release under that release instead of the root.
+     */
     @Override
     public List<QTestCycle> cycles(long projectId) {
+        List<QTestCycle> flat = new ArrayList<>();
         try {
-            List<Cycle> cycles = client.get().uri("/api/v3/projects/{id}/test-cycles", projectId)
-                    .accept(APPLICATION_JSON).retrieve().body(CYCLES);
-            List<QTestCycle> flat = new ArrayList<>();
-            flatten(cycles, flat);
-            return flat;
+            flatten(cyclesUnder(projectId, ROOT_ID, ROOT), flat);
         } catch (HttpClientErrorException.NotFound e) {
             throw notFound(PROJECT, projectId);
         } catch (RestClientException e) {
             throw refusal(QTEST, "list the test cycles of project " + projectId, e);
+        }
+        for (Release release : releases(projectId)) {
+            try {
+                flatten(cyclesUnder(projectId, release.id(), RELEASE), flat);
+            } catch (HttpClientErrorException.NotFound e) {
+                // a release deleted since it was listed has no cycles left
+            } catch (RestClientException e) {
+                throw refusal(QTEST, "list the test cycles of release " + release.id(), e);
+            }
+        }
+        return flat;
+    }
+
+    private List<Cycle> cyclesUnder(long projectId, long parentId, String parentType) {
+        return client.get().uri(CYCLES_UNDER, projectId, parentId, parentType).accept(APPLICATION_JSON).retrieve()
+                .body(CYCLES);
+    }
+
+    private List<Release> releases(long projectId) {
+        try {
+            List<Release> releases = client.get().uri("/api/v3/projects/{id}/releases", projectId)
+                    .accept(APPLICATION_JSON).retrieve().body(RELEASES);
+            return releases == null ? List.of() : releases;
+        } catch (HttpClientErrorException.NotFound e) {
+            throw notFound(PROJECT, projectId);
+        } catch (RestClientException e) {
+            throw refusal(QTEST, "list the releases of project " + projectId, e);
         }
     }
 
@@ -84,7 +123,7 @@ class QTestAdapter implements QTestPort {
             Log log = lastLog(projectId, run.id());
             result.add(new QTestRun(run.id(), run.name(), run.pid(),
                     log == null || log.status() == null || log.status().name() == null ? UNEXECUTED : log.status().name(),
-                    log == null ? null : timestamp(log.executionDate())));
+                    log == null ? null : log.executedAt()));
         }
         return result;
     }
@@ -105,7 +144,7 @@ class QTestAdapter implements QTestPort {
         }
         List<Run> runs = new ArrayList<>();
         try {
-            int total;
+            boolean more;
             int page = 0;
             do {
                 RunPage fetched = client.get()
@@ -117,8 +156,8 @@ class QTestAdapter implements QTestPort {
                     break;
                 }
                 runs.addAll(fetched.items());
-                total = fetched.total();
-            } while (runs.size() < total && runs.size() < MAX_RUNS);
+                more = fetched.total() == null ? fetched.items().size() >= PAGE_SIZE : runs.size() < fetched.total();
+            } while (more && runs.size() < MAX_RUNS);
         } catch (RestClientException e) {
             throw refusal(QTEST, "list the test runs of test cycle " + cycleId, e);
         }
@@ -149,16 +188,36 @@ class QTestAdapter implements QTestPort {
     record Project(long id, String name) {
     }
 
+    record Release(long id, String name) {
+    }
+
     record Cycle(long id, String name, String pid, @JsonProperty("test-cycles") List<Cycle> children) {
     }
 
-    record RunPage(int page, int pageSize, int total, List<Run> items) {
+    record RunPage(Integer page, @JsonProperty("page_size") Integer pageSize, Integer total, List<Run> items) {
     }
 
     record Run(long id, String name, String pid) {
     }
 
-    record Log(Status status, @JsonProperty("execution_date") String executionDate) {
+    /**
+     * The last result of a test run, with the ISO 8601 times its execution started and ended.
+     */
+    record Log(Status status, @JsonProperty("exe_start_date") String startedAt,
+               @JsonProperty("exe_end_date") String endedAt) {
+
+        /**
+         * When the run was executed: the end of its last execution, or its start when it has no end. A time qTest
+         * writes in another notation is left out rather than failing the list.
+         */
+        Instant executedAt() {
+            String at = isBlank(endedAt) ? startedAt : endedAt;
+            try {
+                return isBlank(at) ? null : timestamp(at);
+            } catch (DateTimeParseException e) {
+                return null;
+            }
+        }
     }
 
     record Status(String name) {

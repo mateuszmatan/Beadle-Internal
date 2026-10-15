@@ -37,8 +37,8 @@ reached or refuses the call answers `502` naming the system and its reason.
 | `POST /api/internal/confluence/pages` | `201` the new page |
 | `PUT /api/internal/confluence/pages/{id}` | the page one version up; `409` when `version` is not the current one |
 | `GET /api/internal/qtest/projects` | the qTest projects |
-| `GET /api/internal/qtest/projects/{id}/test-cycles` | the test cycles of a project |
-| `GET /api/internal/qtest/projects/{id}/test-runs?cycleId=` | the test runs of a cycle with their latest result |
+| `GET /api/internal/qtest/projects/{id}/test-cycles` | the test cycles of a project, flat: those under the root then those of each release, each followed by the cycles nested in it |
+| `GET /api/internal/qtest/projects/{id}/test-runs?cycleId=` | the test runs of a cycle and of the cycles and suites in it, with their latest result and when it ended (or started) |
 | `GET /api/internal/qtest/projects/{id}/test-cycles/{cycleId}/summary` | the runs of a cycle counted by result |
 | `GET /api/internal/call-log?correlationId=&from=&to=&page=0&size=50` | the call log, newest first, for diagnosis |
 | `GET /actuator/health` | open, without a token |

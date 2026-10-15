@@ -1,4 +1,6 @@
 import org.springframework.boot.gradle.plugin.SpringBootPlugin
+import org.gradle.api.services.BuildService
+import org.gradle.api.services.BuildServiceParameters
 
 plugins {
     alias(libs.plugins.spring.boot) apply false
@@ -6,9 +8,20 @@ plugins {
     alias(libs.plugins.sonarqube)
 }
 
+abstract class HeavyTestService implements BuildService<BuildServiceParameters.None> {}
+
+def heavyTests = gradle.sharedServices.registerIfAbsent('heavyTests', HeavyTestService) {
+  maxParallelUsages = (findProperty('heavyTests.parallel') ?: '1') as int
+}
+
 def bbhNetwork = gradle.ext.bbhNetwork as boolean
 def skipGui = providers.gradleProperty('skipGui').map { it != 'false' }.getOrElse(false)
+def performanceFactor = providers.systemProperty('performance.factor')
+  .orElse(providers.gradleProperty('performance.factor'))
+  .getOrElse('2.0')
 def applications = [beadle: [backend: 'beadle-backend', gui: 'beadle-gui', jar: 'beadle'],
+
+
                     dso   : [backend: 'dso-backend', gui: 'dso-gui', jar: 'dso-portal']]
 
 allprojects {
@@ -19,10 +32,14 @@ allprojects {
 subprojects {
     apply plugin: 'base'
 
+    tasks.withType(Test).configureEach {
+      usesService(heavyTests)
+    }
+
     plugins.withType(JavaBasePlugin).configureEach {
         java {
             toolchain {
-                languageVersion = JavaLanguageVersion.of(17)
+                languageVersion = JavaLanguageVersion.of(21)
             }
         }
         tasks.withType(JavaCompile).configureEach {
@@ -119,6 +136,7 @@ configure(subprojects.findAll { it.name.endsWith('-gui') }) { gui ->
 
     tasks.register('testAngular', Exec) {
         dependsOn ':installDesignSystem'
+        usesService(heavyTests)
         group = 'verification'
         description = "Run the Angular unit tests of ${gui.name} (Vitest on jsdom) with coverage; fails below the thresholds in angular.json"
         workingDir = rootDir
@@ -199,7 +217,8 @@ configure(subprojects.findAll { it.name.endsWith('-gui') }) { gui ->
                                 systemProperty 'frontend.dist', distDir.asFile.absolutePath
                                 systemProperty 'frontend.reports', gui.layout.buildDirectory.dir('reports/frontend').get().asFile.absolutePath
                                 systemProperty 'performance.report', gui.layout.buildDirectory.file("reports/performance/${gui.name}-performance-report.md").get().asFile.absolutePath
-                                forward(it, 'frontend.browser', 'frontend.headed', 'smoke.baseUrl', 'performance.factor')
+                                forward(it, 'frontend.browser', 'frontend.headed', 'smoke.baseUrl')
+                                systemProperty 'performance.factor', performanceFactor
                                 testLogging {
                                     events 'failed'
                                     exceptionFormat = 'full'
@@ -307,7 +326,8 @@ configure(subprojects.findAll { it.name.endsWith('-backend') }) { backend ->
                                 extensions.getByType(JacocoTaskExtension).enabled = false
                                 systemProperty 'regression.expectedDir', backend.file('src/regressionTest/resources/regression').absolutePath
                                 systemProperty 'performance.report', backend.layout.buildDirectory.file("reports/performance/${backend.name}-performance-report.md").get().asFile.absolutePath
-                                forward(it, 'regression.updateExpected', 'smoke.baseUrl', 'smoke.ui', 'performance.factor')
+                                forward(it, 'regression.updateExpected', 'smoke.baseUrl', 'smoke.ui')
+                                systemProperty 'performance.factor', performanceFactor
                                 if (suiteName != 'regressionTest') {
                                     outputs.upToDateWhen { false }
                                     outputs.cacheIf { false }
@@ -355,6 +375,9 @@ configure(subprojects.findAll { it.name.endsWith('-backend') }) { backend ->
     }
 }
 
+def nexusPublishProperty = version.toString().endsWith('SNAPSHOT') ? 'nexus.snapshotsUrl' : 'nexus.releasesUrl'
+def nexusPublishUrl = findProperty(nexusPublishProperty)
+
 applications.each { appName, app ->
     project(":${app.backend}") { backend ->
         apply plugin: 'org.springframework.boot'
@@ -386,21 +409,32 @@ applications.each { appName, app ->
             mustRunAfter gui.tasks.matching { it.name in ['regressionTest', 'smokeTest', 'performanceTest'] }
         }
 
-        publishing {
-            publications {
-                create('application', MavenPublication) {
-                    artifactId = app.jar
-                    artifact tasks.named('bootJar')
-                }
-            }
-            repositories {
-                maven {
-                    name = 'bbhNexus'
-                    url = uri(version.toString().endsWith('SNAPSHOT') ? findProperty('nexus.snapshotsUrl') : findProperty('nexus.releasesUrl'))
-                    credentials(PasswordCredentials)
-                }
-            }
+      publishing {
+        publications {
+          create('application', MavenPublication) {
+            artifactId = app.jar
+            artifact tasks.named('bootJar')
+          }
         }
+        if (nexusPublishUrl) {
+          repositories {
+            maven {
+              name = 'bbhNexus'
+              url = uri(nexusPublishUrl)
+              credentials(PasswordCredentials)
+            }
+          }
+        }
+      }
+
+      tasks.named('publish') {
+        dependsOn tasks.named('bootJar')
+        doFirst {
+          if (!nexusPublishUrl) {
+            throw new GradleException("Set -P${nexusPublishProperty}=<url> to publish ${app.jar} to the BBH Nexus.")
+          }
+        }
+      }
 
         tasks.named('publish') {
             dependsOn tasks.named('bootJar')

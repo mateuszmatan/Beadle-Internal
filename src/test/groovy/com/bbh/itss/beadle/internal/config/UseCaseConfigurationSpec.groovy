@@ -18,6 +18,7 @@ import com.bbh.itss.beadle.internal.application.qtest.QTestService
 import com.bbh.itss.beadle.internal.application.qtest.port.out.QTestPort
 import com.bbh.itss.beadle.internal.application.status.StatusService
 import com.bbh.itss.beadle.internal.application.status.port.in.StatusUseCase
+import com.bbh.itss.beadle.internal.domain.cybertrack.FollowUp
 import com.bbh.itss.beadle.internal.support.RecordingTransactionManager
 import org.springframework.aop.Advisor
 import org.springframework.aop.support.AopUtils
@@ -56,6 +57,7 @@ class UseCaseConfigurationSpec extends Specification {
             .withBean(CallbackPort, { [:] as CallbackPort } as Supplier<CallbackPort>)
             .withBean(TrackedTicketPort, { [open: { states << transactionState(); [] }] as TrackedTicketPort } as Supplier<TrackedTicketPort>)
             .withBean(Clock, { Clock.systemUTC() } as Supplier<Clock>)
+            .withBean(FollowUp, { FollowUp.DEFAULT } as Supplier<FollowUp>)
 
     def "the use case advisor puts a transaction interceptor around every @UseCase bean"() {
         expect:

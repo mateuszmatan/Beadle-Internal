@@ -8,3 +8,6 @@ databaseChangeLog:
   - include:
       file: oracle/003-cybertrack-ticket-demo.sql
       relativeToChangelogFile: true
+  - include:
+      file: oracle/004-cybertrack-ticket-misses.sql
+      relativeToChangelogFile: true

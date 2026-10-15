@@ -37,6 +37,8 @@ class ApplicationProfilesSpec extends Specification {
         env.getProperty('beadle.cybertrack.project-key') == 'SCP'
         env.getProperty('beadle.cybertrack.issue-type') == 'Task'
         env.getProperty('beadle.cybertrack.poll') == 'PT5M'
+        env.getProperty('beadle.cybertrack.closed-statuses') == "Done,Closed,Resolved,Cancelled,Canceled,Rejected,Won't Do"
+        env.getProperty('beadle.cybertrack.max-misses') == '12'
         env.getProperty('beadle.jira.epic-link-field') == 'customfield_10014'
         env.getProperty('spring.http.clients.connect-timeout') == '5s'
         env.getProperty('spring.http.clients.read-timeout') == '30s'
@@ -48,7 +50,8 @@ class ApplicationProfilesSpec extends Specification {
                                    JIRA_URL: 'https://jira.bbh.com', JIRA_TOKEN: 'jira-token', JIRA_EPIC_LINK_FIELD: 'customfield_10008',
                                    CYBERTRACK_URL: 'https://cybertrack.bbh.com', CYBERTRACK_TOKEN: 'cybertrack-token',
                                    CYBERTRACK_PROJECT_KEY: 'SEC', CYBERTRACK_ISSUE_TYPE: 'Security Task',
-                                   CYBERTRACK_POLL: 'PT1M', CONFLUENCE_URL: 'https://confluence.bbh.com',
+                                   CYBERTRACK_POLL: 'PT1M', CYBERTRACK_CLOSED_STATUSES: 'Remediated,Risk Accepted',
+                                   CYBERTRACK_MAX_MISSES: '3', CONFLUENCE_URL: 'https://confluence.bbh.com',
                                    CONFLUENCE_TOKEN: 'confluence-token', QTEST_URL: 'https://qtest.bbh.com',
                                    QTEST_TOKEN: 'qtest-token'])
 
@@ -62,6 +65,8 @@ class ApplicationProfilesSpec extends Specification {
         env.getProperty('beadle.cybertrack.project-key') == 'SEC'
         env.getProperty('beadle.cybertrack.issue-type') == 'Security Task'
         env.getProperty('beadle.cybertrack.poll') == 'PT1M'
+        env.getProperty('beadle.cybertrack.closed-statuses') == 'Remediated,Risk Accepted'
+        env.getProperty('beadle.cybertrack.max-misses') == '3'
         env.getProperty('beadle.jira.epic-link-field') == 'customfield_10008'
     }
 

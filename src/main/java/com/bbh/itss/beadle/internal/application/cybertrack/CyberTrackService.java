@@ -8,6 +8,7 @@ import com.bbh.itss.beadle.internal.application.cybertrack.port.out.CyberTrackPo
 import com.bbh.itss.beadle.internal.application.cybertrack.port.out.TrackedTicketPort;
 import com.bbh.itss.beadle.internal.domain.cybertrack.CreatedTicket;
 import com.bbh.itss.beadle.internal.domain.cybertrack.CyberTrackTicket;
+import com.bbh.itss.beadle.internal.domain.cybertrack.FollowUp;
 import com.bbh.itss.beadle.internal.domain.cybertrack.SecureCodingTicket;
 import com.bbh.itss.beadle.internal.domain.cybertrack.TrackedTicket;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class CyberTrackService implements CyberTrackUseCase {
 
     private final CyberTrackPort cyberTrack;
     private final TrackedTicketPort tracked;
+    private final FollowUp followUp;
     private final Clock clock;
 
     /**
@@ -39,7 +41,7 @@ public class CyberTrackService implements CyberTrackUseCase {
     public CreatedTicket create(SecureCodingTicket ticket) {
         CreatedTicket created = cyberTrack.create(ticket);
         tracked.track(TrackedTicket.created(created.key(), statusOf(created.key()),
-                CallerContext.current().correlationId(), now(clock), !cyberTrack.connected()));
+                CallerContext.current().correlationId(), now(clock), !cyberTrack.connected(), followUp));
         return created;
     }
 

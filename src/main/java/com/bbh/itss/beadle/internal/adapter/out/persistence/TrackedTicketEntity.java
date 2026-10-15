@@ -32,6 +32,8 @@ class TrackedTicketEntity {
 
     private boolean demo;
 
+    private int misses;
+
     static TrackedTicketEntity of(TrackedTicket ticket) {
         TrackedTicketEntity entity = new TrackedTicketEntity();
         entity.ticketKey = ticket.key();
@@ -42,11 +44,12 @@ class TrackedTicketEntity {
         entity.lastEventAt = ticket.lastEventAt();
         entity.closedAt = ticket.closedAt();
         entity.demo = ticket.demo();
+        entity.misses = ticket.misses();
         return entity;
     }
 
     TrackedTicket toDomain() {
         return new TrackedTicket(ticketKey, status, correlationId, createdAt, lastSeenAt, lastEventAt, closedAt,
-                demo);
+                demo, misses);
     }
 }

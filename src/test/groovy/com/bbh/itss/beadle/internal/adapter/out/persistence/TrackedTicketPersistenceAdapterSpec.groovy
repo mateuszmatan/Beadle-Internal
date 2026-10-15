@@ -11,6 +11,7 @@ import spock.lang.Subject
 
 import java.time.Instant
 
+import static com.bbh.itss.beadle.internal.domain.cybertrack.FollowUp.DEFAULT
 import static com.bbh.itss.beadle.internal.support.Fixtures.CREATED
 import static com.bbh.itss.beadle.internal.support.Fixtures.trackedTicket
 import static org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase.Replace.NONE
@@ -47,25 +48,25 @@ class TrackedTicketPersistenceAdapterSpec extends Specification {
                 [TICKET_KEY: 'SCP-1234', STATUS: 'To Do', CORRELATION_ID: 'corr-1', DEMO: 0]
 
         when:
-        adapter.save(trackedTicket().reported('In Progress', LATER))
+        adapter.save(trackedTicket().reported('In Progress', LATER, DEFAULT))
 
         then:
         adapter.open() == [trackedTicket(status: 'In Progress', lastSeenAt: LATER, lastEventAt: LATER)]
 
         when:
-        adapter.save(trackedTicket().reported('Done', LATER))
+        adapter.save(trackedTicket().reported('Done', LATER, DEFAULT))
 
         then:
         adapter.open() == []
         jdbc.queryForObject('SELECT STATUS FROM BEADLE_INTERNAL_CYBERTRACK_TICKET', String) == 'Done'
     }
 
-    def "a ticket the demo made up is read back as one"() {
+    def "a ticket the demo made up is read back as one, with the polls that missed it"() {
         when:
-        adapter.track(trackedTicket(demo: true))
+        adapter.track(trackedTicket(demo: true, misses: 2))
 
         then:
-        adapter.open() == [trackedTicket(demo: true)]
+        adapter.open() == [trackedTicket(demo: true, misses: 2)]
     }
 
     def "the open tickets come oldest first"() {

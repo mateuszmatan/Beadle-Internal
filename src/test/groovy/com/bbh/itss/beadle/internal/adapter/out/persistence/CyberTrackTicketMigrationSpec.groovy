@@ -19,7 +19,8 @@ class CyberTrackTicketMigrationSpec extends MigrationSpecification {
     static final String TABLE = 'BEADLE_INTERNAL_CYBERTRACK_TICKET'
     static final List<String> COLUMNS_002 = ['TICKET_KEY', 'STATUS', 'CORRELATION_ID', 'CREATED_AT', 'LAST_SEEN_AT',
                                              'LAST_EVENT_AT', 'CLOSED_AT']
-    static final List<String> COLUMNS = COLUMNS_002 + ['DEMO']
+    static final List<String> COLUMNS_003 = COLUMNS_002 + ['DEMO']
+    static final List<String> COLUMNS = COLUMNS_003 + ['MISSES']
     static final String INSERT = "INSERT INTO $TABLE (TICKET_KEY, STATUS, CORRELATION_ID, CREATED_AT) VALUES (?, 'To Do', 'corr-1', ?)"
 
     def setup() {
@@ -68,7 +69,7 @@ class CyberTrackTicketMigrationSpec extends MigrationSpecification {
         liquibase.update('')
 
         then:
-        columns(TABLE) == COLUMNS
+        columns(TABLE).take(COLUMNS_003.size()) == COLUMNS_003
         !nullable(TABLE, 'DEMO')
         jdbc.queryForObject("SELECT DEMO FROM $TABLE WHERE TICKET_KEY = 'SCP-1234'", Integer) == 0
 
@@ -78,6 +79,27 @@ class CyberTrackTicketMigrationSpec extends MigrationSpecification {
         then:
         columns(TABLE) == COLUMNS_002
         jdbc.queryForObject("SELECT STATUS FROM $TABLE WHERE TICKET_KEY = 'SCP-1234'", String) == 'To Do'
+    }
+
+    def "004 counts the polls that missed a ticket, none for a ticket followed before it, and rolls back to 003"() {
+        given:
+        liquibase.update('')
+        rollBackSince('004-')
+        jdbc.update(INSERT, 'SCP-1234', new java.sql.Timestamp(0))
+
+        when:
+        liquibase.update('')
+
+        then:
+        columns(TABLE).take(COLUMNS.size()) == COLUMNS
+        !nullable(TABLE, 'MISSES')
+        jdbc.queryForObject("SELECT MISSES FROM $TABLE WHERE TICKET_KEY = 'SCP-1234'", Integer) == 0
+
+        when:
+        rollBackSince('004-')
+
+        then:
+        columns(TABLE) == COLUMNS_003
     }
 
     def "a ticket is followed once and always has a key and a creation time"() {

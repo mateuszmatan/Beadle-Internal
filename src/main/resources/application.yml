@@ -59,6 +59,8 @@ beadle:
     project-key: ${CYBERTRACK_PROJECT_KEY:SCP}
     issue-type: ${CYBERTRACK_ISSUE_TYPE:Task}
     poll: ${CYBERTRACK_POLL:PT5M}
+    closed-statuses: ${CYBERTRACK_CLOSED_STATUSES:Done,Closed,Resolved,Cancelled,Canceled,Rejected,Won't Do}
+    max-misses: ${CYBERTRACK_MAX_MISSES:12}
   confluence:
     url: ${CONFLUENCE_URL:}
     token: ${CONFLUENCE_TOKEN:}

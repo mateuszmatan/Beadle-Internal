@@ -11,6 +11,7 @@ import com.bbh.itss.beadle.internal.domain.callback.PollReport;
 import com.bbh.itss.beadle.internal.domain.callback.StatusCallback;
 import com.bbh.itss.beadle.internal.domain.calllog.Caller;
 import com.bbh.itss.beadle.internal.domain.cybertrack.CyberTrackTicket;
+import com.bbh.itss.beadle.internal.domain.cybertrack.FollowUp;
 import com.bbh.itss.beadle.internal.domain.cybertrack.TrackedTicket;
 import lombok.RequiredArgsConstructor;
 
@@ -37,7 +38,8 @@ import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
  * them from CyberTrack. The poll reads all open tickets in one call made by {@code system}; each callback carries the
  * correlation id of the user action that created its ticket. A ticket the demo made up is never looked for in the
  * real CyberTrack, where its key may belong to another ticket, nor a real one in the demo: once the adapter changed,
- * such a ticket is dropped.
+ * such a ticket is dropped. A ticket CyberTrack no longer finds is tried again on the next polls and dropped once
+ * the {@link FollowUp} gives up on it.
  */
 @UseCase
 @RequiredArgsConstructor
@@ -50,6 +52,7 @@ public class CyberTrackPollService implements CyberTrackPollUseCase {
     private final TrackedTicketPort tracked;
     private final CyberTrackPort cyberTrack;
     private final CallbackPort callbacks;
+    private final FollowUp followUp;
     private final Clock clock;
 
     @Override
@@ -82,18 +85,29 @@ public class CyberTrackPollService implements CyberTrackPollUseCase {
             CyberTrackTicket found = current.get(ticket.key());
             try {
                 if (found == null) {
-                    throw notFound(TICKET, ticket.key());
-                }
-                if (ticket.movedIn(found)) {
+                    missed(ticket, now, dropped, failures);
+                } else if (ticket.movedIn(found)) {
                     sent.add(report(ticket, found, now));
                 } else {
-                    tracked.save(ticket.withLastSeenAt(now));
+                    tracked.save(ticket.seen(now));
                 }
             } catch (RuntimeException e) {
                 failures.put(ticket.key(), defaultIfBlank(e.getMessage(), e.getClass().getSimpleName()));
             }
         }
         return pollReport(sent, failures, dropped);
+    }
+
+    private void missed(TrackedTicket ticket, Instant now, Map<String, String> dropped, Map<String, String> failures) {
+        TrackedTicket missed = ticket.missed(now, followUp);
+        tracked.save(missed);
+        String reason = notFound(TICKET, ticket.key()).getMessage();
+        if (missed.open()) {
+            failures.put(ticket.key(), reason + " (" + missed.misses() + " of " + followUp.maxMisses()
+                    + " polls in a row before it is dropped)");
+        } else {
+            dropped.put(ticket.key(), reason + ": CyberTrack did not find it " + missed.misses() + " polls in a row");
+        }
     }
 
     private void drop(TrackedTicket ticket, String reason, Instant now, Map<String, String> dropped,
@@ -116,7 +130,7 @@ public class CyberTrackPollService implements CyberTrackPollUseCase {
         StatusCallback callback = new StatusCallback(CYBERTRACK, ticket.key(), found.status(),
                 getIfNull(found.updated(), now), ticket.correlationId());
         CallerContext.run(new Caller(SYSTEM_USER, ticket.correlationId()), () -> callbacks.notify(callback));
-        tracked.save(ticket.reported(found.status(), now));
+        tracked.save(ticket.reported(found.status(), now, followUp));
         return callback;
     }
 }

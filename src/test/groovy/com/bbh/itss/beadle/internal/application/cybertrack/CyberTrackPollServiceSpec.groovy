@@ -7,6 +7,7 @@ import com.bbh.itss.beadle.internal.application.cybertrack.port.out.TrackedTicke
 import com.bbh.itss.beadle.internal.domain.callback.PollReport
 import com.bbh.itss.beadle.internal.domain.callback.StatusCallback
 import com.bbh.itss.beadle.internal.domain.calllog.Caller
+import com.bbh.itss.beadle.internal.domain.cybertrack.FollowUp
 import spock.lang.Specification
 
 import java.time.Instant
@@ -27,7 +28,7 @@ class CyberTrackPollServiceSpec extends Specification {
     CyberTrackPort cyberTrack = Mock()
     CallbackPort callbacks = Mock()
     CyberTrackPort demoCyberTrack = Mock()
-    def service = new CyberTrackPollService(tracked, cyberTrack, callbacks, fixed(NOW, UTC))
+    def service = new CyberTrackPollService(tracked, cyberTrack, callbacks, new FollowUp(FollowUp.CLOSED_STATUSES, 3), fixed(NOW, UTC))
 
     def setup() {
         cyberTrack.connected() >> true
@@ -141,10 +142,40 @@ class CyberTrackPollServiceSpec extends Specification {
         then:
         1 * tracked.open() >> [trackedTicket(), trackedTicket(key: 'SCP-1235')]
         1 * cyberTrack.readAll(_) >> [cyberTrackTicket(key: 'SCP-1235')]
-        1 * tracked.save(_) >> { throw new IllegalStateException() }
+        1 * tracked.save(trackedTicket(misses: 1))
+        1 * tracked.save({ it.key() == 'SCP-1235' }) >> { throw new IllegalStateException() }
         0 * callbacks._
         report.sent() == []
-        report.failures() == ['SCP-1234': 'CyberTrack ticket SCP-1234 does not exist', 'SCP-1235': 'IllegalStateException']
+        report.failures() == ['SCP-1234': 'CyberTrack ticket SCP-1234 does not exist (1 of 3 polls in a row before it is dropped)',
+                              'SCP-1235': 'IllegalStateException']
+        report.dropped() == [:]
+    }
+
+    def "a ticket CyberTrack did not find the last polls in a row is dropped, one found again counts afresh"() {
+        when:
+        def report = service.poll()
+
+        then:
+        1 * tracked.open() >> [trackedTicket(misses: 2), trackedTicket(key: 'SCP-1235', misses: 2)]
+        1 * cyberTrack.readAll(['SCP-1234', 'SCP-1235']) >> [cyberTrackTicket(key: 'SCP-1235')]
+        1 * tracked.save(trackedTicket(misses: 3, closedAt: NOW))
+        1 * tracked.save(trackedTicket(key: 'SCP-1235', lastSeenAt: NOW, misses: 0))
+        0 * callbacks._
+        report == new PollReport([], [:], ['SCP-1234': 'CyberTrack ticket SCP-1234 does not exist: CyberTrack did not find it 3 polls in a row'])
+    }
+
+    def "a ticket that reached a closed status of its own workflow is no longer followed"() {
+        given:
+        def service = new CyberTrackPollService(tracked, cyberTrack, callbacks, new FollowUp(['Remediated'], 3), fixed(NOW, UTC))
+
+        when:
+        service.poll()
+
+        then:
+        1 * tracked.open() >> [trackedTicket(), trackedTicket(key: 'SCP-1235')]
+        1 * cyberTrack.readAll(_) >> [cyberTrackTicket(status: 'Remediated'), cyberTrackTicket(key: 'SCP-1235', status: 'Done')]
+        1 * tracked.save(trackedTicket(status: 'Remediated', lastSeenAt: NOW, lastEventAt: NOW, closedAt: NOW))
+        1 * tracked.save(trackedTicket(key: 'SCP-1235', status: 'Done', lastSeenAt: NOW, lastEventAt: NOW))
     }
 
     def "a CyberTrack that cannot be read fails the poll without telling anything"() {
@@ -161,7 +192,7 @@ class CyberTrackPollServiceSpec extends Specification {
 
     def "a ticket made up by the demo is dropped once CyberTrack is configured, and a real one while the demo plays"() {
         given:
-        def demo = new CyberTrackPollService(tracked, demoCyberTrack, callbacks, fixed(NOW, UTC))
+        def demo = new CyberTrackPollService(tracked, demoCyberTrack, callbacks, FollowUp.DEFAULT, fixed(NOW, UTC))
 
         when:
         def live = service.poll()

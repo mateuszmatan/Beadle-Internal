@@ -20,5 +20,7 @@ configMapGenerator:
       - CYBERTRACK_PROJECT_KEY=SCP
       - CYBERTRACK_ISSUE_TYPE=Task
       - CYBERTRACK_POLL=PT5M
+      - CYBERTRACK_CLOSED_STATUSES=Done,Closed,Resolved,Cancelled,Canceled,Rejected,Won't Do
+      - CYBERTRACK_MAX_MISSES=12
       - CONFLUENCE_URL=
       - QTEST_URL=

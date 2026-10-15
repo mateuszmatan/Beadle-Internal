@@ -45,16 +45,18 @@ reached or refuses the call answers `502` naming the system and its reason.
 
 ### Callbacks to Beadle-GUI
 
-A CyberTrack ticket created through the API is written down in `BEADLE_INTERNAL_CYBERTRACK_TICKET` with the status
-it was created in and the correlation id of the user action. A scheduled poll reads the open tickets in one call,
-every 10 seconds while the demo adapter moves tickets on its clock (To Do, In Progress, Done, two minutes per step)
-and every `beadle.cybertrack.poll` once CyberTrack is configured, and for every ticket that moved posts
+A CyberTrack ticket created through the API is written down in `BEADLE_INTERNAL_CYBERTRACK_TICKET` with the status it
+was created in and the correlation id of the user action. A scheduled poll reads the open tickets in one call, every
+10 seconds while the demo adapter moves tickets on its clock (To Do, In Progress, Done, two minutes per step) and
+every `beadle.cybertrack.poll` once CyberTrack is configured, and for every ticket that moved posts
 `{"system": "CYBERTRACK", "key", "status", "at", "correlationId"}` to `{beadle.gui.url}/api/callbacks/internal` with
-the service token and `X-Beadle-User: system`. A ticket that reached a final status (Done, Closed, Resolved,
-Cancelled, Rejected, Won't Do) is no longer followed. A callback Beadle-GUI does not take is logged and sent again
-on the next tick; the poll never fails a request. Each ticket remembers whether the demo made it up: the real
-CyberTrack is never asked about a demo key, which may belong to another ticket there, nor the demo about a real one,
-so the open tickets of the other kind are dropped with a warning once `CYBERTRACK_URL` is set or cleared.
+the service token and `X-Beadle-User: system`. A ticket that reached a final status (`beadle.cybertrack.closed-statuses`, by
+default Done, Closed, Resolved, Cancelled, Canceled, Rejected, Won't Do) is no longer followed, nor one that the poll
+did not find `beadle.cybertrack.max-misses` times in a row (deleted, or out of reach of the service account), which
+is logged as dropped. A callback Beadle-GUI does not take is logged and sent again on the next tick; the poll never
+fails a request. Each ticket remembers whether the demo made it up: the real CyberTrack is never asked about a demo
+key, which may belong to another ticket there, nor the demo about a real one, so the open tickets of the other kind
+are dropped with a warning once `CYBERTRACK_URL` is set or cleared.
 
 ### Call log
 
@@ -117,6 +119,8 @@ refuse to start while a system's URL is blank, unless its `<SYSTEM>_DEMO=true` a
 | `beadle.cybertrack.project-key` | `CYBERTRACK_PROJECT_KEY` | `SCP` | the project of the secure coding tickets |
 | `beadle.cybertrack.issue-type` | `CYBERTRACK_ISSUE_TYPE` | `Task` | the issue type of the secure coding tickets |
 | `beadle.cybertrack.poll` | `CYBERTRACK_POLL` | `PT5M` | how often the open tickets are polled once CyberTrack is configured (the demo is checked every 10 seconds) |
+| `beadle.cybertrack.closed-statuses` | `CYBERTRACK_CLOSED_STATUSES` | `Done,Closed,Resolved,Cancelled,Canceled,Rejected,Won't Do` | the statuses (any case) that end the follow-up of a ticket; list the final statuses of the CyberTrack workflow |
+| `beadle.cybertrack.max-misses` | `CYBERTRACK_MAX_MISSES` | `12` | how many polls in a row may miss a ticket before it is no longer followed |
 | `beadle.confluence.url` | `CONFLUENCE_URL` | blank: demo | Confluence |
 | `beadle.confluence.token` | `CONFLUENCE_TOKEN` | blank | bearer token of the Beadle service account in Confluence |
 | `beadle.confluence.demo` | `CONFLUENCE_DEMO` | `false` | `true` lets `rd`, `qc` and `prod` start with a blank `CONFLUENCE_URL`, on the demo |

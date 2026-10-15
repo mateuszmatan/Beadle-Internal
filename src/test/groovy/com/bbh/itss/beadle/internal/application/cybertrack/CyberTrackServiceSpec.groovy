@@ -5,6 +5,7 @@ import com.bbh.itss.beadle.internal.application.cybertrack.port.out.CyberTrackPo
 import com.bbh.itss.beadle.internal.application.cybertrack.port.out.TrackedTicketPort
 import com.bbh.itss.beadle.internal.domain.calllog.Caller
 import com.bbh.itss.beadle.internal.domain.cybertrack.CreatedTicket
+import com.bbh.itss.beadle.internal.domain.cybertrack.FollowUp
 import com.bbh.itss.beadle.internal.domain.cybertrack.TrackedTicket
 import spock.lang.Specification
 
@@ -21,7 +22,7 @@ class CyberTrackServiceSpec extends Specification {
 
     CyberTrackPort cyberTrack = Mock()
     TrackedTicketPort tracked = Mock()
-    def service = new CyberTrackService(cyberTrack, tracked, fixed(NOW, UTC))
+    def service = new CyberTrackService(cyberTrack, tracked, FollowUp.DEFAULT, fixed(NOW, UTC))
 
     def cleanup() {
         CallerContext.clear()
@@ -41,7 +42,7 @@ class CyberTrackServiceSpec extends Specification {
 
         then:
         1 * cyberTrack.read('SCP-1234') >> cyberTrackTicket()
-        1 * tracked.track(new TrackedTicket('SCP-1234', 'To Do', 'corr-1', NOW, NOW, null, null, !connected))
+        1 * tracked.track(new TrackedTicket('SCP-1234', 'To Do', 'corr-1', NOW, NOW, null, null, !connected, 0))
         result == created
 
         where:
@@ -60,7 +61,7 @@ class CyberTrackServiceSpec extends Specification {
         then:
         1 * cyberTrack.create(ticket()) >> new CreatedTicket('SCP-1234', null)
         1 * cyberTrack.read('SCP-1234') >> { throw failure }
-        1 * tracked.track(new TrackedTicket('SCP-1234', null, 'corr-1', NOW, null, null, null, true))
+        1 * tracked.track(new TrackedTicket('SCP-1234', null, 'corr-1', NOW, null, null, null, true, 0))
         result.key() == 'SCP-1234'
 
         where:

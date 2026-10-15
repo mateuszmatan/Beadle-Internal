@@ -4,6 +4,7 @@ import spock.lang.Specification
 
 import java.time.Instant
 
+import static com.bbh.itss.beadle.internal.domain.cybertrack.FollowUp.DEFAULT
 import static com.bbh.itss.beadle.internal.support.Fixtures.CREATED
 import static com.bbh.itss.beadle.internal.support.Fixtures.cyberTrackTicket
 import static com.bbh.itss.beadle.internal.support.Fixtures.trackedTicket
@@ -14,11 +15,12 @@ class TrackedTicketSpec extends Specification {
 
     def "a created ticket is followed from the status it was created in, seen then if CyberTrack told it"() {
         expect:
-        TrackedTicket.created('SCP-1234', 'To Do', 'corr-1', CREATED, false) == trackedTicket()
-        TrackedTicket.created('SCP-1234', null, 'corr-1', CREATED, false) == trackedTicket(status: null, lastSeenAt: null)
-        TrackedTicket.created('SCP-1234', 'To Do', 'corr-1', CREATED, true) == trackedTicket(demo: true)
-        TrackedTicket.created('SCP-1234', 'To Do', 'corr-1', CREATED, false).open()
-        !TrackedTicket.created('SCP-1234', 'Done', 'corr-1', CREATED, false).open()
+        TrackedTicket.created('SCP-1234', 'To Do', 'corr-1', CREATED, false, DEFAULT) == trackedTicket()
+        TrackedTicket.created('SCP-1234', null, 'corr-1', CREATED, false, DEFAULT) == trackedTicket(status: null, lastSeenAt: null)
+        TrackedTicket.created('SCP-1234', 'To Do', 'corr-1', CREATED, true, DEFAULT) == trackedTicket(demo: true)
+        TrackedTicket.created('SCP-1234', 'To Do', 'corr-1', CREATED, false, DEFAULT).open()
+        !TrackedTicket.created('SCP-1234', 'Done', 'corr-1', CREATED, false, DEFAULT).open()
+        TrackedTicket.created('SCP-1234', 'Remediated', 'corr-1', CREATED, false, new FollowUp(['Remediated'], 3)).closedAt() == CREATED
     }
 
     def "a ticket moved when CyberTrack tells another status than the last one Beadle-GUI knows"() {
@@ -36,11 +38,11 @@ class TrackedTicketSpec extends Specification {
 
     def "a reported status is the new known status, closing the ticket when it is a final one"() {
         when:
-        def reported = trackedTicket().reported(status, LATER)
+        def reported = trackedTicket(misses: 2).reported(status, LATER, DEFAULT)
 
         then:
         reported == trackedTicket(status: status, lastSeenAt: LATER, lastEventAt: LATER, closedAt: closed ? LATER : null)
-        trackedTicket(demo: true).reported(status, LATER).demo()
+        trackedTicket(demo: true).reported(status, LATER, DEFAULT).demo()
         reported.open() == !closed
 
         where:
@@ -55,8 +57,31 @@ class TrackedTicketSpec extends Specification {
         'Reopened'    || false
     }
 
-    def "no status is not a closed one"() {
+    def "a ticket seen again starts counting its misses afresh"() {
         expect:
-        !TrackedTicket.closed(null)
+        trackedTicket(misses: 3).seen(LATER) == trackedTicket(lastSeenAt: LATER)
+    }
+
+    def "a ticket CyberTrack did not find counts the miss and is closed on the #limit. one in a row"() {
+        given:
+        def followUp = new FollowUp(['Done'], limit)
+        def ticket = trackedTicket()
+
+        when:
+        (limit - 1).times { ticket = ticket.missed(LATER, followUp) }
+
+        then:
+        ticket == trackedTicket(misses: limit - 1)
+        ticket.open()
+
+        when:
+        ticket = ticket.missed(LATER, followUp)
+
+        then:
+        ticket == trackedTicket(misses: limit, closedAt: LATER)
+        !ticket.open()
+
+        where:
+        limit << [1, 3, 12]
     }
 }

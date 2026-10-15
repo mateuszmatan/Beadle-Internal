@@ -1,529 +1,192 @@
 import org.springframework.boot.gradle.plugin.SpringBootPlugin
-import org.gradle.api.services.BuildService
-import org.gradle.api.services.BuildServiceParameters
 
 plugins {
-    alias(libs.plugins.spring.boot) apply false
-    alias(libs.plugins.spring.dependency.management) apply false
+    alias(libs.plugins.spring.boot)
+    alias(libs.plugins.spring.dependency.management)
     alias(libs.plugins.sonarqube)
+    id 'groovy'
+    id 'jacoco'
+    id 'java-test-fixtures'
+    id 'maven-publish'
 }
 
-abstract class HeavyTestService implements BuildService<BuildServiceParameters.None> {}
+group = 'com.bbh.itss.beadle'
+version = findProperty('artifactVersion') ?: '0.1.0-SNAPSHOT'
+description = 'Beadle-Internal: the service between Beadle and Jira, CyberTrack, Confluence and qTest'
 
-def heavyTests = gradle.sharedServices.registerIfAbsent('heavyTests', HeavyTestService) {
-  maxParallelUsages = (findProperty('heavyTests.parallel') ?: '1') as int
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
 }
 
-def bbhNetwork = gradle.ext.bbhNetwork as boolean
-def skipGui = providers.gradleProperty('skipGui').map { it != 'false' }.getOrElse(false)
-def performanceFactor = providers.systemProperty('performance.factor')
-  .orElse(providers.gradleProperty('performance.factor'))
-  .getOrElse('2.0')
-def applications = [beadle: [backend: 'beadle-backend', gui: 'beadle-gui', jar: 'beadle'],
-
-
-                    dso   : [backend: 'dso-backend', gui: 'dso-gui', jar: 'dso-portal']]
-
-allprojects {
-    group = 'com.bbh.itss.dso'
-    version = findProperty('artifactVersion') ?: '0.1.0-SNAPSHOT'
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs << '-parameters'
 }
 
-subprojects {
-    apply plugin: 'base'
+base {
+    archivesName = 'beadle-internal'
+}
 
-    tasks.withType(Test).configureEach {
-      usesService(heavyTests)
+dependencyManagement {
+    imports {
+        mavenBom SpringBootPlugin.BOM_COORDINATES
     }
+}
 
-    plugins.withType(JavaBasePlugin).configureEach {
-        java {
-            toolchain {
-                languageVersion = JavaLanguageVersion.of(21)
-            }
-        }
-        tasks.withType(JavaCompile).configureEach {
-            options.compilerArgs << '-parameters'
-        }
-    }
+configurations {
+    testFixturesApi.extendsFrom implementation
+}
 
-    ext.forward = { Test task, String... names ->
-        names.each { name ->
-            def value = providers.systemProperty(name).orNull
-            if (value != null) {
-                task.systemProperty name, value
-            }
-        }
-    }
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-liquibase'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-restclient'
+    implementation 'org.apache.commons:commons-lang3'
+    implementation libs.commons.collections4
+    runtimeOnly 'com.h2database:h2'
+    runtimeOnly 'com.oracle.database.jdbc:ojdbc11'
+
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+
+    testFixturesApi 'org.springframework.boot:spring-boot-starter-test'
+    testFixturesApi 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testFixturesApi 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+    testFixturesApi libs.groovy
+    testFixturesApi libs.groovy.json
+    testFixturesApi platform(libs.spock.bom)
+    testFixturesApi libs.spock.core
+    testFixturesApi libs.spock.spring
+    testFixturesApi libs.archunit.junit5
 }
 
 sonar {
     properties {
         property "sonar.host.url", "https://tools.bbh.com/sonar"
         property "sonar.token", System.getenv("SONAR_AUTH_TOKEN")
-        property "sonar.projectKey", "DSOMgmtPortal"
-        property "sonar.projectName", "DSOMgmtPortal"
+        property "sonar.projectKey", "Beadle-Internal"
+        property "sonar.projectName", "Beadle-Internal"
+        property "sonar.java.binaries", "build/classes/java/main"
+        property "sonar.groovy.binaries", "build/classes/groovy/test"
+        property "sonar.coverage.jacoco.xmlReportPaths", "build/reports/jacoco/test/jacocoTestReport.xml"
     }
 }
 
-def isWindows = System.getProperty('os.name').toLowerCase().contains('windows')
-def nodeCommand = { String name ->
-    def configured = findProperty("${name}.executable")
-    configured && file(configured).isFile() ? [configured] : isWindows ? ['cmd', '/c', name] : [name]
-}
-def npmCmd = nodeCommand('npm')
-def npxCmd = nodeCommand('npx')
-def npmSettings = [
-        'npm.registry'   : 'npm_config_registry',
-        'npm.strictSsl'  : 'npm_config_strict_ssl',
-        'npm.cafile'     : 'npm_config_cafile',
-        'npm.http.proxy' : 'npm_config_proxy',
-        'npm.https.proxy': 'npm_config_https_proxy',
-        'npm.no.proxy'   : 'npm_config_noproxy',
-        'npm.loglevel'   : 'npm_config_loglevel']
-def npmEnvironment = bbhNetwork
-        ? npmSettings.findAll { setting, variable -> findProperty(setting) && (setting != 'npm.cafile' || file(findProperty(setting)).isFile()) }
-                .collectEntries { setting, variable -> [variable, findProperty(setting)] }
-        : [npm_config_registry: findProperty('npm.publicRegistry') ?: 'https://registry.npmjs.org/']
-def designSystemPackages = (findProperty('designSystem.packages') ?: '@v6/v6-themes@21 @v6/v6-table @v6/v6-icons').toString().tokenize()
-def angularConfiguration = bbhNetwork ? 'production' : 'production,public'
-def agGridLicenseKey = providers.gradleProperty('agGridLicenseKey').orElse(providers.environmentVariable('AG_GRID_LICENSE_KEY')).getOrElse('')
-def npmInstalled = layout.buildDirectory.file('npm/installed.txt')
-def workspaceFiles = files('package.json', 'package-lock.json', '.npmrc', 'angular.json', 'tsconfig.json')
-
-tasks.register('installNpmCIDeps', Exec) {
-    group = 'build'
-    description = 'npm ci of the Angular workspace (uses package-lock.json)'
-    workingDir = projectDir
-    environment npmEnvironment
-    inputs.files('package.json', 'package-lock.json', '.npmrc')
-    inputs.property('registry', npmEnvironment.npm_config_registry ?: '')
-    commandLine = npmCmd + ['ci', '--no-audit', '--no-fund']
-    outputs.file(npmInstalled)
-    outputs.upToDateWhen { file('node_modules').isDirectory() }
-    doLast { npmInstalled.get().asFile.text = 'npm ci' }
+jacoco {
+    toolVersion = libs.versions.jacoco.get()
 }
 
-tasks.register('installDesignSystem', Exec) {
-    dependsOn 'installNpmCIDeps'
-    onlyIf { bbhNetwork }
-    group = 'build'
-    description = 'Install the BBH Design System (@v6) packages from the BBH npm registry next to the locked dependencies'
-    workingDir = projectDir
-    environment npmEnvironment
-    inputs.files('package.json', 'package-lock.json', '.npmrc')
-    inputs.property('packages', designSystemPackages)
-    commandLine = npmCmd + ['install', '--no-save', '--no-audit', '--no-fund'] + designSystemPackages
-    outputs.dir('node_modules/@v6')
-}
-
-configure(subprojects.findAll { it.name.endsWith('-gui') }) { gui ->
-    apply plugin: 'groovy'
-    apply plugin: 'java-test-fixtures'
-
-    def sources = files(fileTree('src') { exclude 'smokeTest/**', 'regressionTest/**', 'performanceTest/**', 'testFixtures/**' },
-            fileTree(rootProject.file('common-gui')) { include 'src/**', 'public/**'; exclude 'src/testFixtures/**' },
-            'tsconfig.app.json', 'tsconfig.spec.json', 'tsconfig.lib.json', workspaceFiles)
-
-    dependencies {
-        testFixturesApi platform(libs.groovy.bom)
-        testFixturesApi libs.groovy
-        testFixturesApi libs.groovy.json
-        testFixturesApi platform(libs.spock.bom)
-        testFixturesApi libs.spock.core
-        testFixturesApi libs.playwright
-    }
-
-    tasks.register('testAngular', Exec) {
-        dependsOn ':installDesignSystem'
-        usesService(heavyTests)
-        group = 'verification'
-        description = "Run the Angular unit tests of ${gui.name} (Vitest on jsdom) with coverage; fails below the thresholds in angular.json"
-        workingDir = rootDir
-        environment npmEnvironment
-        inputs.files(sources).withPathSensitivity(PathSensitivity.RELATIVE)
-        commandLine = npxCmd + ['ng', 'test', gui.name, '--watch=false', '--coverage']
-        outputs.dir("coverage")
-    }
-
-    sonar {
-        properties {
-            property "sonar.sources", "src"
-            property "sonar.tests", "src"
-            property "sonar.test.inclusions", "**/*.spec.ts"
-            property "sonar.exclusions", "**/node_modules/**,**/dist/**"
-            property "sonar.javascript.lcov.reportPaths", "${gui.projectDir}/coverage/**/lcov.info"
-        }
-    }
-
-    tasks.named('test') {
-        dependsOn 'testAngular'
-    }
-
-    tasks.named('jar') {
-        enabled = false
-    }
-
-    tasks.named('clean') {
-        delete 'dist', 'coverage'
-    }
-
-    if (gui.name == 'common-gui') {
-        return
-    }
-
-    def distDir = layout.projectDirectory.dir('dist')
-
-    dependencies {
-        testFixturesApi testFixtures(project(':common-gui'))
-    }
-
-    tasks.register('buildAngular', Exec) {
-        dependsOn ':installDesignSystem'
-        group = 'build'
-        description = "Build ${gui.name} ($angularConfiguration) with npx ng"
-        workingDir = rootDir
-        environment npmEnvironment
-        inputs.files(sources).withPathSensitivity(PathSensitivity.RELATIVE)
-        inputs.property('configuration', angularConfiguration)
-        inputs.property('agGridLicensed', agGridLicenseKey ? agGridLicenseKey.digest('SHA-256') : '')
-        commandLine = npxCmd + ['ng', 'build', gui.name, "--configuration=$angularConfiguration"] +
-                (agGridLicenseKey ? ["--define=AG_GRID_LICENSE_KEY=\"$agGridLicenseKey\"".toString()] : [])
-        outputs.dir(distDir)
-        doFirst { logger.lifecycle("Executing: npx ng build ${gui.name} --configuration=$angularConfiguration") }
-    }
-
-    tasks.named('assemble') {
-        dependsOn 'buildAngular'
-    }
-
-    testing {
-        suites {
-            [regressionTest: 'Runs the user journeys of the interface in a browser against a stubbed API.',
-             smokeTest     : 'Opens every page of the interface in a browser; -Dsmoke.baseUrl checks a deployed application.',
-             performanceTest: 'Measures load and render times of the interface on a large catalogue.'].each { suiteName, text ->
-                if (gui.file("src/$suiteName").isDirectory()) {
-                    register(suiteName, JvmTestSuite) {
-                        useJUnitJupiter(libs.versions.junit)
-                        dependencies {
-                            implementation testFixtures(project())
-                        }
-                        targets.configureEach {
-                            testTask.configure {
-                                description = text
-                                dependsOn 'buildAngular'
-                                shouldRunAfter 'testAngular'
-                                inputs.dir(distDir).withPathSensitivity(PathSensitivity.RELATIVE)
-                                systemProperty 'frontend.dist', distDir.asFile.absolutePath
-                                systemProperty 'frontend.reports', gui.layout.buildDirectory.dir('reports/frontend').get().asFile.absolutePath
-                                systemProperty 'performance.report', gui.layout.buildDirectory.file("reports/performance/${gui.name}-performance-report.md").get().asFile.absolutePath
-                                forward(it, 'frontend.browser', 'frontend.headed', 'smoke.baseUrl')
-                                systemProperty 'performance.factor', performanceFactor
-                                testLogging {
-                                    events 'failed'
-                                    exceptionFormat = 'full'
-                                }
-                                if (suiteName != 'regressionTest') {
-                                    outputs.upToDateWhen { false }
-                                    outputs.cacheIf { false }
-                                }
-                            }
-                        }
+testing {
+    suites {
+        configureEach {
+            useJUnitJupiter()
+            targets.configureEach {
+                testTask.configure {
+                    jvmArgs '-XX:+EnableDynamicAgentLoading'
+                    testLogging {
+                        events 'failed'
+                        exceptionFormat = 'full'
                     }
                 }
             }
         }
-    }
 
-    tasks.named('check') {
-        dependsOn testing.suites.withType(JvmTestSuite).matching { it.name != 'test' }
-    }
-}
-
-configure(subprojects.findAll { it.name.endsWith('-backend') }) { backend ->
-    apply plugin: 'groovy'
-    apply plugin: 'jacoco'
-    apply plugin: 'java-test-fixtures'
-    apply plugin: 'io.spring.dependency-management'
-
-    dependencyManagement {
-        imports {
-            mavenBom SpringBootPlugin.BOM_COORDINATES
-        }
-    }
-
-    configurations {
-        testFixturesApi.extendsFrom implementation
-    }
-
-    dependencies {
-        compileOnly 'org.projectlombok:lombok'
-        annotationProcessor 'org.projectlombok:lombok'
-        testCompileOnly 'org.projectlombok:lombok'
-        testAnnotationProcessor 'org.projectlombok:lombok'
-
-        testFixturesApi 'org.springframework.boot:spring-boot-starter-test'
-        testFixturesApi 'org.springframework.boot:spring-boot-starter-webmvc-test'
-        testFixturesApi libs.groovy
-        testFixturesApi libs.groovy.json
-        testFixturesApi platform(libs.spock.bom)
-        testFixturesApi libs.spock.core
-        testFixturesApi libs.spock.spring
-        testFixturesApi libs.archunit.junit5
-    }
-
-    sonar {
-        properties {
-            property "sonar.java.binaries", "build/classes/java/main"
-            property "sonar.groovy.binaries", "build/classes/groovy/test"
-            property "sonar.coverage.jacoco.xmlReportPaths", "build/reports/jacoco/test/jacocoTestReport.xml"
-        }
-    }
-
-    jacoco {
-        toolVersion = libs.versions.jacoco.get()
-    }
-
-    testing {
-        suites {
-            configureEach {
-                useJUnitJupiter()
-                targets.configureEach {
-                    testTask.configure {
-                        jvmArgs '-XX:+EnableDynamicAgentLoading'
-                        testLogging {
-                            events 'failed'
-                            exceptionFormat = 'full'
-                        }
-                    }
+        test {
+            targets.configureEach {
+                testTask.configure {
+                    finalizedBy tasks.named('jacocoTestReport')
                 }
             }
+        }
 
-            test {
+        if (file('src/regressionTest').isDirectory()) {
+            register('regressionTest', JvmTestSuite) {
                 dependencies {
-                    implementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+                    implementation project()
+                    implementation testFixtures(project())
                 }
                 targets.configureEach {
                     testTask.configure {
-                        finalizedBy tasks.named('jacocoTestReport')
-                    }
-                }
-            }
-
-            [regressionTest : 'Runs the API end to end on H2 in Oracle mode.',
-             smokeTest      : 'Starts the application and checks health, the API and the UI.',
-             performanceTest: 'Measures the p95 latencies of the main calls on a large catalogue.'].each { suiteName, text ->
-                if (backend.file("src/$suiteName").isDirectory()) {
-                    register(suiteName, JvmTestSuite) {
-                        dependencies {
-                            implementation project()
-                            implementation testFixtures(project())
-                        }
-                        targets.configureEach {
-                            testTask.configure {
-                                description = text
-                                shouldRunAfter tasks.named('test')
-                                extensions.getByType(JacocoTaskExtension).enabled = false
-                                systemProperty 'regression.expectedDir', backend.file('src/regressionTest/resources/regression').absolutePath
-                                systemProperty 'performance.report', backend.layout.buildDirectory.file("reports/performance/${backend.name}-performance-report.md").get().asFile.absolutePath
-                                forward(it, 'regression.updateExpected', 'smoke.baseUrl', 'smoke.ui')
-                                systemProperty 'performance.factor', performanceFactor
-                                if (suiteName != 'regressionTest') {
-                                    outputs.upToDateWhen { false }
-                                    outputs.cacheIf { false }
-                                }
-                            }
-                        }
+                        description = 'Runs the API end to end on H2 in Oracle mode with the demo adapters.'
+                        shouldRunAfter tasks.named('test')
+                        extensions.getByType(JacocoTaskExtension).enabled = false
                     }
                 }
             }
         }
     }
+}
 
-    tasks.named('check') {
-        dependsOn testing.suites.withType(JvmTestSuite).matching { it.name != 'test' }
+tasks.named('check') {
+    dependsOn testing.suites.withType(JvmTestSuite).matching { it.name != 'test' }
+}
+
+def coveredClasses = sourceSets.main.output.classesDirs.asFileTree.matching {
+    exclude '**/*Application.class'
+}
+
+tasks.named('jacocoTestReport') {
+    classDirectories.setFrom(coveredClasses)
+    reports {
+        xml.required = true
+        html.required = true
     }
+}
 
-    def coveredClasses = sourceSets.main.output.classesDirs.asFileTree.matching {
-        exclude '**/*Application.class'
-    }
-
-    tasks.named('jacocoTestReport') {
-        classDirectories.setFrom(coveredClasses)
-        reports {
-            xml.required = true
-            html.required = true
-        }
-    }
-
-    tasks.named('jacocoTestCoverageVerification') {
-        classDirectories.setFrom(coveredClasses)
-        violationRules {
-            rule {
-                element = 'BUNDLE'
-                limit {
-                    counter = 'LINE'
-                    value = 'COVEREDRATIO'
-                    minimum = providers.gradleProperty('coverage.minimum').getOrElse('0.60') as BigDecimal
-                }
+tasks.named('jacocoTestCoverageVerification') {
+    classDirectories.setFrom(coveredClasses)
+    violationRules {
+        rule {
+            element = 'BUNDLE'
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = providers.gradleProperty('coverage.minimum').getOrElse('0.60') as BigDecimal
             }
         }
     }
+}
 
-    tasks.named('check') {
-        dependsOn tasks.named('jacocoTestCoverageVerification')
-    }
+tasks.named('check') {
+    dependsOn tasks.named('jacocoTestCoverageVerification')
+}
+
+tasks.named('sonar') {
+    dependsOn tasks.named('jacocoTestReport')
 }
 
 def nexusPublishProperty = version.toString().endsWith('SNAPSHOT') ? 'nexus.snapshotsUrl' : 'nexus.releasesUrl'
 def nexusPublishUrl = findProperty(nexusPublishProperty)
 
-applications.each { appName, app ->
-    project(":${app.backend}") { backend ->
-        apply plugin: 'org.springframework.boot'
-        apply plugin: 'maven-publish'
-
-        base {
-            archivesName = app.jar
-        }
-
-        dependencies {
-            implementation project(':common-backend')
-            testFixturesApi testFixtures(project(':common-backend'))
-        }
-
-        def gui = project(":${app.gui}")
-        if (!skipGui) {
-            tasks.named('processResources', ProcessResources) {
-                from(gui.tasks.named('buildAngular')) {
-                    into 'static'
-                }
-            }
-        }
-
-        tasks.named('bootRun') {
-            workingDir = rootDir
-        }
-
-        tasks.matching { it.name in ['regressionTest', 'performanceTest'] }.configureEach {
-            mustRunAfter gui.tasks.matching { it.name in ['regressionTest', 'smokeTest', 'performanceTest'] }
-        }
-
-      publishing {
-        publications {
-          create('application', MavenPublication) {
-            artifactId = app.jar
+publishing {
+    publications {
+        create('application', MavenPublication) {
+            artifactId = 'beadle-internal'
             artifact tasks.named('bootJar')
-          }
         }
-        if (nexusPublishUrl) {
-          repositories {
+    }
+    if (nexusPublishUrl) {
+        repositories {
             maven {
-              name = 'bbhNexus'
-              url = uri(nexusPublishUrl)
-              credentials(PasswordCredentials)
+                name = 'bbhNexus'
+                url = uri(nexusPublishUrl)
+                credentials(PasswordCredentials)
             }
-          }
         }
-      }
-
-      tasks.named('publish') {
-        dependsOn tasks.named('bootJar')
-        doFirst {
-          if (!nexusPublishUrl) {
-            throw new GradleException("Set -P${nexusPublishProperty}=<url> to publish ${app.jar} to the BBH Nexus.")
-          }
-        }
-      }
-
-        tasks.named('publish') {
-            dependsOn tasks.named('bootJar')
-        }
-    }
-
-    tasks.register("${appName}Jar") {
-        group = 'build'
-        description = "Builds the ${app.jar} jar: the ${app.backend} service with the ${app.gui} interface inside"
-        dependsOn ":${app.backend}:bootJar"
     }
 }
 
-project(':backend') { launcher ->
-    apply plugin: 'groovy'
-    apply plugin: 'jacoco'
-
-    dependencies {
-        testImplementation platform(libs.groovy.bom)
-        testImplementation libs.groovy
-        testImplementation platform(libs.spock.bom)
-        testImplementation libs.spock.core
-    }
-
-    jacoco {
-        toolVersion = libs.versions.jacoco.get()
-    }
-
-    testing {
-        suites {
-            test {
-                useJUnitJupiter(libs.versions.junit)
-                targets.configureEach {
-                    testTask.configure {
-                        jvmArgs '-XX:+EnableDynamicAgentLoading'
-                        finalizedBy tasks.named('jacocoTestReport')
-                        testLogging {
-                            events 'failed'
-                            exceptionFormat = 'full'
-                        }
-                    }
-                }
-            }
+tasks.named('publish') {
+    dependsOn tasks.named('bootJar')
+    doFirst {
+        if (!nexusPublishUrl) {
+            throw new GradleException("Set -P${nexusPublishProperty}=<url> to publish beadle-internal to the BBH Nexus.")
         }
     }
-
-    tasks.named('jacocoTestCoverageVerification') {
-        violationRules {
-            rule {
-                element = 'BUNDLE'
-                limit {
-                    counter = 'LINE'
-                    value = 'COVEREDRATIO'
-                    minimum = providers.gradleProperty('coverage.minimum').getOrElse('0.60') as BigDecimal
-                }
-            }
-        }
-    }
-
-    tasks.named('check') {
-        dependsOn tasks.named('jacocoTestCoverageVerification')
-    }
-
-    tasks.named('jar') {
-        enabled = false
-    }
-
-    def bootJar = tasks.register('bootJar', Jar) {
-        group = 'build'
-        description = 'Builds backend/build/libs/dso-portal-<version>.jar: a launcher that starts the DevSecOps Management Portal and Beadle together, each from its own jar inside'
-        archiveBaseName = 'dso-portal'
-        manifest {
-            attributes 'Main-Class': 'com.bbh.itss.dso.launcher.Launcher'
-        }
-        from sourceSets.main.output
-        applications.each { appName, app ->
-            from(project(":${app.backend}").tasks.named('bootJar')) {
-                into 'applications'
-                rename { "${app.jar}.jar" }
-            }
-        }
-    }
-
-    tasks.named('assemble') {
-        dependsOn bootJar
-    }
-}
-
-tasks.named('sonar').configure {
-    dependsOn subprojects.findAll { it.name.endsWith('-backend') }.collect { "${it.path}:jacocoTestReport" }
-    dependsOn subprojects.findAll { it.name.endsWith('-gui') }.collect { "${it.path}:testAngular" }
 }

@@ -1,5 +1,4 @@
 *
-!beadle-backend/build/libs/beadle-*.jar
-!dso-backend/build/libs/dso-portal-*.jar
+!build/libs/beadle-internal-*.jar
 **/*-plain.jar
 **/*-test-fixtures.jar

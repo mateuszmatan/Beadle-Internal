@@ -2,18 +2,22 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "ng serve",
-      "type": "chrome",
+      "type": "java",
+      "name": "Beadle-Internal (local)",
       "request": "launch",
-      "preLaunchTask": "npm: start",
-      "url": "http://localhost:4200/"
-    },
+      "mainClass": "com.bbh.itss.beadle.internal.BeadleInternalApplication",
+      "projectName": "beadle-internal",
+      "env": {
+        "BEADLE_SERVICE_TOKEN": "${input:serviceToken}"
+      }
+    }
+  ],
+  "inputs": [
     {
-      "name": "ng test",
-      "type": "chrome",
-      "request": "launch",
-      "preLaunchTask": "npm: test",
-      "url": "http://localhost:9876/debug.html"
+      "id": "serviceToken",
+      "type": "promptString",
+      "description": "BEADLE_SERVICE_TOKEN, the same value Beadle-GUI sends",
+      "password": true
     }
   ]
 }

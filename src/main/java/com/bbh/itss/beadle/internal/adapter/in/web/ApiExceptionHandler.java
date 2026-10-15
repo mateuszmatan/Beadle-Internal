@@ -68,7 +68,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(InvalidRequestException.class)
     ProblemDetail invalid(InvalidRequestException e) {
         ProblemDetail detail = problem(BAD_REQUEST, "Validation failed", e.getMessage());
-        detail.setProperty("errors", e.problems());
+        detail.setProperty("problems", e.problems());
         return detail;
     }
 
@@ -86,7 +86,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         MalformedBody body = MalformedBody.of(e);
         ProblemDetail detail = problem(BAD_REQUEST, "Malformed request", body.detail());
         if (!body.problems().isEmpty()) {
-            detail.setProperty("errors", body.problems());
+            detail.setProperty("problems", body.problems());
         }
         return handleExceptionInternal(e, detail, headers, BAD_REQUEST, request);
     }

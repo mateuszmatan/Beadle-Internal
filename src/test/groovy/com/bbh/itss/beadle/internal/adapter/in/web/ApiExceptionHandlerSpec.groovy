@@ -39,7 +39,7 @@ class ApiExceptionHandlerSpec extends Specification {
             it.status == status
             it.title == title
             it.detail == detail
-            it.properties?.errors == errors
+            it.properties?.problems == problems
         }
 
         where:
@@ -53,7 +53,7 @@ class ApiExceptionHandlerSpec extends Specification {
 
         detail << ['Product 7 does not exist', 'code clash', STALE_VERSION, 'is required', UNEXPECTED,
                    'Jira timed out']
-        errors << [null, null, null, [PROBLEM], null, null]
+        problems << [null, null, null, [PROBLEM], null, null]
     }
 
     def "a violated database constraint is 409 without the constraint's name"() {
@@ -75,7 +75,7 @@ class ApiExceptionHandlerSpec extends Specification {
         with(parse(response.contentAsString)) {
             title == 'Validation failed'
             it.detail == detail
-            errors*.field == fields
+            problems*.field == fields
         }
 
         where:
@@ -94,7 +94,7 @@ class ApiExceptionHandlerSpec extends Specification {
         with(parse(response.contentAsString)) {
             it.title == title
             it.detail == detail
-            errors == null
+            problems == null
         }
 
         where:

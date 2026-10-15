@@ -43,8 +43,8 @@ class TrackedTicketPersistenceAdapterSpec extends Specification {
 
         then:
         adapter.open() == [trackedTicket()]
-        jdbc.queryForMap('SELECT TICKET_KEY, STATUS, CORRELATION_ID FROM BEADLE_INTERNAL_CYBERTRACK_TICKET') ==
-                [TICKET_KEY: 'SCP-1234', STATUS: 'To Do', CORRELATION_ID: 'corr-1']
+        jdbc.queryForMap('SELECT TICKET_KEY, STATUS, CORRELATION_ID, DEMO FROM BEADLE_INTERNAL_CYBERTRACK_TICKET') ==
+                [TICKET_KEY: 'SCP-1234', STATUS: 'To Do', CORRELATION_ID: 'corr-1', DEMO: 0]
 
         when:
         adapter.save(trackedTicket().reported('In Progress', LATER))
@@ -58,6 +58,14 @@ class TrackedTicketPersistenceAdapterSpec extends Specification {
         then:
         adapter.open() == []
         jdbc.queryForObject('SELECT STATUS FROM BEADLE_INTERNAL_CYBERTRACK_TICKET', String) == 'Done'
+    }
+
+    def "a ticket the demo made up is read back as one"() {
+        when:
+        adapter.track(trackedTicket(demo: true))
+
+        then:
+        adapter.open() == [trackedTicket(demo: true)]
     }
 
     def "the open tickets come oldest first"() {

@@ -14,10 +14,11 @@ class TrackedTicketSpec extends Specification {
 
     def "a created ticket is followed from the status it was created in, seen then if CyberTrack told it"() {
         expect:
-        TrackedTicket.created('SCP-1234', 'To Do', 'corr-1', CREATED) == trackedTicket()
-        TrackedTicket.created('SCP-1234', null, 'corr-1', CREATED) == trackedTicket(status: null, lastSeenAt: null)
-        TrackedTicket.created('SCP-1234', 'To Do', 'corr-1', CREATED).open()
-        !TrackedTicket.created('SCP-1234', 'Done', 'corr-1', CREATED).open()
+        TrackedTicket.created('SCP-1234', 'To Do', 'corr-1', CREATED, false) == trackedTicket()
+        TrackedTicket.created('SCP-1234', null, 'corr-1', CREATED, false) == trackedTicket(status: null, lastSeenAt: null)
+        TrackedTicket.created('SCP-1234', 'To Do', 'corr-1', CREATED, true) == trackedTicket(demo: true)
+        TrackedTicket.created('SCP-1234', 'To Do', 'corr-1', CREATED, false).open()
+        !TrackedTicket.created('SCP-1234', 'Done', 'corr-1', CREATED, false).open()
     }
 
     def "a ticket moved when CyberTrack tells another status than the last one Beadle-GUI knows"() {
@@ -39,6 +40,7 @@ class TrackedTicketSpec extends Specification {
 
         then:
         reported == trackedTicket(status: status, lastSeenAt: LATER, lastEventAt: LATER, closedAt: closed ? LATER : null)
+        trackedTicket(demo: true).reported(status, LATER).demo()
         reported.open() == !closed
 
         where:

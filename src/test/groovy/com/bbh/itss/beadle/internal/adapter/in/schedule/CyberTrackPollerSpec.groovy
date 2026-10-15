@@ -37,7 +37,7 @@ class CyberTrackPollerSpec extends Specification {
         logger.level = formerLevel
     }
 
-    def "a tick polls the tickets and logs the callbacks it sent and the tickets it could not follow up"() {
+    def "a tick polls the tickets and logs the callbacks it sent, the tickets it could not follow up and those it dropped"() {
         when:
         poller.tick()
 
@@ -48,11 +48,14 @@ class CyberTrackPollerSpec extends Specification {
 
         where:
         report << [PollReport.NOTHING,
-                   new PollReport([statusCallback()], ['SCP-1235': 'Beadle-GUI could not take the callback for SCP-1235: 503'])]
+                   new PollReport([statusCallback()], ['SCP-1235': 'Beadle-GUI could not take the callback for SCP-1235: 503'],
+                           ['SCP-1236': 'the demo CyberTrack made it up'])]
         messages << [[],
                      ['INFO Told Beadle-GUI that CyberTrack ticket SCP-1234 is now In Progress',
                       'WARN CyberTrack ticket SCP-1235 could not be followed up and is tried again on the next tick: ' +
-                              'Beadle-GUI could not take the callback for SCP-1235: 503']]
+                              'Beadle-GUI could not take the callback for SCP-1235: 503',
+                      'WARN CyberTrack ticket SCP-1236 is no longer followed and Beadle-GUI hears no more of it: ' +
+                              'the demo CyberTrack made it up']]
     }
 
     def "a tick never throws the #failure.class.simpleName the poll ran into, it logs it and tries again on the next tick"() {

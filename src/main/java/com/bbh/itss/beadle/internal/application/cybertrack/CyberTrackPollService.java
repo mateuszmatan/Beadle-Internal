@@ -35,13 +35,17 @@ import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 /**
  * Follows the CyberTrack tickets Beadle created: the demo adapter moves them on its clock, the live adapter reads
  * them from CyberTrack. The poll reads all open tickets in one call made by {@code system}; each callback carries the
- * correlation id of the user action that created its ticket.
+ * correlation id of the user action that created its ticket. A ticket the demo made up is never looked for in the
+ * real CyberTrack, where its key may belong to another ticket, nor a real one in the demo: once the adapter changed,
+ * such a ticket is dropped.
  */
 @UseCase
 @RequiredArgsConstructor
 public class CyberTrackPollService implements CyberTrackPollUseCase {
 
     static final String TICKET = "CyberTrack ticket";
+    static final String DEMO_TICKET = "the demo CyberTrack made it up, and CyberTrack is configured now";
+    static final String REAL_TICKET = "it was created in CyberTrack, and the demo plays CyberTrack now";
 
     private final TrackedTicketPort tracked;
     private final CyberTrackPort cyberTrack;
@@ -55,13 +59,26 @@ public class CyberTrackPollService implements CyberTrackPollUseCase {
         if (open.isEmpty()) {
             return PollReport.NOTHING;
         }
-        Map<String, CyberTrackTicket> current = CallerContext.as(new Caller(SYSTEM_USER, randomUUID().toString()),
-                        () -> cyberTrack.readAll(open.stream().map(TrackedTicket::key).toList())).stream()
-                .collect(toMap(CyberTrackTicket::key, identity(), (first, second) -> first));
         Instant now = now(clock);
-        List<StatusCallback> sent = new ArrayList<>();
+        boolean demo = !cyberTrack.connected();
         Map<String, String> failures = new LinkedHashMap<>();
+        Map<String, String> dropped = new LinkedHashMap<>();
+        List<TrackedTicket> followed = new ArrayList<>();
         for (TrackedTicket ticket : open) {
+            if (ticket.demo() == demo) {
+                followed.add(ticket);
+            } else {
+                drop(ticket, ticket.demo() ? DEMO_TICKET : REAL_TICKET, now, dropped, failures);
+            }
+        }
+        if (followed.isEmpty()) {
+            return pollReport(List.of(), failures, dropped);
+        }
+        Map<String, CyberTrackTicket> current = CallerContext.as(new Caller(SYSTEM_USER, randomUUID().toString()),
+                        () -> cyberTrack.readAll(followed.stream().map(TrackedTicket::key).toList())).stream()
+                .collect(toMap(CyberTrackTicket::key, identity(), (first, second) -> first));
+        List<StatusCallback> sent = new ArrayList<>();
+        for (TrackedTicket ticket : followed) {
             CyberTrackTicket found = current.get(ticket.key());
             try {
                 if (found == null) {
@@ -76,7 +93,23 @@ public class CyberTrackPollService implements CyberTrackPollUseCase {
                 failures.put(ticket.key(), defaultIfBlank(e.getMessage(), e.getClass().getSimpleName()));
             }
         }
-        return new PollReport(List.copyOf(sent), Collections.unmodifiableMap(failures));
+        return pollReport(sent, failures, dropped);
+    }
+
+    private void drop(TrackedTicket ticket, String reason, Instant now, Map<String, String> dropped,
+                      Map<String, String> failures) {
+        try {
+            tracked.save(ticket.withClosedAt(now));
+            dropped.put(ticket.key(), reason);
+        } catch (RuntimeException e) {
+            failures.put(ticket.key(), defaultIfBlank(e.getMessage(), e.getClass().getSimpleName()));
+        }
+    }
+
+    private static PollReport pollReport(List<StatusCallback> sent, Map<String, String> failures,
+                                         Map<String, String> dropped) {
+        return new PollReport(List.copyOf(sent), Collections.unmodifiableMap(failures),
+                Collections.unmodifiableMap(dropped));
     }
 
     private StatusCallback report(TrackedTicket ticket, CyberTrackTicket found, Instant now) {

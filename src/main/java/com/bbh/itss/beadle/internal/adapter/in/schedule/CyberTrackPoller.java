@@ -33,6 +33,8 @@ public class CyberTrackPoller {
             report.failures().forEach((key, reason) -> log.warn(
                     "CyberTrack ticket {} could not be followed up and is tried again on the next tick: {}", key,
                     reason));
+            report.dropped().forEach((key, reason) -> log.warn(
+                    "CyberTrack ticket {} is no longer followed and Beadle-GUI hears no more of it: {}", key, reason));
         } catch (RuntimeException e) {
             log.warn("The CyberTrack poll failed and is tried again on the next tick: {}", e.getMessage(), e);
         }

@@ -27,10 +27,11 @@ class CyberTrackServiceSpec extends Specification {
         CallerContext.clear()
     }
 
-    def "a secure coding ticket is created in CyberTrack as it is and followed from the status it was created in"() {
+    def "a secure coding ticket is created in #system as it is and followed from the status it was created in"() {
         given:
         def created = new CreatedTicket('SCP-1234', null)
         CallerContext.set(new Caller('Mateusz Matan', 'corr-1'))
+        cyberTrack.connected() >> connected
 
         when:
         def result = service.create(ticket())
@@ -40,8 +41,13 @@ class CyberTrackServiceSpec extends Specification {
 
         then:
         1 * cyberTrack.read('SCP-1234') >> cyberTrackTicket()
-        1 * tracked.track(new TrackedTicket('SCP-1234', 'To Do', 'corr-1', NOW, NOW, null, null))
+        1 * tracked.track(new TrackedTicket('SCP-1234', 'To Do', 'corr-1', NOW, NOW, null, null, !connected))
         result == created
+
+        where:
+        system                    | connected
+        'CyberTrack'              | true
+        'the demo of CyberTrack'  | false
     }
 
     def "a ticket whose status cannot be read after its creation is followed without a status"() {
@@ -54,7 +60,7 @@ class CyberTrackServiceSpec extends Specification {
         then:
         1 * cyberTrack.create(ticket()) >> new CreatedTicket('SCP-1234', null)
         1 * cyberTrack.read('SCP-1234') >> { throw failure }
-        1 * tracked.track(new TrackedTicket('SCP-1234', null, 'corr-1', NOW, null, null, null))
+        1 * tracked.track(new TrackedTicket('SCP-1234', null, 'corr-1', NOW, null, null, null, true))
         result.key() == 'SCP-1234'
 
         where:

@@ -39,7 +39,7 @@ public class CyberTrackService implements CyberTrackUseCase {
     public CreatedTicket create(SecureCodingTicket ticket) {
         CreatedTicket created = cyberTrack.create(ticket);
         tracked.track(TrackedTicket.created(created.key(), statusOf(created.key()),
-                CallerContext.current().correlationId(), now(clock)));
+                CallerContext.current().correlationId(), now(clock), !cyberTrack.connected()));
         return created;
     }
 

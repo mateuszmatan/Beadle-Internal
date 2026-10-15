@@ -17,8 +17,9 @@ import static org.springframework.transaction.annotation.Propagation.NOT_SUPPORT
 class CyberTrackTicketMigrationSpec extends MigrationSpecification {
 
     static final String TABLE = 'BEADLE_INTERNAL_CYBERTRACK_TICKET'
-    static final List<String> COLUMNS = ['TICKET_KEY', 'STATUS', 'CORRELATION_ID', 'CREATED_AT', 'LAST_SEEN_AT',
-                                         'LAST_EVENT_AT', 'CLOSED_AT']
+    static final List<String> COLUMNS_002 = ['TICKET_KEY', 'STATUS', 'CORRELATION_ID', 'CREATED_AT', 'LAST_SEEN_AT',
+                                             'LAST_EVENT_AT', 'CLOSED_AT']
+    static final List<String> COLUMNS = COLUMNS_002 + ['DEMO']
     static final String INSERT = "INSERT INTO $TABLE (TICKET_KEY, STATUS, CORRELATION_ID, CREATED_AT) VALUES (?, 'To Do', 'corr-1', ?)"
 
     def setup() {
@@ -55,6 +56,28 @@ class CyberTrackTicketMigrationSpec extends MigrationSpecification {
         then:
         TABLE in tables()
         jdbc.queryForObject("SELECT COUNT(*) FROM $TABLE", Integer) == 0
+    }
+
+    def "003 marks the tickets the demo made up, a ticket followed before it being a real one, and rolls back to 002"() {
+        given:
+        liquibase.update('')
+        rollBackSince('003-')
+        jdbc.update(INSERT, 'SCP-1234', new java.sql.Timestamp(0))
+
+        when:
+        liquibase.update('')
+
+        then:
+        columns(TABLE) == COLUMNS
+        !nullable(TABLE, 'DEMO')
+        jdbc.queryForObject("SELECT DEMO FROM $TABLE WHERE TICKET_KEY = 'SCP-1234'", Integer) == 0
+
+        when:
+        rollBackSince('003-')
+
+        then:
+        columns(TABLE) == COLUMNS_002
+        jdbc.queryForObject("SELECT STATUS FROM $TABLE WHERE TICKET_KEY = 'SCP-1234'", String) == 'To Do'
     }
 
     def "a ticket is followed once and always has a key and a creation time"() {

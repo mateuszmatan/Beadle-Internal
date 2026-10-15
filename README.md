@@ -52,7 +52,9 @@ and every `beadle.cybertrack.poll` once CyberTrack is configured, and for every 
 `{"system": "CYBERTRACK", "key", "status", "at", "correlationId"}` to `{beadle.gui.url}/api/callbacks/internal` with
 the service token and `X-Beadle-User: system`. A ticket that reached a final status (Done, Closed, Resolved,
 Cancelled, Rejected, Won't Do) is no longer followed. A callback Beadle-GUI does not take is logged and sent again
-on the next tick; the poll never fails a request.
+on the next tick; the poll never fails a request. Each ticket remembers whether the demo made it up: the real
+CyberTrack is never asked about a demo key, which may belong to another ticket there, nor the demo about a real one,
+so the open tickets of the other kind are dropped with a warning once `CYBERTRACK_URL` is set or cleared.
 
 ### Call log
 

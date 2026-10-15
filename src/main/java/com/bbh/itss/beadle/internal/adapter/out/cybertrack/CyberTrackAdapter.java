@@ -36,8 +36,8 @@ class CyberTrackAdapter implements CyberTrackPort {
     static final String CREATE = "create the secure coding ticket";
     static final String READ = "read the ticket";
     static final String READ_ALL = "read the tickets";
-    static final String NO_KEY = "Jira answered without the key of the new issue";
-    static final String NO_FIELDS = "Jira answered without the fields of ";
+    static final String NO_KEY = "CyberTrack answered without the key of the new issue";
+    static final String NO_FIELDS = "CyberTrack answered without the fields of ";
     static final String TICKET = "CyberTrack ticket";
     static final int BATCH = 50;
     static final int MAX_KEYS = 200;
@@ -90,8 +90,8 @@ class CyberTrackAdapter implements CyberTrackPort {
     }
 
     /**
-     * Searches the tickets by key, {@value #BATCH} at a time, without validating the query so that a key Jira does
-     * not know (a deleted issue) is left out instead of refusing the whole search.
+     * Searches the tickets by key, {@value #BATCH} at a time, without validating the query so that a key CyberTrack
+     * does not know (a deleted issue) is left out instead of refusing the whole search.
      */
     @Override
     public List<CyberTrackTicket> readAll(Collection<String> keys) {

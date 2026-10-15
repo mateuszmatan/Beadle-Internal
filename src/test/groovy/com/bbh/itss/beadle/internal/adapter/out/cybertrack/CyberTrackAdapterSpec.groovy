@@ -39,7 +39,7 @@ class CyberTrackAdapterSpec extends Specification {
     def server = MockRestServiceServer.bindTo(builder).build()
     def cyberTrack = adapter('SCP', 'Security Task')
 
-    def "the secure coding ticket is created in the configured Jira project with its summary and description"() {
+    def "the secure coding ticket is created in the configured CyberTrack project with its summary and description"() {
         given:
         server.expect(requestTo(URL + '/rest/api/2/issue')).andExpect(method(POST))
                 .andExpect(header('Authorization', 'Bearer secret-token'))
@@ -69,7 +69,7 @@ class CyberTrackAdapterSpec extends Specification {
         server.verify()
     }
 
-    def "a Jira answer of #problem is refused with the reason"() {
+    def "a CyberTrack answer of #problem is refused with the reason"() {
         given:
         server.expect(requestTo(URL + '/rest/api/2/issue')).andRespond(response)
 
@@ -89,7 +89,7 @@ class CyberTrackAdapterSpec extends Specification {
         'a long server error' | withServerError().body('{"errorMessages":["' + 'x' * 600 + '"]}')               || '500 Internal Server Error'
     }
 
-    def "an unreachable Jira is refused with the reason"() {
+    def "an unreachable CyberTrack is refused with the reason"() {
         given:
         def unreachable = new CyberTrackAdapter(new CyberTrackProperties('http://127.0.0.1:1', 'token', 'SCP', 'Task'),
                 RestClient.builder())
@@ -118,7 +118,7 @@ class CyberTrackAdapterSpec extends Specification {
         'ISO notation'      | '2026-10-15T09:00:00Z'
     }
 
-    def "an unknown ticket is not found and a Jira answer of #problem is refused when reading"() {
+    def "an unknown ticket is not found and a CyberTrack answer of #problem is refused when reading"() {
         given:
         server.expect(requestTo(URL + '/rest/api/2/issue/SCP-9?fields=status,updated')).andRespond(response)
 
@@ -163,7 +163,7 @@ class CyberTrackAdapterSpec extends Specification {
         batch = CyberTrackAdapter.BATCH
     }
 
-    def "a ticket Jira does not answer, or answers without fields, is left out of a search"() {
+    def "a ticket CyberTrack does not answer, or answers without fields, is left out of a search"() {
         given:
         server.expect(requestTo(URL + '/rest/api/2/search'))
                 .andRespond(withSuccess('{"total":2,"issues":[{"key":"SCP-1","fields":{"status":{"name":"To Do"}}},' +

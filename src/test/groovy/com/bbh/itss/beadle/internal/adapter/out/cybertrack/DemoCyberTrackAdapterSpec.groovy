@@ -85,7 +85,7 @@ class DemoCyberTrackAdapterSpec extends Specification {
         later.readAll([]) == []
     }
 
-    def "Jira is used only once its URL is set, with SCP and Task by default"() {
+    def "the live CyberTrack adapter is used only once its URL is set, with SCP and Task by default"() {
         given:
         def runner = new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(RestClientAutoConfiguration))

@@ -12,6 +12,8 @@ class ApplicationProfilesSpec extends Specification {
     static final Map ORACLE = [DB_URL     : 'jdbc:oracle:thin:@//oracle.bbh.test:1521/BEADLE',
                                DB_USERNAME: 'BEADLE_INTERNAL', DB_PASSWORD: 'secret']
     static final List<String> SYSTEMS = ['jira', 'cybertrack', 'confluence', 'qtest']
+    static final Map REAL_SYSTEMS = [JIRA_URL      : 'https://jira.bbh.com', CYBERTRACK_URL: 'https://cybertrack.bbh.com',
+                                     CONFLUENCE_URL: 'https://confluence.bbh.com', QTEST_URL: 'https://qtest.bbh.com']
 
     def "without a profile Beadle-Internal runs locally on port 8082 on H2 in the home folder with the demo adapters"() {
         when:
@@ -29,6 +31,7 @@ class ApplicationProfilesSpec extends Specification {
         env.getProperty('spring.liquibase.analytics-enabled') == 'false'
         env.getProperty('management.endpoint.health.show-details') == 'always'
         SYSTEMS.every { env.getProperty("beadle.${it}.url") == '' && env.getProperty("beadle.${it}.token") == '' }
+        SYSTEMS.every { env.getProperty("beadle.${it}.demo") == 'false' }
         env.getProperty('beadle.services.token') == ''
         env.getProperty('beadle.gui.url') == 'http://localhost:8081'
         env.getProperty('beadle.cybertrack.project-key') == 'SCP'
@@ -97,8 +100,59 @@ class ApplicationProfilesSpec extends Specification {
         profile << ['rd', 'qc', 'prod']
     }
 
-    private static Environment environment(List<String> profiles, Map<String, String> variables) {
-        def application = new SpringApplicationBuilder(Empty)
+    def "the #profile profile starts on the real systems"() {
+        when:
+        def env = environment([profile], ORACLE + REAL_SYSTEMS, RealSystemsConfiguration)
+
+        then:
+        SYSTEMS.collect { env.getProperty("beadle.${it}.url") } == REAL_SYSTEMS.values() as List
+
+        where:
+        profile << ['rd', 'qc', 'prod']
+    }
+
+    def "the #profile profile does not start while #blank is blank, since a demo adapter would answer in its place"() {
+        when:
+        environment([profile], ORACLE + REAL_SYSTEMS + variables, RealSystemsConfiguration)
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message.startsWith("The rd, qc and prod profiles need the real systems, but $blank ${verb} blank")
+        e.message.contains('<SYSTEM>_DEMO=true')
+
+        where:
+        profile | variables                                                              || blank                                                  | verb
+        'prod'  | [CYBERTRACK_URL: '']                                                   || 'CYBERTRACK_URL'                                       | 'is'
+        'qc'    | [JIRA_URL: ' ', QTEST_URL: '']                                         || 'JIRA_URL, QTEST_URL'                                  | 'are'
+        'rd'    | [JIRA_URL: '', CYBERTRACK_URL: '', CONFLUENCE_URL: '', QTEST_URL: ''] || 'JIRA_URL, CYBERTRACK_URL, CONFLUENCE_URL, QTEST_URL' | 'are'
+        'prod'  | [CYBERTRACK_URL: '', CYBERTRACK_DEMO: 'false']                         || 'CYBERTRACK_URL'                                       | 'is'
+    }
+
+    def "a system runs on its demo on #profile only when asked for on purpose"() {
+        when:
+        def env = environment([profile], ORACLE + REAL_SYSTEMS + [CONFLUENCE_URL: '', CONFLUENCE_DEMO: 'true'],
+                RealSystemsConfiguration)
+
+        then:
+        env.getProperty('beadle.confluence.url') == ''
+        env.getProperty('beadle.confluence.demo') == 'true'
+
+        where:
+        profile << ['rd', 'prod']
+    }
+
+    def "the local profile runs on the demo adapters without asking"() {
+        when:
+        def env = environment([], [:], RealSystemsConfiguration)
+
+        then:
+        env.defaultProfiles as List == ['local']
+        SYSTEMS.every { env.getProperty("beadle.${it}.url") == '' }
+    }
+
+    private static Environment environment(List<String> profiles, Map<String, String> variables,
+                                           Class<?>... configurations) {
+        def application = new SpringApplicationBuilder(([Empty] + (configurations as List)) as Class<?>[])
                 .web(NONE)
                 .logStartupInfo(false)
                 .properties(variables.collectEntries { name, value -> [name, value] } as Map<String, Object>)

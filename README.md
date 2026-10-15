@@ -98,7 +98,8 @@ services.gradle.org outside (`settings.gradle` makes one `HEAD` request to the B
 ## Configuration
 
 Every setting comes from an environment variable; OpenShift fills them from the ConfigMap `beadle-internal-config`
-and the secrets below. A system whose URL is blank is played by its demo adapter.
+and the secrets below. A system whose URL is blank is played by its demo adapter; the `rd`, `qc` and `prod` profiles
+refuse to start while a system's URL is blank, unless its `<SYSTEM>_DEMO=true` asks for the demo on purpose.
 
 | Property | Variable | Default | What |
 |---|---|---|---|
@@ -106,16 +107,20 @@ and the secrets below. A system whose URL is blank is played by its demo adapter
 | `beadle.gui.url` | `BEADLE_GUI_URL` | `http://localhost:8081` | where Beadle-GUI takes the callbacks |
 | `beadle.jira.url` | `JIRA_URL` | blank: demo | the BBH Jira of the delivery teams |
 | `beadle.jira.token` | `JIRA_TOKEN` | blank | bearer token of the Beadle service account in Jira |
+| `beadle.jira.demo` | `JIRA_DEMO` | `false` | `true` lets `rd`, `qc` and `prod` start with a blank `JIRA_URL`, on the demo |
 | `beadle.jira.epic-link-field` | `JIRA_EPIC_LINK_FIELD` | `customfield_10014` | the field linking a story to its epic (the parent is read too) |
 | `beadle.cybertrack.url` | `CYBERTRACK_URL` | blank: demo | CyberTrack, the Jira of the Cybersecurity team |
 | `beadle.cybertrack.token` | `CYBERTRACK_TOKEN` | blank | bearer token of the Beadle service account in CyberTrack |
+| `beadle.cybertrack.demo` | `CYBERTRACK_DEMO` | `false` | `true` lets `rd`, `qc` and `prod` start with a blank `CYBERTRACK_URL`, on the demo |
 | `beadle.cybertrack.project-key` | `CYBERTRACK_PROJECT_KEY` | `SCP` | the project of the secure coding tickets |
 | `beadle.cybertrack.issue-type` | `CYBERTRACK_ISSUE_TYPE` | `Task` | the issue type of the secure coding tickets |
 | `beadle.cybertrack.poll` | `CYBERTRACK_POLL` | `PT5M` | how often the open tickets are polled once CyberTrack is configured (the demo is checked every 10 seconds) |
 | `beadle.confluence.url` | `CONFLUENCE_URL` | blank: demo | Confluence |
 | `beadle.confluence.token` | `CONFLUENCE_TOKEN` | blank | bearer token of the Beadle service account in Confluence |
+| `beadle.confluence.demo` | `CONFLUENCE_DEMO` | `false` | `true` lets `rd`, `qc` and `prod` start with a blank `CONFLUENCE_URL`, on the demo |
 | `beadle.qtest.url` | `QTEST_URL` | blank: demo | qTest |
 | `beadle.qtest.token` | `QTEST_TOKEN` | blank | bearer token of the Beadle service account in qTest |
+| `beadle.qtest.demo` | `QTEST_DEMO` | `false` | `true` lets `rd`, `qc` and `prod` start with a blank `QTEST_URL`, on the demo |
 
 The other variables: `PORT` (`8082`), `SPRING_PROFILES_ACTIVE` (`local`), `BEADLE_INTERNAL_DATA_DIR` (the H2 folder
 of the `local` profile, `~/bbh-devsecops/beadle-internal`), `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` and
@@ -142,7 +147,7 @@ the tasks `gradle: bootRun`, `gradle: test`, `gradle: regressionTest` and `gradl
 | Profile | Database | Adapters |
 |---------|----------|----------|
 | `local` (default) | H2 file in Oracle mode | demo, unless a system's URL is set |
-| `rd`, `qc`, `prod` | Oracle from `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` (`DB_POOL_SIZE` sizes the pool) | the real ones, one per system whose URL is set |
+| `rd`, `qc`, `prod` | Oracle from `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` (`DB_POOL_SIZE` sizes the pool) | the real ones: the service does not start while a system's URL is blank, unless `<SYSTEM>_DEMO=true` asks for its demo |
 
 `rd`, `qc` and `prod` each switch on the `oracle` profile. Liquibase updates the schema on every start and
 Hibernate validates it on Oracle. `rd` logs at `DEBUG`; `rd` and `qc` show the health details.
@@ -161,7 +166,11 @@ The image runs as user 185, listens on 8082 and keeps the H2 database of the `lo
 
 The manifests in `deploy/openshift/beadle-internal` are a Kustomize base (Deployment, Service, Route and the
 ConfigMap `beadle-internal-config` with the profile, `BEADLE_GUI_URL=http://beadle:8081`, the system URLs and the
-CyberTrack settings) with one overlay per environment that sets its profile. The Deployment reads the secrets
+CyberTrack settings) with one overlay per environment that sets its profile and the URLs of its systems. The
+overlays ship those URLs blank: fill in `JIRA_URL`, `CYBERTRACK_URL`, `CONFLUENCE_URL` and `QTEST_URL` in the
+overlay's `configMapGenerator` before applying it, since `rd`, `qc` and `prod` do not start while one is blank
+(a demo adapter would otherwise answer in its place, and a demo CyberTrack would hand Beadle-GUI made-up tickets).
+Add `<SYSTEM>_DEMO=true` next to them only to run a system on its demo on purpose. The Deployment reads the secrets
 `beadle-internal-db` (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`) and `beadle-internal-services`
 (`BEADLE_SERVICE_TOKEN`), and the optional `beadle-internal-jira`, `beadle-internal-cybertrack`,
 `beadle-internal-confluence` and `beadle-internal-qtest` (`<SYSTEM>_TOKEN`); its probes are
@@ -174,6 +183,7 @@ oc create secret generic beadle-internal-services --from-literal=BEADLE_SERVICE_
 oc create secret generic beadle-internal-jira --from-literal=JIRA_TOKEN='<token>'
 cd deploy/openshift/beadle-internal/overlays/rd
 kustomize edit set image beadle-internal=<registry>/<project>/beadle-internal:0.1.0-SNAPSHOT
+# set JIRA_URL, CYBERTRACK_URL, CONFLUENCE_URL and QTEST_URL in kustomization.yaml, then
 oc apply -k .
 ```
 

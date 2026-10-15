@@ -50,19 +50,23 @@ beadle:
   jira:
     url: ${JIRA_URL:}
     token: ${JIRA_TOKEN:}
+    demo: ${JIRA_DEMO:false}
     epic-link-field: ${JIRA_EPIC_LINK_FIELD:customfield_10014}
   cybertrack:
     url: ${CYBERTRACK_URL:}
     token: ${CYBERTRACK_TOKEN:}
+    demo: ${CYBERTRACK_DEMO:false}
     project-key: ${CYBERTRACK_PROJECT_KEY:SCP}
     issue-type: ${CYBERTRACK_ISSUE_TYPE:Task}
     poll: ${CYBERTRACK_POLL:PT5M}
   confluence:
     url: ${CONFLUENCE_URL:}
     token: ${CONFLUENCE_TOKEN:}
+    demo: ${CONFLUENCE_DEMO:false}
   qtest:
     url: ${QTEST_URL:}
     token: ${QTEST_TOKEN:}
+    demo: ${QTEST_DEMO:false}
 ---
 spring:
   config:

@@ -1,5 +1,6 @@
 package com.bbh.itss.beadle.internal.adapter.out.jira
 
+import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 import org.springframework.http.client.ClientHttpRequest
 import org.springframework.mock.http.client.MockClientHttpRequest
@@ -28,6 +29,7 @@ class JiraAdapterSpec extends Specification {
 
     static final String URL = 'https://jira.bbh.com'
     static final String SEARCH = URL + '/rest/api/2/search'
+    static final List<String> FIELDS = ['summary', 'status', 'updated', 'parent', 'customfield_10014']
 
     def builder = RestClient.builder()
     def server = MockRestServiceServer.bindTo(builder).build()
@@ -53,7 +55,13 @@ class JiraAdapterSpec extends Specification {
     }
 
     def "the epics of a FixVersion are searched by JQL, page by page, newest change first"() {
-        given:
+        given: 'no issue of the FixVersion belongs to an epic'
+        server.expect(requestTo(SEARCH)).andExpect(method(POST))
+                .andExpect(body([jql   : 'project = "CERT" AND issuetype != Epic AND fixVersion = "CERT 1.4"' + ORDER,
+                                 startAt: 0, maxResults: 100, fields: FIELDS]))
+                .andRespond(withSuccess('{"startAt":0,"maxResults":100,"total":1,"issues":[' +
+                        '{"key":"CERT-30","fields":{"summary":"A bug on its own","customfield_10014":null,"parent":null}}]}',
+                        APPLICATION_JSON))
         def jql = 'project = "CERT" AND issuetype = Epic AND fixVersion = "CERT 1.4"' + ORDER
         server.expect(requestTo(SEARCH)).andExpect(method(POST))
                 .andExpect(header('Authorization', 'Bearer secret-token'))
@@ -74,6 +82,70 @@ class JiraAdapterSpec extends Specification {
         then:
         epics == [issue(), issue(key: 'CERT-13', summary: 'Audit trail', status: 'To Do', updated: LocalDate.parse('2026-09-20'))]
         server.verify()
+    }
+
+    def "an epic without the FixVersion comes with the epics that carry it when one of its issues is in the FixVersion"() {
+        given: 'the issues of the FixVersion name their epics by epic link or parent'
+        server.expect(requestTo(SEARCH))
+                .andExpect(body([jql   : 'project = "CERT" AND issuetype != Epic AND fixVersion = "CERT 1.4"' + ORDER,
+                                 startAt: 0, maxResults: 100, fields: FIELDS]))
+                .andRespond(withSuccess('''{"startAt":0,"maxResults":100,"total":4,"issues":[
+                    {"key":"CERT-20","fields":{"summary":"Map SSO groups","customfield_10014":"CERT-14"}},
+                    {"key":"CERT-21","fields":{"summary":"Export the audit trail","parent":{"key":"CERT-12"}}},
+                    {"key":"CERT-22","fields":{"summary":"Nothing linked"}},
+                    {"key":"CERT-23","fields":{"summary":"Sign out everywhere","customfield_10014":"CERT-14"}}]}''', APPLICATION_JSON))
+
+        and: 'those epics are searched with the ones that carry the FixVersion, without validating their keys'
+        server.expect(requestTo(SEARCH))
+                .andExpect(body([jql          : 'project = "CERT" AND issuetype = Epic AND ' +
+                        '(fixVersion = "CERT 1.4" OR key in ("CERT-14", "CERT-12"))' + ORDER,
+                                 startAt      : 0, maxResults: 100, fields: FIELDS, validateQuery: false]))
+                .andRespond(withSuccess('''{"startAt":0,"maxResults":100,"total":3,"issues":[
+                    {"key":"CERT-14","fields":{"summary":"Single sign-on","status":{"name":"In Progress"},
+                     "updated":"2026-10-03T08:00:00.000+0000"}},
+                    {"key":"CERT-12","fields":{"summary":"Single sign-on with BBH SSO","status":{"name":"In Progress"},
+                     "updated":"2026-10-01T23:30:00.000+0200"}},
+                    {"key":"CERT-11","fields":{"summary":"Carries the FixVersion","status":{"name":"To Do"},
+                     "updated":"2026-09-01T08:00:00.000+0000"}}]}''', APPLICATION_JSON))
+
+        expect:
+        jira.epics('CERT', 'CERT 1.4') == [
+                issue(key: 'CERT-14', summary: 'Single sign-on', updated: LocalDate.parse('2026-10-03')),
+                issue(),
+                issue(key: 'CERT-11', summary: 'Carries the FixVersion', status: 'To Do', updated: LocalDate.parse('2026-09-01'))]
+        server.verify()
+    }
+
+    def "the epics of more than #batch issues of the FixVersion are searched #batch keys at a time, newest change first"() {
+        given:
+        def stories = (1..101).collect { [key: "CERT-${2000 + it}".toString(), fields: [customfield_10014: "CERT-${1000 + it}".toString()]] }
+        [stories.take(100), stories.drop(100)].eachWithIndex { List page, int index ->
+            server.expect(requestTo(SEARCH))
+                    .andExpect(body([jql   : 'project = "CERT" AND issuetype != Epic AND fixVersion = "CERT 1.4"' + ORDER,
+                                     startAt: index * 100, maxResults: 100, fields: FIELDS]))
+                    .andRespond(withSuccess(JsonOutput.toJson([startAt: index * 100, maxResults: 100, total: 101, issues: page]), APPLICATION_JSON))
+        }
+        def keys = (1001..1101).collect { '"CERT-' + it + '"' }
+        server.expect(requestTo(SEARCH))
+                .andExpect(body([jql          : 'project = "CERT" AND issuetype = Epic AND (fixVersion = "CERT 1.4" OR key in (' +
+                        keys.take(100).join(', ') + '))' + ORDER, startAt: 0, maxResults: 100, fields: FIELDS, validateQuery: false]))
+                .andRespond(withSuccess('''{"startAt":0,"maxResults":100,"total":2,"issues":[
+                    {"key":"CERT-1001","fields":{"summary":"Older","updated":"2026-10-01T08:00:00.000+0000"}},
+                    {"key":"CERT-9","fields":{"summary":"Same time, lower number","updated":"2026-10-01T08:00:00.000+0000"}}]}''',
+                        APPLICATION_JSON))
+        server.expect(requestTo(SEARCH))
+                .andExpect(body([jql          : 'project = "CERT" AND issuetype = Epic AND key in (' + keys.drop(100).join(', ') + ')' + ORDER,
+                                 startAt      : 0, maxResults: 100, fields: FIELDS, validateQuery: false]))
+                .andRespond(withSuccess('''{"startAt":0,"maxResults":100,"total":2,"issues":[
+                    {"key":"CERT-1101","fields":{"summary":"Newest","updated":"2026-10-05T08:00:00.000+0000"}},
+                    {"key":"CERT-1050","fields":{"summary":"Never updated"}}]}''', APPLICATION_JSON))
+
+        expect:
+        jira.epics('CERT', 'CERT 1.4')*.key() == ['CERT-1101', 'CERT-9', 'CERT-1001', 'CERT-1050']
+        server.verify()
+
+        where:
+        batch = JiraAdapter.EPIC_BATCH
     }
 
     def "the stories of chosen epics are searched by their epic link or parent, which becomes their epic key"() {

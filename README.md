@@ -28,7 +28,7 @@ reached or refuses the call answers `502` naming the system and its reason.
 |---|---|
 | `GET /api/internal/status` | `connected` and `mode` (`demo` or `live`) of `jira`, `cyberTrack`, `confluence`, `qtest` |
 | `GET /api/internal/jira/projects/{key}/versions` | the versions of a project, unreleased first |
-| `GET /api/internal/jira/projects/{key}/epics?fixVersion=` | the epics of a FixVersion |
+| `GET /api/internal/jira/projects/{key}/epics?fixVersion=` | the epics of a FixVersion: those that carry it and those with an issue in it, newest change first |
 | `GET /api/internal/jira/projects/{key}/stories?fixVersion=&epicKeys=` | the stories of chosen epics, with their `epicKey` |
 | `POST /api/internal/cybertrack/tickets` | `201` the key (`SCP-123`) and link of the new secure coding ticket, answered straight after its creation; a change whose ticket is still followed gets that ticket again instead of a second one |
 | `GET /api/internal/cybertrack/tickets/{key}` | the status of a ticket and when it last changed |

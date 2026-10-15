@@ -114,7 +114,7 @@ refuse to start while a system's URL is blank, unless its `<SYSTEM>_DEMO=true` a
 
 | Property | Variable | Default | What |
 |---|---|---|---|
-| `beadle.services.token` | `BEADLE_SERVICE_TOKEN` | blank: every call is refused | the token shared by the three Beadle services, checked on every call and sent with the callbacks |
+| `beadle.services.token` | `BEADLE_SERVICE_TOKEN` | blank: every call is refused | the token shared by the three Beadle services, checked on every call and sent with the callbacks; whitespace around it, such as the newline of a secret written from a file, is dropped both ways, as from every `<SYSTEM>_TOKEN` |
 | `beadle.gui.url` | `BEADLE_GUI_URL` | `http://localhost:8081` | where Beadle-GUI takes the callbacks |
 | `beadle.jira.url` | `JIRA_URL` | blank: demo | the BBH Jira of the delivery teams |
 | `beadle.jira.token` | `JIRA_TOKEN` | blank | bearer token of the Beadle service account in Jira |

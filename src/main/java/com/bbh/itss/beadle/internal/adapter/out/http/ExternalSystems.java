@@ -14,7 +14,6 @@ import java.time.format.DateTimeParseException;
 import static java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 import static lombok.AccessLevel.PRIVATE;
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
-import static org.apache.commons.lang3.StringUtils.defaultString;
 import static org.apache.commons.lang3.StringUtils.removeEnd;
 import static org.apache.commons.lang3.StringUtils.trimToEmpty;
 import static org.apache.commons.lang3.StringUtils.truncate;
@@ -27,9 +26,14 @@ public final class ExternalSystems {
     private static final DateTimeFormatter ATLASSIAN_TIMESTAMP =
             DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSSZ");
 
+    /**
+     * A client for the system at {@code url} that sends {@code token} as its bearer token. The token is trimmed, as
+     * the Beadle services compare the service token: a secret written from a file ends in a newline, and the HTTP
+     * client refuses to send a header value that holds one.
+     */
     public static RestClient client(RestClient.Builder builder, String url, String token) {
         return builder.baseUrl(removeEnd(trimToEmpty(url), "/"))
-                .defaultHeader(AUTHORIZATION, "Bearer " + defaultString(token)).build();
+                .defaultHeader(AUTHORIZATION, "Bearer " + trimToEmpty(token)).build();
     }
 
     public static UncheckedIOException refusal(String system, String operation, RestClientException cause) {

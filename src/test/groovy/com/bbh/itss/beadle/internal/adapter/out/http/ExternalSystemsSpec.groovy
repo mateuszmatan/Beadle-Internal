@@ -42,6 +42,24 @@ class ExternalSystemsSpec extends Specification {
         server.verify()
     }
 
+    def "a token is sent without the whitespace around it, such as the newline of a secret written from a file"() {
+        given:
+        def builder = RestClient.builder()
+        def server = MockRestServiceServer.bindTo(builder).build()
+        server.expect(requestTo('https://confluence.bbh.com/rest/api/content'))
+                .andExpect(header('Authorization', 'Bearer secret-token'))
+                .andRespond(withSuccess('{}', APPLICATION_JSON))
+
+        when:
+        client(builder, 'https://confluence.bbh.com', token).get().uri('/rest/api/content').retrieve().body(Map)
+
+        then:
+        server.verify()
+
+        where:
+        token << ['secret-token\n', 'secret-token\r\n', ' secret-token\t']
+    }
+
     def "a missing token is sent as an empty bearer so the system refuses the call itself"() {
         given:
         def builder = RestClient.builder()

@@ -1,12 +1,15 @@
 package com.bbh.itss.beadle.internal.adapter.out.gui
 
 import com.bbh.itss.beadle.internal.config.ServiceTokenProperties
+import com.sun.net.httpserver.HttpServer
 import groovy.json.JsonSlurper
 import org.springframework.http.client.ClientHttpRequest
 import org.springframework.mock.http.client.MockClientHttpRequest
 import org.springframework.test.web.client.MockRestServiceServer
 import org.springframework.web.client.RestClient
 import spock.lang.Specification
+
+import java.util.concurrent.CompletableFuture
 
 import static com.bbh.itss.beadle.internal.support.Fixtures.statusCallback
 import static org.springframework.http.HttpMethod.POST
@@ -49,6 +52,51 @@ class GuiCallbackClientSpec extends Specification {
 
         then:
         server.verify()
+    }
+
+    def "a service token read with #whitespace is sent trimmed, as Beadle-GUI compares it"() {
+        given:
+        def builder = RestClient.builder()
+        def server = MockRestServiceServer.bindTo(builder).build()
+        server.expect(requestTo(URL + '/api/callbacks/internal'))
+                .andExpect(header('Authorization', 'Bearer service-token'))
+                .andRespond(withStatus(ACCEPTED))
+
+        when:
+        new GuiCallbackClient(new GuiProperties(URL), new ServiceTokenProperties(token), builder)
+                .notify(statusCallback())
+
+        then:
+        server.verify()
+
+        where:
+        whitespace                     | token
+        'a trailing newline'           | 'service-token\n'
+        'a trailing carriage return'   | 'service-token\r\n'
+        'surrounding blanks'           | '  service-token\t'
+    }
+
+    def "a service token written to its secret from a file, newline included, reaches a real Beadle-GUI"() {
+        given: 'an HTTP server, since the HTTP client itself refuses a header value that holds a newline'
+        def authorization = new CompletableFuture<String>()
+        def gui = HttpServer.create(new InetSocketAddress('127.0.0.1', 0), 0)
+        gui.createContext('/api/callbacks/internal') { exchange ->
+            authorization.complete(exchange.requestHeaders.getFirst('Authorization'))
+            exchange.sendResponseHeaders(ACCEPTED.value(), -1)
+            exchange.close()
+        }
+        gui.start()
+        def url = "http://127.0.0.1:${gui.address.port}"
+
+        when:
+        new GuiCallbackClient(new GuiProperties(url), new ServiceTokenProperties('service-token\n'),
+                RestClient.builder()).notify(statusCallback())
+
+        then:
+        authorization.getNow(null) == 'Bearer service-token'
+
+        cleanup:
+        gui?.stop(0)
     }
 
     def "a callback without a correlation id is posted without the header"() {

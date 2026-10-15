@@ -4,6 +4,7 @@ import com.bbh.itss.beadle.internal.application.jira.port.out.JiraPort;
 import com.bbh.itss.beadle.internal.domain.jira.JiraIssue;
 import com.bbh.itss.beadle.internal.domain.jira.JiraVersion;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
@@ -15,6 +16,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
+import static com.bbh.itss.beadle.internal.adapter.out.jira.JiraProperties.NOT_CONFIGURED;
 import static java.util.Collections.shuffle;
 import static java.util.Comparator.comparing;
 import static java.util.Map.entry;
@@ -22,6 +24,7 @@ import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.lang3.ObjectUtils.getIfNull;
 
 @Component
+@ConditionalOnExpression(NOT_CONFIGURED)
 @RequiredArgsConstructor
 class DemoJiraAdapter implements JiraPort {
 

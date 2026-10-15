@@ -1,9 +1,15 @@
 package com.bbh.itss.beadle.internal.adapter.out.jira
 
+import com.bbh.itss.beadle.internal.application.jira.port.out.JiraPort
+import org.springframework.boot.context.properties.EnableConfigurationProperties
+import org.springframework.boot.test.context.runner.ApplicationContextRunner
+import org.springframework.context.annotation.Import
 import spock.lang.Specification
 
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.util.function.Supplier
 
 import static com.bbh.itss.beadle.internal.adapter.out.jira.DemoJiraAdapter.EPICS_PER_PROJECT
 import static java.time.Clock.fixed
@@ -96,5 +102,27 @@ class DemoJiraAdapterSpec extends Specification {
             def epics = issues.findAll { it.issue().epicKey() == null }.collectEntries { [it.issue().key(), it] }
             issues.any { it.issue().epicKey() != null && it.fixVersion() != epics[it.issue().epicKey()].fixVersion() }
         }
+    }
+
+    def "the demo is used only while the Jira URL is blank"() {
+        given:
+        def runner = new ApplicationContextRunner().withUserConfiguration(Adapters)
+                .withBean(Clock, { fixed(Instant.parse('2026-10-07T10:00:00Z'), UTC) } as Supplier<Clock>)
+
+        expect:
+        runner.withPropertyValues(properties as String[]).run { context ->
+            assert context.getBeansOfType(JiraPort).values()*.class == types
+        }
+
+        where:
+        properties                               || types
+        []                                       || [DemoJiraAdapter]
+        ['beadle.jira.url=']                     || [DemoJiraAdapter]
+        ['beadle.jira.url=https://jira.bbh.com'] || []
+    }
+
+    @EnableConfigurationProperties(JiraProperties)
+    @Import(DemoJiraAdapter)
+    static class Adapters {
     }
 }

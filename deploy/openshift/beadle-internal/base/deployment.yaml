@@ -5,11 +5,10 @@ metadata:
 spec:
   replicas: 1
   revisionHistoryLimit: 5
+  # One pod at a time, also during a rollout: every pod polls the CyberTrack tickets it created and would send the
+  # same callbacks to Beadle-GUI.
   strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+    type: Recreate
   template:
     spec:
       securityContext:

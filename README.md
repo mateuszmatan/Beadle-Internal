@@ -177,7 +177,9 @@ kustomize edit set image beadle-internal=<registry>/<project>/beadle-internal:0.
 oc apply -k .
 ```
 
-Run one replica: the CyberTrack poll runs in every replica and each would send the callbacks.
+The Deployment runs one replica with the `Recreate` strategy: the CyberTrack poll runs in every pod and each would
+send the same callbacks, so a rollout stops the old pod before the new one starts, and Beadle-Internal is away for
+the seconds the new pod takes to start. Keep it at one replica.
 
 ## Tests
 

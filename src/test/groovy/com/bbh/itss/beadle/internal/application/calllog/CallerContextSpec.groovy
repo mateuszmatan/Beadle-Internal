@@ -52,4 +52,26 @@ class CallerContextSpec extends Specification {
         then:
         CallerContext.current() == Caller.NONE
     }
+
+    def "work without a result runs as another caller too, even when it fails"() {
+        given:
+        def before = new Caller('Mateusz Matan', 'corr-1')
+        def system = new Caller('system', 'corr-2')
+        Caller seen = null
+        CallerContext.set(before)
+
+        when:
+        CallerContext.run(system) { seen = CallerContext.current() }
+
+        then:
+        seen == system
+        CallerContext.current() == before
+
+        when:
+        CallerContext.run(system) { throw new IllegalStateException('boom') }
+
+        then:
+        thrown(IllegalStateException)
+        CallerContext.current() == before
+    }
 }

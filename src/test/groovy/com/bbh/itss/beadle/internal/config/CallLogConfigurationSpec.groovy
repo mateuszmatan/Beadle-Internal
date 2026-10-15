@@ -1,5 +1,6 @@
 package com.bbh.itss.beadle.internal.config
 
+import com.bbh.itss.beadle.internal.application.callback.port.out.CallbackPort
 import com.bbh.itss.beadle.internal.application.calllog.CallerContext
 import com.bbh.itss.beadle.internal.application.calllog.port.out.CallLogPort
 import com.bbh.itss.beadle.internal.application.confluence.port.out.ConfluencePort
@@ -19,12 +20,14 @@ import java.time.Instant
 import java.util.function.Supplier
 
 import static com.bbh.itss.beadle.internal.domain.calllog.ExternalSystem.CONFLUENCE
+import static com.bbh.itss.beadle.internal.domain.calllog.ExternalSystem.GUI
 import static com.bbh.itss.beadle.internal.domain.calllog.ExternalSystem.JIRA
 import static com.bbh.itss.beadle.internal.domain.calllog.Outcome.FAILURE
 import static com.bbh.itss.beadle.internal.domain.calllog.Outcome.SUCCESS
 import static com.bbh.itss.beadle.internal.support.Fixtures.newPage
 import static com.bbh.itss.beadle.internal.support.Fixtures.page
 import static com.bbh.itss.beadle.internal.support.Fixtures.pageUpdate
+import static com.bbh.itss.beadle.internal.support.Fixtures.statusCallback
 import static com.bbh.itss.beadle.internal.support.Fixtures.version
 import static java.time.Clock.fixed
 import static java.time.ZoneOffset.UTC
@@ -60,6 +63,7 @@ class CallLogConfigurationSpec extends Specification {
                 [connected: { true }, find: { String s, String t -> [] }, get: { String id -> page() },
                  create   : { newOne -> page() }, update: { String id, update -> page() }] as ConfluencePort
             } as Supplier<ConfluencePort>)
+            .withBean(CallbackPort, { [notify: { callback -> }] as CallbackPort } as Supplier<CallbackPort>)
 
     def cleanup() {
         CallerContext.clear()
@@ -129,6 +133,26 @@ class CallLogConfigurationSpec extends Specification {
         runner.run { ApplicationContext context ->
             assert context.getBean(JiraPort).versions('CERT') == [version()]
             assert recorded == []
+            true
+        }
+    }
+
+    def "a callback to Beadle-GUI is written to the call log as a call of the system"() {
+        given:
+        CallerContext.set(new Caller('system', 'corr-1'))
+
+        expect:
+        runner.run { ApplicationContext context ->
+            context.getBean(CallbackPort).notify(statusCallback())
+            assert recorded.size() == 1
+            with(recorded[0]) {
+                assert userName() == 'system'
+                assert correlationId() == 'corr-1'
+                assert system() == GUI
+                assert operation() == 'notify'
+                assert target() == 'SCP-1234 In Progress'
+                assert outcome() == SUCCESS
+            }
             true
         }
     }

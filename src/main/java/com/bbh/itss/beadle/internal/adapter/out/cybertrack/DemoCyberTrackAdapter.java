@@ -12,8 +12,11 @@ import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -56,6 +59,19 @@ class DemoCyberTrackAdapter implements CyberTrackPort {
         Instant createdAt = created.computeIfAbsent(key, missing -> adopted(missing, now));
         int step = (int) min(between(createdAt, now).dividedBy(STEP), STATUSES.size() - 1L);
         return new CyberTrackTicket(key, STATUSES.get(step), null, createdAt.plus(STEP.multipliedBy(step)));
+    }
+
+    @Override
+    public List<CyberTrackTicket> readAll(Collection<String> keys) {
+        List<CyberTrackTicket> found = new ArrayList<>();
+        for (String key : keys) {
+            try {
+                found.add(read(key));
+            } catch (NoSuchElementException e) {
+                // a key the demo does not know is left out, as CyberTrack leaves out an issue it does not have
+            }
+        }
+        return found;
     }
 
     private Instant adopted(String key, Instant now) {

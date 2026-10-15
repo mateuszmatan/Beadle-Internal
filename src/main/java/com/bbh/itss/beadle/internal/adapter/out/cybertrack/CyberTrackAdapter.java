@@ -11,6 +11,9 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -19,6 +22,9 @@ import static com.bbh.itss.beadle.internal.adapter.out.http.ExternalSystems.clie
 import static com.bbh.itss.beadle.internal.adapter.out.http.ExternalSystems.refusal;
 import static com.bbh.itss.beadle.internal.adapter.out.http.ExternalSystems.timestamp;
 import static com.bbh.itss.beadle.internal.domain.shared.Failures.notFound;
+import static java.lang.Math.min;
+import static java.util.stream.Collectors.joining;
+import static org.apache.commons.lang3.StringUtils.abbreviate;
 import static org.apache.commons.lang3.StringUtils.removeEnd;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 
@@ -29,9 +35,12 @@ class CyberTrackAdapter implements CyberTrackPort {
     static final String CYBERTRACK = "CyberTrack";
     static final String CREATE = "create the secure coding ticket";
     static final String READ = "read the ticket";
+    static final String READ_ALL = "read the tickets";
     static final String NO_KEY = "Jira answered without the key of the new issue";
     static final String NO_FIELDS = "Jira answered without the fields of ";
     static final String TICKET = "CyberTrack ticket";
+    static final int BATCH = 50;
+    static final int MAX_KEYS = 200;
 
     private final CyberTrackProperties properties;
     private final RestClient client;
@@ -72,8 +81,7 @@ class CyberTrackAdapter implements CyberTrackPort {
             if (issue == null || issue.fields() == null) {
                 throw new RestClientException(NO_FIELDS + key);
             }
-            String status = Optional.ofNullable(issue.fields().status()).map(Status::name).orElse(null);
-            return new CyberTrackTicket(key, status, browseUrl(key), timestamp(issue.fields().updated()));
+            return ticket(key, issue.fields());
         } catch (HttpClientErrorException.NotFound e) {
             throw notFound(TICKET, key);
         } catch (RestClientException e) {
@@ -81,11 +89,52 @@ class CyberTrackAdapter implements CyberTrackPort {
         }
     }
 
+    /**
+     * Searches the tickets by key, {@value #BATCH} at a time, without validating the query so that a key Jira does
+     * not know (a deleted issue) is left out instead of refusing the whole search.
+     */
+    @Override
+    public List<CyberTrackTicket> readAll(Collection<String> keys) {
+        List<String> distinct = keys.stream().distinct().toList();
+        List<CyberTrackTicket> tickets = new ArrayList<>();
+        try {
+            for (int from = 0; from < distinct.size(); from += BATCH) {
+                List<String> batch = distinct.subList(from, min(from + BATCH, distinct.size()));
+                SearchResult result = client.post().uri("/rest/api/2/search").contentType(APPLICATION_JSON)
+                        .accept(APPLICATION_JSON)
+                        .body(Map.of("jql", "key in " + batch.stream().map(CyberTrackAdapter::quoted)
+                                        .collect(joining(", ", "(", ")")),
+                                "startAt", 0, "maxResults", batch.size(), "validateQuery", false,
+                                "fields", List.of("status", "updated")))
+                        .retrieve().body(SearchResult.class);
+                if (result != null && result.issues() != null) {
+                    result.issues().stream().filter(issue -> issue.key() != null && issue.fields() != null)
+                            .map(issue -> ticket(issue.key(), issue.fields())).forEach(tickets::add);
+                }
+            }
+        } catch (RestClientException e) {
+            throw refusal(CYBERTRACK, READ_ALL + " " + abbreviate(String.join(", ", distinct), MAX_KEYS), e);
+        }
+        return tickets;
+    }
+
+    private CyberTrackTicket ticket(String key, Fields fields) {
+        String status = Optional.ofNullable(fields.status()).map(Status::name).orElse(null);
+        return new CyberTrackTicket(key, status, browseUrl(key), timestamp(fields.updated()));
+    }
+
     private String browseUrl(String key) {
         return removeEnd(properties.url().trim(), "/") + "/browse/" + key;
     }
 
+    static String quoted(String value) {
+        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+    }
+
     record Created(String key) {
+    }
+
+    record SearchResult(List<Issue> issues) {
     }
 
     record Issue(String key, Fields fields) {

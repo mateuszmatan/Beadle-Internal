@@ -1,5 +1,6 @@
 package com.bbh.itss.beadle.internal.support
 
+import com.bbh.itss.beadle.internal.domain.callback.StatusCallback
 import com.bbh.itss.beadle.internal.domain.calllog.CallLogEntry
 import com.bbh.itss.beadle.internal.domain.confluence.ConfluencePage
 import com.bbh.itss.beadle.internal.domain.confluence.ConfluencePageUpdate
@@ -7,6 +8,7 @@ import com.bbh.itss.beadle.internal.domain.confluence.NewConfluencePage
 import com.bbh.itss.beadle.internal.domain.cybertrack.CyberTrackTicket
 import com.bbh.itss.beadle.internal.domain.cybertrack.SecureCoding
 import com.bbh.itss.beadle.internal.domain.cybertrack.SecureCodingTicket
+import com.bbh.itss.beadle.internal.domain.cybertrack.TrackedTicket
 import com.bbh.itss.beadle.internal.domain.jira.JiraIssue
 import com.bbh.itss.beadle.internal.domain.jira.JiraVersion
 import com.bbh.itss.beadle.internal.domain.qtest.QTestCycle
@@ -16,6 +18,7 @@ import com.bbh.itss.beadle.internal.domain.qtest.QTestRun
 import java.time.Instant
 import java.time.LocalDate
 
+import static com.bbh.itss.beadle.internal.domain.calllog.ExternalSystem.CYBERTRACK
 import static com.bbh.itss.beadle.internal.domain.calllog.ExternalSystem.JIRA
 import static com.bbh.itss.beadle.internal.domain.calllog.Outcome.SUCCESS
 
@@ -23,6 +26,7 @@ class Fixtures {
 
     static final LocalDate IMPLEMENTATION_DATE = LocalDate.parse('2026-10-15')
     static final Instant UPDATED = Instant.parse('2026-10-15T09:00:00Z')
+    static final Instant CREATED = Instant.parse('2026-10-15T08:30:00Z')
 
     private Fixtures() {
     }
@@ -38,6 +42,14 @@ class Fixtures {
 
     static CyberTrackTicket cyberTrackTicket(Map changes = [:]) {
         copy(changes, new CyberTrackTicket('SCP-1234', 'To Do', 'https://cybertrack.bbh.com/browse/SCP-1234', UPDATED))
+    }
+
+    static TrackedTicket trackedTicket(Map changes = [:]) {
+        copy(changes, new TrackedTicket('SCP-1234', 'To Do', 'corr-1', CREATED, CREATED, null, null))
+    }
+
+    static StatusCallback statusCallback(Map changes = [:]) {
+        copy(changes, new StatusCallback(CYBERTRACK, 'SCP-1234', 'In Progress', UPDATED, 'corr-1'))
     }
 
     static Map secureCodingJson(SecureCoding inputs = secureCoding()) {

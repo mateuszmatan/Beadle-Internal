@@ -1,5 +1,6 @@
 package com.bbh.itss.beadle.internal.config;
 
+import com.bbh.itss.beadle.internal.application.callback.port.out.CallbackPort;
 import com.bbh.itss.beadle.internal.application.calllog.CallerContext;
 import com.bbh.itss.beadle.internal.application.calllog.port.out.CallLogPort;
 import com.bbh.itss.beadle.internal.application.confluence.port.out.ConfluencePort;
@@ -32,6 +33,7 @@ import static com.bbh.itss.beadle.internal.domain.calllog.CallLogEntry.MESSAGE_M
 import static com.bbh.itss.beadle.internal.domain.calllog.CallLogEntry.TARGET_MAX;
 import static com.bbh.itss.beadle.internal.domain.calllog.ExternalSystem.CONFLUENCE;
 import static com.bbh.itss.beadle.internal.domain.calllog.ExternalSystem.CYBERTRACK;
+import static com.bbh.itss.beadle.internal.domain.calllog.ExternalSystem.GUI;
 import static com.bbh.itss.beadle.internal.domain.calllog.ExternalSystem.JIRA;
 import static com.bbh.itss.beadle.internal.domain.calllog.ExternalSystem.QTEST;
 import static com.bbh.itss.beadle.internal.domain.calllog.Outcome.FAILURE;
@@ -49,7 +51,7 @@ class CallLogInterceptor implements MethodInterceptor {
 
     static final String UNLOGGED = "connected";
     static final Map<Class<?>, ExternalSystem> SYSTEMS = Map.of(JiraPort.class, JIRA, CyberTrackPort.class, CYBERTRACK,
-            ConfluencePort.class, CONFLUENCE, QTestPort.class, QTEST);
+            ConfluencePort.class, CONFLUENCE, QTestPort.class, QTEST, CallbackPort.class, GUI);
 
     private final ObjectProvider<CallLogPort> callLog;
     private final ObjectProvider<Clock> clock;

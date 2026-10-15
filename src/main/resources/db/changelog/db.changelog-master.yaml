@@ -2,3 +2,6 @@ databaseChangeLog:
   - include:
       file: oracle/001-call-log.sql
       relativeToChangelogFile: true
+  - include:
+      file: oracle/002-cybertrack-tickets.sql
+      relativeToChangelogFile: true

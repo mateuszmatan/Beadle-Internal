@@ -73,6 +73,18 @@ class DemoCyberTrackAdapterSpec extends Specification {
         missing.message == 'CyberTrack ticket CERT-77 does not exist'
     }
 
+    def "the demo reads several tickets at once, on its clock, leaving out the keys it does not know"() {
+        given:
+        def key = demo.create(ticket()).key()
+        def later = new DemoCyberTrackAdapter(offset(fixed(NOW, UTC), STEP), PROPERTIES)
+        later.created.put(key, NOW)
+
+        expect:
+        later.readAll([key, 'CERT-77', 'SCP-77']) == [new CyberTrackTicket(key, 'In Progress', null, NOW + STEP),
+                                                      new CyberTrackTicket('SCP-77', 'Done', null, NOW + STEP)]
+        later.readAll([]) == []
+    }
+
     def "Jira is used only once its URL is set, with SCP and Task by default"() {
         given:
         def runner = new ApplicationContextRunner()

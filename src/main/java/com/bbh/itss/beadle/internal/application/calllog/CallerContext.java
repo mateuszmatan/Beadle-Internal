@@ -29,6 +29,13 @@ public final class CallerContext {
         CURRENT.remove();
     }
 
+    public static void run(Caller caller, Runnable work) {
+        as(caller, () -> {
+            work.run();
+            return null;
+        });
+    }
+
     public static <T> T as(Caller caller, Supplier<T> work) {
         Caller before = CURRENT.get();
         CURRENT.set(caller);

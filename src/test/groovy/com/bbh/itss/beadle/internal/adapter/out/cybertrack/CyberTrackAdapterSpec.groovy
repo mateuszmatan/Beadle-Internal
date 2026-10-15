@@ -136,6 +136,65 @@ class CyberTrackAdapterSpec extends Specification {
         'no fields'      | withSuccess('{"key":"SCP-9"}', APPLICATION_JSON)             || UncheckedIOException   | NO_FIELDS + 'SCP-9'
     }
 
+    def "#count tickets are searched by key without validating the query, #batch keys at a time"() {
+        given:
+        def keys = (1..count).collect { "SCP-$it" as String }
+        def batches = keys.collate(CyberTrackAdapter.BATCH)
+        batches.each { List<String> batchKeys ->
+            server.expect(requestTo(URL + '/rest/api/2/search')).andExpect(method(POST))
+                    .andExpect(header('Authorization', 'Bearer secret-token'))
+                    .andExpect { ClientHttpRequest request ->
+                        assert new JsonSlurper().parseText((request as MockClientHttpRequest).bodyAsString) ==
+                                [jql          : 'key in (' + batchKeys.collect { '"' + it + '"' }.join(', ') + ')',
+                                 startAt      : 0, maxResults: batchKeys.size(), validateQuery: false,
+                                 fields       : ['status', 'updated']]
+                    }
+                    .andRespond(withSuccess('{"total":' + batchKeys.size() + ',"issues":[' + batchKeys.collect {
+                        '{"key":"' + it + '","fields":{"status":{"name":"Done"},"updated":"2026-10-15T11:00:00.000+0200"}}'
+                    }.join(',') + ']}', APPLICATION_JSON))
+        }
+
+        expect:
+        cyberTrack.readAll(keys + keys.take(1)) == keys.collect { new CyberTrackTicket(it, 'Done', URL + '/browse/' + it, NOW) }
+        server.verify()
+
+        where:
+        count << [1, 50, 51]
+        batch = CyberTrackAdapter.BATCH
+    }
+
+    def "a ticket Jira does not answer, or answers without fields, is left out of a search"() {
+        given:
+        server.expect(requestTo(URL + '/rest/api/2/search'))
+                .andRespond(withSuccess('{"total":2,"issues":[{"key":"SCP-1","fields":{"status":{"name":"To Do"}}},' +
+                        '{"key":"SCP-2"},{"fields":{"status":{"name":"Done"}}}]}', APPLICATION_JSON))
+
+        expect:
+        cyberTrack.readAll(['SCP-1', 'SCP-2', 'SCP-3']) == [new CyberTrackTicket('SCP-1', 'To Do', URL + '/browse/SCP-1', null)]
+    }
+
+    def "no keys need no search and an empty answer finds nothing"() {
+        given:
+        server.expect(requestTo(URL + '/rest/api/2/search')).andRespond(withSuccess('{}', APPLICATION_JSON))
+
+        expect:
+        cyberTrack.readAll([]) == []
+        cyberTrack.readAll(['SCP-1']) == []
+    }
+
+    def "a refused search is refused with the keys and the reason"() {
+        given:
+        server.expect(requestTo(URL + '/rest/api/2/search'))
+                .andRespond(withBadRequest().body('{"errorMessages":["Error in the JQL Query"]}'))
+
+        when:
+        cyberTrack.readAll(['SCP-1', 'SCP-2'])
+
+        then:
+        def refused = thrown(UncheckedIOException)
+        refused.message.startsWith('CyberTrack could not ' + CyberTrackAdapter.READ_ALL + ' SCP-1, SCP-2: 400 Bad Request')
+    }
+
     private CyberTrackAdapter adapter(String projectKey, String issueType) {
         new CyberTrackAdapter(new CyberTrackProperties(URL + '/', 'secret-token', projectKey, issueType), builder)
     }

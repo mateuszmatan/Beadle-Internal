@@ -15,6 +15,7 @@ import jakarta.persistence.Embeddable
 import jakarta.persistence.Entity
 import jakarta.persistence.MappedSuperclass
 import org.springframework.data.repository.Repository
+import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Controller
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -26,6 +27,7 @@ import java.util.function.Predicate
 import static com.tngtech.archunit.base.DescribedPredicate.describe
 import static com.tngtech.archunit.lang.SimpleConditionEvent.violated
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices
 
@@ -104,6 +106,11 @@ abstract class ArchitectureSpecification extends Specification {
          slices().matching('com.bbh.itss.beadle.internal.adapter.(**)').should().beFreeOfCycles(),
          classes().that().areAnnotatedWith(UseCase)
                  .should().resideInAPackage(APPLICATION).andShould(implementAnInPort()).allowEmptyShould(true),
+         classes().that(describedAs('implement an out port') { JavaClass type ->
+             !type.isInterface() && type.allRawInterfaces.any { it.packageName.contains('.port.out') }
+         }).should().resideInAPackage(ADAPTER_OUT).allowEmptyShould(true),
+         methods().that().areAnnotatedWith(Scheduled)
+                 .should().beDeclaredInClassesThat().resideInAPackage(ADAPTER_IN).allowEmptyShould(true),
          classes().should(notDependOnOtherUseCases())]
     }
 

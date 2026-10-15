@@ -5,10 +5,11 @@ labels:
     pairs:
       app.kubernetes.io/name: beadle-internal
       app.kubernetes.io/part-of: beadle
+# No Route: only Beadle-GUI calls the API, inside the cluster through the Service (http://beadle-internal:8082), so
+# nothing of Beadle-Internal is published outside it.
 resources:
   - deployment.yaml
   - service.yaml
-  - route.yaml
 configMapGenerator:
   - name: beadle-internal-config
     literals:

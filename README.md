@@ -179,17 +179,19 @@ docker run --rm -p 8082:8082 -e BEADLE_SERVICE_TOKEN=<token> -e BEADLE_GUI_URL=h
 The image runs as user 185, listens on 8082 and keeps the H2 database of the `local` profile in the volume
 `/application/data`.
 
-The manifests in `deploy/openshift/beadle-internal` are a Kustomize base (Deployment, Service, Route and the
-ConfigMap `beadle-internal-config` with the profile, `BEADLE_GUI_URL=http://beadle:8081`, the system URLs and the
-CyberTrack settings) with one overlay per environment that sets its profile and the URLs of its systems. The
-overlays ship those URLs blank: fill in `JIRA_URL`, `CYBERTRACK_URL`, `CONFLUENCE_URL` and `QTEST_URL` in the
-overlay's `configMapGenerator` before applying it, since `rd`, `qc` and `prod` do not start while one is blank
-(a demo adapter would otherwise answer in its place, and a demo CyberTrack would hand Beadle-GUI made-up tickets).
-Add `<SYSTEM>_DEMO=true` next to them only to run a system on its demo on purpose. The Deployment reads the secrets
-`beadle-internal-db` (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`) and `beadle-internal-services`
-(`BEADLE_SERVICE_TOKEN`), and the optional `beadle-internal-jira`, `beadle-internal-cybertrack`,
-`beadle-internal-confluence` and `beadle-internal-qtest` (`<SYSTEM>_TOKEN`); its probes are
-`/actuator/health/liveness` and `/actuator/health/readiness`.
+The manifests in `deploy/openshift/beadle-internal` are a Kustomize base (Deployment, Service and the ConfigMap
+`beadle-internal-config` with the profile, `BEADLE_GUI_URL=http://beadle:8081`, the system URLs and the CyberTrack
+settings) with one overlay per environment that sets its profile and the URLs of its systems. There is no Route:
+Beadle-GUI is the only caller of the API and reaches it inside the cluster through the Service
+(`BEADLE_INTERNAL_URL=http://beadle-internal:8082`), so nothing of Beadle-Internal is published outside it; to call
+the API by hand, forward a port with `oc port-forward service/beadle-internal 8082:8082`. The overlays ship those URLs
+blank: fill in `JIRA_URL`, `CYBERTRACK_URL`, `CONFLUENCE_URL` and `QTEST_URL` in the overlay's `configMapGenerator`
+before applying it, since `rd`, `qc` and `prod` do not start while one is blank (a demo adapter would otherwise answer
+in its place, and a demo CyberTrack would hand Beadle-GUI made-up tickets). Add `<SYSTEM>_DEMO=true` next to them only
+to run a system on its demo on purpose. The Deployment reads the secrets `beadle-internal-db` (`DB_URL`,
+`DB_USERNAME`, `DB_PASSWORD`) and `beadle-internal-services` (`BEADLE_SERVICE_TOKEN`), and the optional
+`beadle-internal-jira`, `beadle-internal-cybertrack`, `beadle-internal-confluence` and `beadle-internal-qtest`
+(`<SYSTEM>_TOKEN`); its probes are `/actuator/health/liveness` and `/actuator/health/readiness`.
 
 ```bash
 oc create secret generic beadle-internal-db --from-literal=DB_URL='jdbc:oracle:thin:@//<host>:1521/<service>' \

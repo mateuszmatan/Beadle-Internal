@@ -27,6 +27,17 @@
       "detail": "Runs the unit specs with the coverage report"
     },
     {
+      "label": "gradle: regressionTest",
+      "type": "shell",
+      "command": "./gradlew regressionTest",
+      "windows": {
+        "command": "gradlew.bat regressionTest"
+      },
+      "group": "test",
+      "problemMatcher": [],
+      "detail": "Runs the API end to end on H2 with the demo adapters and a stand-in Beadle-GUI"
+    },
+    {
       "label": "gradle: build",
       "type": "shell",
       "command": "./gradlew build",

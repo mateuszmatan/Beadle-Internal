@@ -4,6 +4,7 @@ import com.bbh.itss.beadle.internal.application.cybertrack.port.out.TrackedTicke
 import com.bbh.itss.beadle.internal.domain.cybertrack.TrackedTicket;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -41,6 +42,17 @@ class TrackedTicketPersistenceAdapter implements TrackedTicketPort {
                     changeNumber, e.getMessage());
             return Optional.empty();
         }
+    }
+
+    @Override
+    public Optional<TrackedTicket> find(String key) {
+        return tickets.findById(key).map(TrackedTicketEntity::toDomain);
+    }
+
+    @Override
+    public Optional<String> highestKey(String prefix) {
+        String pattern = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+        return tickets.findKeysLike(pattern, PageRequest.of(0, 1)).stream().findFirst();
     }
 
     @Override

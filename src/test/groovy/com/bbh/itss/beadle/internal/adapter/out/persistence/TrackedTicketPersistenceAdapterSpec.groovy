@@ -95,6 +95,34 @@ class TrackedTicketPersistenceAdapterSpec extends Specification {
         jdbc.execute('ALTER TABLE BEADLE_INTERNAL_CYBERTRACK_TICKET RENAME COLUMN CHANGE_NO TO CHANGE_NUMBER')
     }
 
+    def "a followed ticket is found by its key, open or closed"() {
+        given:
+        adapter.track(trackedTicket(key: 'SCP-1', closedAt: CREATED))
+        adapter.track(trackedTicket(key: 'SCP-2'))
+
+        expect:
+        adapter.find('SCP-1') == Optional.of(trackedTicket(key: 'SCP-1', closedAt: CREATED))
+        adapter.find('SCP-2') == Optional.of(trackedTicket(key: 'SCP-2'))
+        adapter.find('SCP-3') == Optional.empty()
+    }
+
+    def "the highest key of a project is the one with the highest number, open or closed"() {
+        given:
+        keys.each { adapter.track(trackedTicket(key: it, closedAt: it == 'SCP-1000' ? CREATED : null)) }
+
+        expect:
+        adapter.highestKey(prefix) == Optional.ofNullable(highest)
+
+        where:
+        keys                                   | prefix  || highest
+        ['SCP-999', 'SCP-1000', 'SCP-12']      | 'SCP-'  || 'SCP-1000'
+        ['SCP-7', 'SCPX-99']                   | 'SCP-'  || 'SCP-7'
+        ['SECX1-9', 'SEC_1-5']                 | 'SEC_1-' || 'SEC_1-5'
+        ['SECX1-9']                            | 'SEC_1-' || null
+        ['50%-1', '50X-9']                     | '50%-'  || '50%-1'
+        []                                     | 'SCP-'  || null
+    }
+
     def "the open tickets come oldest first"() {
         given:
         adapter.track(trackedTicket(key: 'SCP-3', createdAt: CREATED.plusSeconds(60)))

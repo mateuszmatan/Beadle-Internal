@@ -50,9 +50,11 @@ its link and the correlation id of the user action, and answered at once: the cr
 within the request, and the first poll tells Beadle-GUI the status the ticket starts in. A second request for a
 change whose ticket is still followed (Beadle-GUI retrying after its own time-out) is answered with that ticket. A
 scheduled poll reads the open tickets in one call, every 10 seconds while the demo adapter moves tickets on its clock
-(To Do, In Progress, Done, two minutes per step) and every `beadle.cybertrack.poll` once CyberTrack is configured,
-and for every ticket that moved posts `{"system": "CYBERTRACK", "key", "status", "at", "correlationId"}` to
-`{beadle.gui.url}/api/callbacks/internal` with the service token and `X-Beadle-User: system`. A ticket that reached a
+(To Do, In Progress, Done, two minutes per step from the creation time the table keeps, so a restart does not move
+them on, and new demo keys continue after the highest one in the table) and every `beadle.cybertrack.poll` once
+CyberTrack is configured, and for every ticket that moved posts
+`{"system": "CYBERTRACK", "key", "status", "at", "correlationId"}` to `{beadle.gui.url}/api/callbacks/internal` with
+the service token and `X-Beadle-User: system`. A ticket that reached a
 final status (`beadle.cybertrack.closed-statuses`, by default Done, Closed, Resolved, Cancelled, Canceled, Rejected,
 Won't Do) is no longer followed, nor one that the poll did not find `beadle.cybertrack.max-misses` times in a row
 (deleted, or out of reach of the service account), which is logged as dropped. A callback Beadle-GUI does not take is

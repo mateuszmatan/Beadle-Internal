@@ -25,4 +25,11 @@ public interface TrackedTicketPort {
      * ticket is raised rather than the request failed.
      */
     Optional<TrackedTicket> openFor(String changeNumber);
+
+    Optional<TrackedTicket> find(String key);
+
+    /**
+     * The followed key with the highest number after {@code prefix} (such as {@code SCP-}), open or closed.
+     */
+    Optional<String> highestKey(String prefix);
 }

@@ -93,7 +93,11 @@ class CyberTrackRegressionSpec extends BeadleInternalSpecification {
         }
         GUI.callbacksFor(key).first().body == [system: 'CYBERTRACK', key: key, status: 'To Do', at: createdAt.toString(),
                                                correlationId: correlationId]
-        followed(key).STATUS == 'To Do'
+
+        and: 'the poll writes the status down once Beadle-GUI took it'
+        conditions.eventually {
+            assert followed(key).STATUS == 'To Do'
+        }
 
         when:
         clock.advance(STEP)
@@ -123,13 +127,18 @@ class CyberTrackRegressionSpec extends BeadleInternalSpecification {
             assert GUI.callbacksFor(key)*.body*.status == ['To Do', 'In Progress', 'Done']
         }
         GUI.callbacksFor(key)[2].body.at == (createdAt + STEP.multipliedBy(2)).toString()
-        followed(key).subMap('STATUS', 'CORRELATION_ID', 'CLOSED') == [STATUS: 'Done', CORRELATION_ID: correlationId, CLOSED: true]
+        conditions.eventually {
+            assert followed(key).subMap('STATUS', 'CORRELATION_ID', 'CLOSED') ==
+                    [STATUS: 'Done', CORRELATION_ID: correlationId, CLOSED: true]
+        }
 
         and: 'the callbacks are in the call log of the creation, as calls of the system to Beadle-GUI'
-        callLog().findAll { it.system == 'GUI' }*.subMap('userName', 'operation', 'target', 'outcome') == [
-                [userName: 'system', operation: 'notify', target: "$key To Do".toString(), outcome: 'SUCCESS'],
-                [userName: 'system', operation: 'notify', target: "$key In Progress".toString(), outcome: 'SUCCESS'],
-                [userName: 'system', operation: 'notify', target: "$key Done".toString(), outcome: 'SUCCESS']]
+        conditions.eventually {
+            assert callLog().findAll { it.system == 'GUI' }*.subMap('userName', 'operation', 'target', 'outcome') == [
+                    [userName: 'system', operation: 'notify', target: "$key To Do".toString(), outcome: 'SUCCESS'],
+                    [userName: 'system', operation: 'notify', target: "$key In Progress".toString(), outcome: 'SUCCESS'],
+                    [userName: 'system', operation: 'notify', target: "$key Done".toString(), outcome: 'SUCCESS']]
+        }
     }
 
     def "a callback Beadle-GUI did not take is sent again on the next tick"() {
@@ -142,8 +151,12 @@ class CyberTrackRegressionSpec extends BeadleInternalSpecification {
             assert GUI.callbacksFor(key)*.status == [503, 202]
         }
         GUI.callbacksFor(key)*.body*.status == ['To Do', 'To Do']
-        followed(key).STATUS == 'To Do'
-        callLog().findAll { it.system == 'GUI' }*.outcome == ['FAILURE', 'SUCCESS']
+
+        and: 'the poll writes the status down and logs both calls once Beadle-GUI took the second one'
+        conditions.eventually {
+            assert followed(key).STATUS == 'To Do'
+            assert callLog().findAll { it.system == 'GUI' }*.outcome == ['FAILURE', 'SUCCESS']
+        }
         callLog().find { it.system == 'GUI' }.message.startsWith("Beadle-GUI could not take the callback for $key: 503")
     }
 

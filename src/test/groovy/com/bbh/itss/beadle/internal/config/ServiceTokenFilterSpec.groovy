@@ -90,10 +90,37 @@ class ServiceTokenFilterSpec extends Specification {
         first.contentAsString != second.contentAsString
     }
 
-    def "a user of #user.length() characters is cut to the 200 bytes the call log holds"() {
+    def "the user travels percent-encoded in UTF-8 and is logged decoded: #header"() {
         when:
         def response = mvc.perform(get('/api/internal/caller').header('Authorization', 'Bearer ' + TOKEN)
-                .header('X-Beadle-User', user).header('X-Correlation-Id', 'corr-1')).andReturn().response
+                .header('X-Beadle-User', header).header('X-Correlation-Id', 'corr-1')).andReturn().response
+
+        then:
+        response.status == 200
+        response.contentAsString == user + '/corr-1'
+        CallerContext.current() == Caller.NONE
+
+        where:
+        header                                                || user
+        '%C5%81ukasz+W%C3%B3jcik'                             || 'Łukasz Wójcik'
+        '%C5%81ukasz%20W%C3%B3jcik'                           || 'Łukasz Wójcik'
+        URLEncoder.encode('Żaneta Ćwięk-Ślusarczyk', 'UTF-8') || 'Żaneta Ćwięk-Ślusarczyk'
+        'Mateusz Matan'                                       || 'Mateusz Matan'
+        'Mateusz+Matan'                                       || 'Mateusz Matan'
+        ' Mateusz+Matan '                                     || 'Mateusz Matan'
+        '+Mateusz+Matan+'                                     || 'Mateusz Matan'
+        'system'                                              || 'system'
+        '100% sure'                                           || '100% sure'
+        ' 100% sure '                                         || '100% sure'
+        '%C5%8'                                               || '%C5%8'
+        '%20'                                                 || 'unknown'
+        '+++'                                                 || 'unknown'
+    }
+
+    def "a user of #user.length() characters (#header.length() in the header) is cut once decoded to the 200 bytes"() {
+        when:
+        def response = mvc.perform(get('/api/internal/caller').header('Authorization', 'Bearer ' + TOKEN)
+                .header('X-Beadle-User', header).header('X-Correlation-Id', 'corr-1')).andReturn().response
         def caller = response.contentAsString - '/corr-1'
 
         then:
@@ -102,9 +129,11 @@ class ServiceTokenFilterSpec extends Specification {
         caller.getBytes(UTF_8).length <= USER_MAX
 
         where:
-        user           || expected
-        'u' * USER_MAX || 'u' * USER_MAX
-        'u' * 250      || 'u' * (USER_MAX - 3) + '...'
+        user           | header                                || expected
+        'u' * USER_MAX | 'u' * USER_MAX                        || 'u' * USER_MAX
+        'u' * 250      | 'u' * 250                             || 'u' * (USER_MAX - 3) + '...'
+        'Ł' * 100      | URLEncoder.encode('Ł' * 100, 'UTF-8') || 'Ł' * 100
+        'Ł' * 150      | URLEncoder.encode('Ł' * 150, 'UTF-8') || 'Ł' * 98 + '...'
     }
 
     def "a correlation id of #length bytes is #outcome"() {
@@ -148,7 +177,7 @@ class ServiceTokenFilterSpec extends Specification {
             'ok'
         }
 
-        @GetMapping('/api/internal/caller')
+        @GetMapping(value = '/api/internal/caller', produces = 'text/plain;charset=UTF-8')
         String caller() {
             def caller = CallerContext.current()
             "${caller.user()}/${caller.correlationId()}"

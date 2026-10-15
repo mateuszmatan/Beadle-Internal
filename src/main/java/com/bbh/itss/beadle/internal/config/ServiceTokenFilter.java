@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.net.URLDecoder;
 import java.util.UUID;
 
 import static com.bbh.itss.beadle.internal.application.calllog.CallerContext.CORRELATION_HEADER;
@@ -36,8 +37,8 @@ import static org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON_VALUE;
 
 /**
  * Lets through the calls that carry the Beadle service token and runs each one as the caller its headers name:
- * {@code X-Beadle-User} (cut to what the call log holds, {@value CallerContext#UNKNOWN_USER} when missing) and
- * {@code X-Correlation-Id} (a fresh one when missing). A correlation id longer than the call log and the followed
+ * {@code X-Beadle-User} (percent-decoded, then cut to what the call log holds, {@value CallerContext#UNKNOWN_USER}
+ * when missing) and {@code X-Correlation-Id} (a fresh one when missing). A correlation id longer than the call log and the followed
  * tickets hold is refused rather than cut, since Beadle-GUI matches the callbacks by it.
  */
 @Slf4j
@@ -83,8 +84,8 @@ public class ServiceTokenFilter extends OncePerRequestFilter {
             problem(response, BAD_REQUEST.value(), CORRELATION_PROBLEM);
             return;
         }
-        CallerContext.set(new Caller(userOf(request), correlationId == null ? UUID.randomUUID().toString()
-                : correlationId));
+        CallerContext.set(new Caller(userOf(request.getHeader(USER_HEADER)),
+                correlationId == null ? UUID.randomUUID().toString() : correlationId));
         try {
             chain.doFilter(request, response);
         } finally {
@@ -92,9 +93,26 @@ public class ServiceTokenFilter extends OncePerRequestFilter {
         }
     }
 
-    private static String userOf(HttpServletRequest request) {
-        String user = trimToNull(request.getHeader(USER_HEADER));
+    /**
+     * The user {@code X-Beadle-User} names. A header carries ASCII only, so the contract has the name percent-encoded
+     * in UTF-8 as {@link java.net.URLEncoder} writes it ({@code Łukasz Wójcik} travels as
+     * {@code %C5%81ukasz+W%C3%B3jcik}); a plain ASCII name reads the same either way, and a value that is not valid
+     * percent-encoding is taken as it came. The decoded name is trimmed and cut to what the call log holds.
+     */
+    static String userOf(String header) {
+        String user = trimToNull(decoded(trimToNull(header)));
         return user == null ? UNKNOWN_USER : abbreviateBytes(user, USER_MAX);
+    }
+
+    private static String decoded(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return URLDecoder.decode(value, UTF_8);
+        } catch (IllegalArgumentException notEncoded) {
+            return value;
+        }
     }
 
     private static void problem(HttpServletResponse response, int status, String problem) throws IOException {

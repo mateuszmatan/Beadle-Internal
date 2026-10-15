@@ -12,6 +12,7 @@ import org.springframework.test.context.DynamicPropertySource
 
 import java.time.Instant
 
+import static java.nio.charset.StandardCharsets.UTF_8
 import static java.time.temporal.ChronoUnit.SECONDS
 import static org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT
 
@@ -43,7 +44,7 @@ abstract class BeadleInternalSpecification extends ServiceSpecification {
 
     @Override
     ServiceClient getApi() {
-        super.api.withHeaders([Authorization: "Bearer $TOKEN" as String, 'X-Beadle-User': USER,
+        super.api.withHeaders([Authorization: "Bearer $TOKEN" as String, 'X-Beadle-User': URLEncoder.encode(USER, UTF_8),
                                'X-Correlation-Id': correlationId])
     }
 

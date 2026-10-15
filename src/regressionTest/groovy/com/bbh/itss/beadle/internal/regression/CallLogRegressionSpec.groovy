@@ -76,6 +76,18 @@ class CallLogRegressionSpec extends BeadleInternalSpecification {
         callLog()*.userName == ['u' * 197 + '...', 'unknown']
     }
 
+    def "a user whose name has Polish letters is logged by that name, sent percent-encoded as the contract says"() {
+        given:
+        String user = 'Łukasz Wójcik'
+
+        when:
+        def found = api.withHeaders(['X-Beadle-User': URLEncoder.encode(user, 'UTF-8')]).get('/api/internal/qtest/projects')
+
+        then:
+        found.status == 200
+        callLog()*.userName == [user]
+    }
+
     def "a correlation id too long to be logged and passed on is refused before any system is called"() {
         given:
         def caller = anonymous.withHeaders([Authorization: "Bearer $TOKEN".toString(), 'X-Beadle-User': USER,

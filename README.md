@@ -17,10 +17,12 @@ and the callback to Beadle-GUI. The code follows it to the letter.
 ## API
 
 Every call carries `Authorization: Bearer <BEADLE_SERVICE_TOKEN>` (otherwise `401`), and from Beadle-GUI
-`X-Beadle-User` (the signed-in user, only logged: cut to the 200 bytes the call log holds, `unknown` when missing)
-and `X-Correlation-Id` (one per user action, logged and passed on in callbacks; a fresh one is minted when it is
-missing, and one longer than 100 bytes is refused with `400`, since cutting it would lose the callbacks of the
-action). Answers are JSON, errors `application/problem+json` with
+`X-Beadle-User` (the signed-in user, only logged; percent-encoded in UTF-8 as `URLEncoder` writes it, so that a
+name such as `Łukasz Wójcik` survives the header as `%C5%81ukasz+W%C3%B3jcik`, and decoded before it is logged, a
+value that is not valid percent-encoding taken as it came; the decoded name is cut to the 200 bytes the call log
+holds, `unknown` when missing) and `X-Correlation-Id` (one per user action, logged and passed on in callbacks; a
+fresh one is minted when it is missing, and one longer than 100 bytes is refused with `400`, since cutting it would
+lose the callbacks of the action). Answers are JSON, errors `application/problem+json` with
 `status`, `title`, `detail` and, for validation, `problems: [{"field", "message"}]`. A system that cannot be
 reached or refuses the call answers `502` naming the system and its reason.
 
@@ -66,9 +68,9 @@ cleared.
 ### Call log
 
 `BEADLE_INTERNAL_CALL_LOG` holds one row per call to Jira, CyberTrack, Confluence, qTest or Beadle-GUI, demo adapters
-included: when, the user (`X-Beadle-User`, `unknown` without it, or `system` for the poll), the correlation id, the
-system, the operation, its target, `SUCCESS` or `FAILURE` with the message, and the duration. The row is written in
-its own transaction, and a call log that cannot be written never fails the call.
+included: when, the user (`X-Beadle-User` decoded, `unknown` without it, or `system` for the poll), the correlation
+id, the system, the operation, its target, `SUCCESS` or `FAILURE` with the message, and the duration. The row is
+written in its own transaction, and a call log that cannot be written never fails the call.
 
 ## Repository layout
 

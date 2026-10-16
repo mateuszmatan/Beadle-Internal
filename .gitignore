@@ -14,9 +14,3 @@ data/
 
 .gradle/
 build/
-.kotlin/
-
-node_modules/
-.angular/
-dist/
-coverage/

@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+configMapGenerator:
+  - name: beadle-internal-config
+    behavior: merge
+    literals:
+      - SPRING_PROFILES_ACTIVE=qc
+      # The systems of qc: fill in each URL before applying. Beadle-Internal does not start on rd, qc or prod while
+      # one is blank, since its demo adapter would answer in its place; <SYSTEM>_DEMO=true runs a system on its
+      # demo on purpose.
+      - JIRA_URL=
+      - CYBERTRACK_URL=
+      - CONFLUENCE_URL=
+      - QTEST_URL=

@@ -1,0 +1,55 @@
+package com.bbh.itss.beadle.internal.domain.shared;
+
+import com.bbh.itss.beadle.internal.domain.shared.InvalidRequestException.FieldProblem;
+import lombok.AllArgsConstructor;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+
+import static com.bbh.itss.beadle.internal.domain.shared.Text.bytes;
+import static lombok.AccessLevel.PRIVATE;
+import static org.apache.commons.lang3.StringUtils.trimToEmpty;
+
+@AllArgsConstructor(access = PRIVATE)
+public class ValidationProblems {
+
+    private final String prefix;
+    private final List<FieldProblem> problems;
+
+    public ValidationProblems() {
+        this("", new ArrayList<>());
+    }
+
+    public ValidationProblems at(String path) {
+        return new ValidationProblems(prefix + path + ".", problems);
+    }
+
+    public void add(String field, String message) {
+        problems.add(new FieldProblem(prefix + field, message));
+    }
+
+    public ValidationProblems require(String field, Object value, String message) {
+        if (value == null || value instanceof Collection<?> values && values.isEmpty()) {
+            add(field, message);
+        }
+        return this;
+    }
+
+    public ValidationProblems fits(String field, String text, int maxBytes) {
+        if (bytes(trimToEmpty(text)) > maxBytes) {
+            add(field, "is too long: it may take at most " + maxBytes + " bytes");
+        }
+        return this;
+    }
+
+    public List<FieldProblem> list() {
+        return List.copyOf(problems);
+    }
+
+    public void throwIfAny() {
+        if (!problems.isEmpty()) {
+            throw new InvalidRequestException(problems);
+        }
+    }
+}

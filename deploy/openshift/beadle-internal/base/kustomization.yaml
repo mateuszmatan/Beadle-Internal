@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/name: beadle-internal
+      app.kubernetes.io/part-of: beadle
+# No Route: only Beadle-GUI calls the API, inside the cluster through the Service (http://beadle-internal:8082), so
+# nothing of Beadle-Internal is published outside it.
+resources:
+  - deployment.yaml
+  - service.yaml
+configMapGenerator:
+  - name: beadle-internal-config
+    literals:
+      - SPRING_PROFILES_ACTIVE=rd
+      - BEADLE_GUI_URL=http://beadle:8081
+      - JIRA_URL=
+      - JIRA_EPIC_LINK_FIELD=customfield_10014
+      - CYBERTRACK_URL=
+      - CYBERTRACK_PROJECT_KEY=SCP
+      - CYBERTRACK_ISSUE_TYPE=Task
+      - CYBERTRACK_POLL=PT5M
+      - CYBERTRACK_CLOSED_STATUSES=Done,Closed,Resolved,Cancelled,Canceled,Rejected,Won't Do
+      - CYBERTRACK_MAX_MISSES=12
+      - CONFLUENCE_URL=
+      - QTEST_URL=
+      - QTEST_CONCURRENCY=8
+      - QTEST_BUDGET=20s

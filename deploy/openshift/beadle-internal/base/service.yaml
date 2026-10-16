@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: beadle-internal
+spec:
+  ports:
+    - name: http
+      port: 8082
+      targetPort: http
+      protocol: TCP

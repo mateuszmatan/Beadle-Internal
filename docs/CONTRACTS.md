@@ -1,7 +1,6 @@
 # Beadle: the three repositories and the contracts between them
 
-Source of everything: `mateuszmatan/DSOMgmtPortal` @ `278766b` (2026-10-15). Three repositories are cut out of it,
-each with the git history of its files. This document is the shared contract; every repository carries a copy in
+Beadle is built from three repositories. This document is the shared contract; every repository carries a copy in
 `docs/CONTRACTS.md` and the code must match it. Code, comments, commit messages and documentation are in English.
 
 ```
@@ -17,16 +16,16 @@ each with the git history of its files. This document is the shared contract; ev
 ## Conventions shared by the three repositories
 
 - Java 21, Spring Boot 4.1.1 and the Gradle 8.14 wrapper, Groovy 5 + Spock 2.4 tests, Lombok, Liquibase, Jacoco,
-  exactly as in `gradle/libs.versions.toml` and `settings.gradle` of DSOMgmtPortal (BBH Nexus when reachable,
+  exactly as in `gradle/libs.versions.toml` and `settings.gradle` of Beadle-GUI (BBH Nexus when reachable,
   Gradle Plugin Portal + Maven Central + registry.npmjs.org otherwise; keep that logic as it is).
 - Spring profiles: `local` (default: H2 file database in Oracle mode, demo adapters, test user) and `oracle`,
   grouped into `rd`, `qc`, `prod` (Oracle from `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`; real adapters).
   Liquibase runs on every start with `ddl-auto: validate`.
-- Hexagonal layout and naming as in DSOMgmtPortal: `adapter/in/web`, `adapter/out/<system>`,
+- Hexagonal layout and naming as in Beadle-GUI: `adapter/in/web`, `adapter/out/<system>`,
   `application/<area>` with `port/in` and `port/out`, `domain/<area>`, `config`. ArchUnit `ArchitectureSpec` keeps
   the layers apart.
 - Base packages: `com.bbh.itss.beadle` (Beadle-GUI backend), `com.bbh.itss.beadle.internal` (Beadle-Internal),
-  `com.bbh.itss.beadle.protech` (Beadle-ProTech). Configuration prefix `beadle.` (was `dso.`).
+  `com.bbh.itss.beadle.protech` (Beadle-ProTech). Configuration prefix `beadle.`.
 - Names: the ServiceNow instance of BBH is called **ProTech** everywhere in code, configuration, documentation and
   the interface (`ProTechPort`, `adapter/out/protech`, `beadle.protech.*`, `proTechConnected`). The word
   ServiceNow appears only where the product or its REST API is meant (for example in the comments of the real
@@ -39,7 +38,7 @@ each with the git history of its files. This document is the shared contract; ev
 - Secrets (tokens, passwords, client secrets) come from environment variables that OpenShift fills from secrets;
   none is ever written to a repository, a log or a test fixture.
 - Every repository builds and tests with `./gradlew build` and ships a `Dockerfile` plus
-  `deploy/openshift/<app>/{base,overlays/{rd,qc,prod}}` (kustomize), on the pattern of DSOMgmtPortal.
+  `deploy/openshift/<app>/{base,overlays/{rd,qc,prod}}` (kustomize), on the pattern of Beadle-GUI.
 - Commit messages end with
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` and
   `Claude-Session: https://claude.ai/code/session_01DK64WyTTEZusvWgXF1UdQX` on the last two lines.
@@ -65,7 +64,7 @@ default `http://localhost:8081`). Ports: GUI 8081, Internal 8082, ProTech 8083.
 
 ## Beadle-ProTech REST API (`/api/protech`)
 
-Mirrors the former `ServiceNowPort` and `ProTechLookupPort` of DSOMgmtPortal one to one, so that
+Mirrors the `ProTechPort` and `ProTechLookupPort` of Beadle-GUI one to one, so that
 `ProductionChangeService` in Beadle-GUI keeps working through a REST adapter.
 
 | Method and path | Body | Answer |
@@ -79,7 +78,7 @@ Mirrors the former `ServiceNowPort` and `ProTechLookupPort` of DSOMgmtPortal one
 | `GET /api/protech/lookups/{kind}?q=&limit=20` | | `[{"value": "...", "detail": "..."}]`; `kind` is one of `users`, `departments`, `assignment-groups`, `releases`, `configuration-items`, `incidents`, `problems`, `clients` |
 
 `Change` and `ChangeTask` are the JSON Jackson makes of the records `ProductionChange` and `ChangeTask` of
-DSOMgmtPortal @ `278766b` (`domain/change`), with every nested record (`ChangeSchedule`, `ChangeTemplate` and its
+Beadle-GUI (`domain/change`), with every nested record (`ChangeSchedule`, `ChangeTemplate` and its
 `Approvers`, `Timing`, `Planning`, `PrivilegedAccess`, `TaskDetails`, `ChangeApproval`, `WorkflowStep`, `Reminder`,
 `ChangeUpdate`) and enum (`ChangeState`, `ApprovalRole`, `ApprovalState`, `TaskState`) by its Java field names.
 Beadle-GUI serialises its domain records; Beadle-ProTech has its own copy of the records (cut out with their
@@ -104,9 +103,9 @@ the audit trail as actor `system:protech`.
 | `GET /api/internal/jira/projects/{key}/stories?fixVersion=&epicKeys=CERT-12,CERT-13` | | `[JiraIssue]` with `epicKey` set |
 | `POST /api/internal/cybertrack/tickets` | `{"changeNumber": "CHG0001234", "applicationName": "CertScanner", "implementationDate": "2026-10-20", "inputs": {"apoNumber": "...", "bitbucketUrl": "...", "artifactLink": "...", "qcApplicationLink": "..."}}` (the former `SecureCodingTicket`) | `201` `{"key": "SCP-123", "url": "https://.../browse/SCP-123" or null}` |
 | `GET /api/internal/cybertrack/tickets/{key}` | | `{"key": "SCP-123", "status": "To Do", "url": ..., "updated": "2026-10-15T09:00:00Z"}` |
-| `GET /api/internal/confluence/pages?spaceKey=&title=` | | `[{"id": "123", "spaceKey": "DSO", "title": "...", "version": 3, "url": "..."}]` |
+| `GET /api/internal/confluence/pages?spaceKey=&title=` | | `[{"id": "123", "spaceKey": "BEADLE", "title": "...", "version": 3, "url": "..."}]` |
 | `GET /api/internal/confluence/pages/{id}` | | the page with `body` (Confluence storage format) |
-| `POST /api/internal/confluence/pages` | `{"spaceKey": "DSO", "title": "...", "parentId": "123" or null, "body": "<p>...</p>"}` | `201` the page |
+| `POST /api/internal/confluence/pages` | `{"spaceKey": "BEADLE", "title": "...", "parentId": "123" or null, "body": "<p>...</p>"}` | `201` the page |
 | `PUT /api/internal/confluence/pages/{id}` | `{"title": "...", "body": "...", "version": 3}` (the version being replaced) | the page with `version` + 1 |
 | `GET /api/internal/qtest/projects` | | `[{"id": 1, "name": "..."}]` |
 | `GET /api/internal/qtest/projects/{id}/test-cycles` | | `[{"id": 10, "name": "Release 1.4", "pid": "CL-10"}]` |
@@ -133,8 +132,7 @@ Beadle-GUI is the system of record and the only place with an audit trail of use
 keep a call log of their own (who caused the call, correlation id, system, operation, target, outcome, message,
 duration), in their own tables `BEADLE_INTERNAL_CALL_LOG` and `BEADLE_PROTECH_CALL_LOG`.
 
-Table `BEADLE_ACTION_HISTORY` (Liquibase change set `028-action-history.sql` on top of the existing changelog, whose
-files and checksums stay untouched): `ID`, `AT` (timestamp, UTC), `USER_NAME`, `ACTION`, `OBJECT_TYPE`,
+Table `BEADLE_ACTION_HISTORY` (Liquibase change set `002-action-history.sql` on top of `001-baseline.sql`): `ID`, `AT` (timestamp, UTC), `USER_NAME`, `ACTION`, `OBJECT_TYPE`,
 `OBJECT_ID`, `OBJECT_KEY` (the CHG, CTASK, product code or ticket key a person would search for), `DETAILS`
 (CLOB, JSON of the request without secrets, trimmed to 32 KB), `OUTCOME` (`SUCCESS` or `FAILURE`), `MESSAGE`
 (the error message on failure), `CORRELATION_ID`, `DURATION_MS`. The application only inserts; nothing updates or

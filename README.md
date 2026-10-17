@@ -93,17 +93,16 @@ scheduling). `ArchitectureSpec` keeps them apart.
 
 ## Build
 
-Needs Java 21 on the `PATH`; the Gradle wrapper downloads Gradle 8.14 from the BBH Nexus inside BBH and from
-services.gradle.org outside (`settings.gradle` makes one `HEAD` request to the BBH Nexus to find out where it is;
-`-PbbhNetwork=false` or `true` overrides the check).
+Configured for Java 21; uses BBH Nexus (`tools.bbh.com/nexus`) repository configuration.
 
 ```bash
 ./gradlew build                 # the jar, every suite and the coverage gate (60% of lines)
 ./gradlew bootJar               # build/libs/beadle-internal-<version>.jar
-./gradlew test                  # the unit specs
+./gradlew test                  # the unit specs (Groovy / Spock, >= 60% coverage)
 ./gradlew regressionTest        # the API end to end on H2 with the demo adapters
-./gradlew publish -Pnexus.snapshotsUrl=<url>   # the jar to the BBH Nexus (bbhNexusUsername and bbhNexusPassword as Gradle properties)
-./gradlew bootJar -PartifactVersion=1.0.0
+./gradlew smokeTest             # health liveness/readiness and key API endpoints
+./gradlew performanceTest       # p95 latency benchmarks
+./gradlew publish -Pnexus.snapshotsUrl=<url>   # the jar to the BBH Nexus
 ```
 
 ## Configuration

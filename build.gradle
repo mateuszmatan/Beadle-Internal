@@ -105,17 +105,21 @@ testing {
             }
         }
 
-        if (file('src/regressionTest').isDirectory()) {
-            register('regressionTest', JvmTestSuite) {
-                dependencies {
-                    implementation project()
-                    implementation testFixtures(project())
-                }
-                targets.configureEach {
-                    testTask.configure {
-                        description = 'Runs the API end to end on H2 in Oracle mode with the demo adapters.'
-                        shouldRunAfter tasks.named('test')
-                        extensions.getByType(JacocoTaskExtension).enabled = false
+        [regressionTest : 'Runs the API end to end on H2 in Oracle mode with the demo adapters.',
+         smokeTest      : 'Starts the application and checks health and key API endpoints.',
+         performanceTest: 'Measures the p95 latencies of the main calls.'].each { suiteName, text ->
+            if (file("src/$suiteName").isDirectory()) {
+                register(suiteName, JvmTestSuite) {
+                    dependencies {
+                        implementation project()
+                        implementation testFixtures(project())
+                    }
+                    targets.configureEach {
+                        testTask.configure {
+                            description = text
+                            shouldRunAfter tasks.named('test')
+                            extensions.getByType(JacocoTaskExtension).enabled = false
+                        }
                     }
                 }
             }

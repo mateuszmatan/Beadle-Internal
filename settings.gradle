@@ -1,58 +1,24 @@
-import static java.net.Proxy.NO_PROXY
-
 pluginManagement {
   def bbhNexus = 'https://tools.bbh.com/nexus'
   def bbhNexusHttp = 'http://tools.bbh.com/nexus'
-  def reachable = { String url ->
-    try {
-      def connection = (HttpURLConnection) new URL(url).openConnection(NO_PROXY)
-      connection.requestMethod = 'HEAD'
-      connection.connectTimeout = 3000
-      connection.readTimeout = 5000
-      def code = connection.responseCode
-      logger.lifecycle("BBH network check: $url -> HTTP $code")
-      code < 400
-    } catch (IOException e) {
-      logger.lifecycle("BBH network check: $url -> ${e.class.simpleName}: ${e.message}")
-      false
-    }
-  }
-  def bbhNetwork = providers.gradleProperty('bbhNetwork').map { it != 'false' }
-    .getOrElse(reachable("$bbhNexus/repository/gradle-plugins/") || reachable("$bbhNexusHttp/content/groups/public/"))
-  gradle.ext.bbhNetwork = bbhNetwork
+
   gradle.ext.bbhRepositories = { RepositoryHandler repositories, boolean plugins ->
-    if (bbhNetwork) {
-      repositories.maven {
-        url = uri("$bbhNexusHttp/content/groups/public")
-        allowInsecureProtocol = true
-      }
-      repositories.maven { url = uri("$bbhNexus/repository/gradle-plugins/") }
-      repositories.maven { url = uri("$bbhNexus/repository/maven-public/") }
-      repositories.maven { url = uri("$bbhNexus/repository/maven-central/") }
-    } else {
-      if (plugins) {
-        repositories.gradlePluginPortal()
-      }
-      repositories.mavenCentral()
+    repositories.maven {
+      url = uri("$bbhNexusHttp/content/groups/public")
+      allowInsecureProtocol = true
     }
-  }
-  if (!bbhNetwork) {
-    ['http', 'https'].each { scheme ->
-      if (System.getProperty("${scheme}.proxyHost") == providers.gradleProperty('bbh.proxyHost').getOrElse('njproxy')) {
-        System.clearProperty("${scheme}.proxyHost")
-        System.clearProperty("${scheme}.proxyPort")
-      }
+    repositories.maven { url = uri("$bbhNexus/repository/gradle-plugins/") }
+    repositories.maven { url = uri("$bbhNexus/repository/maven-public/") }
+    repositories.maven { url = uri("$bbhNexus/repository/maven-central/") }
+    if (plugins) {
+      repositories.gradlePluginPortal()
     }
-    logger.lifecycle('The BBH Nexus is out of reach: plugins and libraries come from the Gradle Plugin Portal and Maven Central.')
-  } else {
-    logger.lifecycle('Using the BBH Nexus for plugins and libraries.')
+    repositories.mavenCentral()
   }
 
+  logger.lifecycle('Using BBH Nexus repository configuration for plugins and libraries.')
+
   repositories {
-    maven { url = 'https://tools.bbh.com/nexus/content/groups/public' }
-    maven { url = uri("https://tools.bbh.com/nexus/repository/gradle-plugins/") }
-    maven { url = uri("https://tools.bbh.com/nexus/repository/maven-public/") }
-    maven { url = uri("https://tools.bbh.com/nexus/repository/EXT_Cloudera") }
     gradle.ext.bbhRepositories(it, true)
   }
 

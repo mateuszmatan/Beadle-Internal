@@ -203,7 +203,7 @@ kustomize edit set image beadle-internal=<registry>/<project>/beadle-internal:0.
 oc apply -k .
 ```
 
-The Deployment runs 2 replicas for high availability with rolling updates (`RollingUpdate` strategy) and mounts emptyDir `/application/logs` for rolling logs. Callbacks to Beadle-GUI are idempotent.
+The Deployment runs 1 replica (`replicas: 1`) on test (`rd`, `qc`) and production (`prod`) OpenShift environments. Redundant instances are not needed because OpenShift automatically respawns the pod if it becomes unavailable. It mounts emptyDir `/application/logs` for rolling logs. Callbacks to Beadle-GUI are idempotent.
 
 ## Tests
 

@@ -13,27 +13,11 @@ All three services require a shared security token configured in `BEADLE_SERVICE
 
 ## 1. Running Locally (All 3 Services)
 
-### Option A: Docker Compose (Fastest & Simplest)
-Runs all three services in containers with embedded H2 databases and demo adapters.
+On a BBH developer laptop, all three services can be run directly as native Java / Gradle applications without needing Docker, using embedded H2 databases.
 
-```bash
-# 1. Navigate to docker deploy directory in Beadle-GUI
-cd deploy/docker
+### Option A: Side-by-Side via Gradle (Recommended - No Docker Needed)
 
-# 2. Start all 3 services
-export BEADLE_SERVICE_TOKEN=local-dev
-docker compose up --build
-```
-- **Web UI**: `http://localhost:8081`
-- **Default User**: `Mateusz Matan`
-
-To stop: `docker compose down`.
-
----
-
-### Option B: Side-by-Side via Gradle (For Active Development)
-
-1. **Set the shared token** in every terminal session:
+1. **Set the shared token** in each terminal session:
    ```bash
    export BEADLE_SERVICE_TOKEN=local-dev
    ```
@@ -63,9 +47,27 @@ To stop: `docker compose down`.
 
 ---
 
-## 2. Deploying to OpenShift (Multi-Pod on Oracle DB)
+### Option B: Docker Compose (All-in-One Alternative)
+Runs all three services in containers with embedded H2 databases and demo adapters.
 
-All services deploy as 2 replicas (`RollingUpdate` strategy) connected to Oracle DB.
+```bash
+# 1. Navigate to docker deploy directory in Beadle-GUI
+cd deploy/docker
+
+# 2. Start all 3 services
+export BEADLE_SERVICE_TOKEN=local-dev
+docker compose up --build
+```
+- **Web UI**: `http://localhost:8081`
+- **Default User**: `Mateusz Matan`
+
+To stop: `docker compose down`.
+
+---
+
+## 2. Deploying to OpenShift (Single Instance per Service on Oracle DB)
+
+All services deploy as a single pod (`replicas: 1`) connected to Oracle DB on test (`rd`, `qc`) and production (`prod`) environments. Redundant instances are not needed because OpenShift automatically respawns any pod if it becomes unavailable.
 
 ### Step 1: Build and Push Container Images
 In each repository:
@@ -138,7 +140,7 @@ oc apply -k .
 
 ### Step 4: Verify Deployment
 ```bash
-# Check all pods (2 replicas each)
+# Check all pods (1 replica each)
 oc get pods -l 'app in (beadle, beadle-internal, beadle-protech)'
 
 # Get public Beadle URL

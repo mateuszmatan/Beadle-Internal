@@ -1,5 +1,3 @@
-import org.springframework.boot.gradle.plugin.SpringBootPlugin
-
 plugins {
     alias(libs.plugins.spring.boot)
     alias(libs.plugins.spring.dependency.management)
@@ -20,18 +18,8 @@ java {
     }
 }
 
-tasks.withType(JavaCompile).configureEach {
-    options.compilerArgs << '-parameters'
-}
-
 base {
     archivesName = 'beadle-internal'
-}
-
-dependencyManagement {
-    imports {
-        mavenBom SpringBootPlugin.BOM_COORDINATES
-    }
 }
 
 configurations {
@@ -47,13 +35,13 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-restclient'
     implementation 'org.apache.commons:commons-lang3'
     implementation libs.commons.collections4
+    implementation libs.shedlock.spring
+    implementation libs.shedlock.jdbc
     runtimeOnly 'com.h2database:h2'
     runtimeOnly 'com.oracle.database.jdbc:ojdbc11'
 
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
-    testCompileOnly 'org.projectlombok:lombok'
-    testAnnotationProcessor 'org.projectlombok:lombok'
 
     testFixturesApi 'org.springframework.boot:spring-boot-starter-test'
     testFixturesApi 'org.springframework.boot:spring-boot-starter-webmvc-test'
@@ -66,21 +54,13 @@ dependencies {
     testFixturesApi libs.archunit.junit5
 }
 
-sonar {
-    properties {
-        property "sonar.host.url", "https://tools.bbh.com/sonar"
-        property "sonar.token", System.getenv("SONAR_AUTH_TOKEN")
-        property "sonar.projectKey", "Beadle-Internal"
-        property "sonar.projectName", "Beadle-Internal"
-        property "sonar.java.binaries", "build/classes/java/main"
-        property "sonar.groovy.binaries", "build/classes/groovy/test"
-        property "sonar.coverage.jacoco.xmlReportPaths", "build/reports/jacoco/test/jacocoTestReport.xml"
-    }
-}
-
 jacoco {
     toolVersion = libs.versions.jacoco.get()
 }
+
+def extraSuites = [smokeTest      : 'Starts the application and checks health and the key endpoints.',
+                   regressionTest : 'Runs the most important journeys end to end on H2 in Oracle mode with the demo adapters.',
+                   performanceTest: 'Measures the p95 latencies of the key calls.']
 
 testing {
     suites {
@@ -88,7 +68,9 @@ testing {
             useJUnitJupiter()
             targets.configureEach {
                 testTask.configure {
-                    jvmArgs '-XX:+EnableDynamicAgentLoading'
+                    // C1 only: the test JVMs are short-lived, so they start Spring faster than with full JIT.
+                    jvmArgs '-XX:+EnableDynamicAgentLoading', '-XX:TieredStopAtLevel=1'
+                    systemProperty 'LOG_PATH', layout.buildDirectory.dir('logs').get().asFile.path
                     testLogging {
                         events 'failed'
                         exceptionFormat = 'full'
@@ -96,69 +78,87 @@ testing {
                 }
             }
         }
-
-        test {
-            targets.configureEach {
-                testTask.configure {
-                    finalizedBy tasks.named('jacocoTestReport')
+        extraSuites.each { suiteName, text ->
+            register(suiteName, JvmTestSuite) {
+                dependencies {
+                    implementation project()
+                    implementation testFixtures(project())
                 }
-            }
-        }
-
-        [regressionTest : 'Runs the API end to end on H2 in Oracle mode with the demo adapters.',
-         smokeTest      : 'Starts the application and checks health and key API endpoints.',
-         performanceTest: 'Measures the p95 latencies of the main calls.'].each { suiteName, text ->
-            if (file("src/$suiteName").isDirectory()) {
-                register(suiteName, JvmTestSuite) {
-                    dependencies {
-                        implementation project()
-                        implementation testFixtures(project())
-                    }
-                    targets.configureEach {
-                        testTask.configure {
-                            description = text
-                            shouldRunAfter tasks.named('test')
-                            extensions.getByType(JacocoTaskExtension).enabled = false
-                        }
+                targets.configureEach {
+                    testTask.configure {
+                        description = text
+                        shouldRunAfter tasks.named('test')
                     }
                 }
             }
         }
     }
-}
-
-tasks.named('check') {
-    dependsOn testing.suites.withType(JvmTestSuite).matching { it.name != 'test' }
 }
 
 def coveredClasses = sourceSets.main.output.classesDirs.asFileTree.matching {
     exclude '**/*Application.class'
 }
 
-tasks.named('jacocoTestReport') {
-    classDirectories.setFrom(coveredClasses)
-    reports {
-        xml.required = true
-        html.required = true
-    }
-}
-
-tasks.named('jacocoTestCoverageVerification') {
-    classDirectories.setFrom(coveredClasses)
-    violationRules {
+def lineCoverage = { BigDecimal minimum ->
+    return {
         rule {
-            element = 'BUNDLE'
             limit {
                 counter = 'LINE'
                 value = 'COVEREDRATIO'
-                minimum = providers.gradleProperty('coverage.minimum').getOrElse('0.60') as BigDecimal
+                it.minimum = minimum
             }
         }
     }
 }
 
+tasks.named('test') {
+    finalizedBy tasks.named('jacocoTestReport')
+}
+
+tasks.named('jacocoTestReport') {
+    classDirectories.setFrom(coveredClasses)
+    reports.xml.required = true
+}
+
+tasks.named('jacocoTestCoverageVerification') {
+    classDirectories.setFrom(coveredClasses)
+    violationRules lineCoverage(0.60)
+}
+
+def suiteTasks = extraSuites.keySet().collect { tasks.named(it) }
+
+def jacocoSuitesReport = tasks.register('jacocoSuitesReport', JacocoReport) {
+    description = 'Coverage of the smoke, regression and performance suites together.'
+    group = 'verification'
+    mustRunAfter suiteTasks
+    executionData.setFrom(suiteTasks.collect { it.map { task -> task.extensions.getByType(JacocoTaskExtension).destinationFile } })
+    sourceDirectories.setFrom(sourceSets.main.allSource.srcDirs)
+    classDirectories.setFrom(coveredClasses)
+    reports.xml.required = true
+}
+
+def jacocoSuitesCoverageVerification = tasks.register('jacocoSuitesCoverageVerification', JacocoCoverageVerification) {
+    description = 'Fails the build when the suites cover less than 30% of the lines.'
+    group = 'verification'
+    mustRunAfter suiteTasks
+    executionData.setFrom(jacocoSuitesReport.map { it.executionData })
+    sourceDirectories.setFrom(sourceSets.main.allSource.srcDirs)
+    classDirectories.setFrom(coveredClasses)
+    violationRules lineCoverage(0.30)
+}
+
 tasks.named('check') {
-    dependsOn tasks.named('jacocoTestCoverageVerification')
+    dependsOn suiteTasks, tasks.named('jacocoTestCoverageVerification'), jacocoSuitesReport, jacocoSuitesCoverageVerification
+}
+
+sonar {
+    properties {
+        property 'sonar.host.url', 'https://tools.bbh.com/sonar'
+        property 'sonar.token', System.getenv('SONAR_AUTH_TOKEN')
+        property 'sonar.projectKey', 'Beadle-Internal'
+        property 'sonar.projectName', 'Beadle-Internal'
+        property 'sonar.coverage.jacoco.xmlReportPaths', 'build/reports/jacoco/test/jacocoTestReport.xml'
+    }
 }
 
 tasks.named('sonar') {
@@ -187,7 +187,6 @@ publishing {
 }
 
 tasks.named('publish') {
-    dependsOn tasks.named('bootJar')
     doFirst {
         if (!nexusPublishUrl) {
             throw new GradleException("Set -P${nexusPublishProperty}=<url> to publish beadle-internal to the BBH Nexus.")

@@ -1,25 +1,17 @@
 pluginManagement {
-  def bbhNexus = 'https://tools.bbh.com/nexus'
-  def bbhNexusHttp = 'http://tools.bbh.com/nexus'
-
-  gradle.ext.bbhRepositories = { RepositoryHandler repositories, boolean plugins ->
+  // Beadle builds inside the BBH network only: plugins and libraries come from the BBH Nexus.
+  gradle.ext.bbhNexus = { RepositoryHandler repositories ->
     repositories.maven {
-      url = uri("$bbhNexusHttp/content/groups/public")
+      url = uri('http://tools.bbh.com/nexus/content/groups/public')
       allowInsecureProtocol = true
     }
-    repositories.maven { url = uri("$bbhNexus/repository/gradle-plugins/") }
-    repositories.maven { url = uri("$bbhNexus/repository/maven-public/") }
-    repositories.maven { url = uri("$bbhNexus/repository/maven-central/") }
-    if (plugins) {
-      repositories.gradlePluginPortal()
+    ['gradle-plugins', 'maven-public', 'maven-central'].each { name ->
+      repositories.maven { url = uri("https://tools.bbh.com/nexus/repository/$name/") }
     }
-    repositories.mavenCentral()
   }
 
-  logger.lifecycle('Using BBH Nexus repository configuration for plugins and libraries.')
-
   repositories {
-    gradle.ext.bbhRepositories(it, true)
+    gradle.ext.bbhNexus(it)
   }
 
   resolutionStrategy {
@@ -34,7 +26,7 @@ pluginManagement {
 dependencyResolutionManagement {
   repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
   repositories {
-    gradle.ext.bbhRepositories(it, false)
+    gradle.ext.bbhNexus(it)
   }
 }
 

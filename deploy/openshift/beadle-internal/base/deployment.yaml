@@ -81,3 +81,9 @@ spec:
             capabilities:
               drop:
                 - ALL
+          volumeMounts:
+            - name: logs
+              mountPath: /application/logs
+      volumes:
+        - name: logs
+          emptyDir: {}

@@ -19,6 +19,10 @@ import java.util.List;
 import static org.springframework.data.domain.Sort.Direction.DESC;
 import static org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW;
 
+/**
+ * The call log: each entry is written in a transaction of its own, so that it stays even when the call it records
+ * failed the transaction around it.
+ */
 @Component
 class CallLogPersistenceAdapter implements CallLogPort {
 

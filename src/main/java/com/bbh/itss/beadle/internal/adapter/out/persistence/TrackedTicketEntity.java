@@ -4,54 +4,37 @@ import com.bbh.itss.beadle.internal.domain.cybertrack.TrackedTicket;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
+import static lombok.AccessLevel.PRIVATE;
 import static lombok.AccessLevel.PROTECTED;
 
 @Entity
 @Table(name = "BEADLE_INTERNAL_CYBERTRACK_TICKET")
 @NoArgsConstructor(access = PROTECTED)
+@AllArgsConstructor(access = PRIVATE)
 class TrackedTicketEntity {
 
     @Id
     private String ticketKey;
-
     private String status;
-
     private String correlationId;
-
     private Instant createdAt;
-
     private Instant lastSeenAt;
-
     private Instant lastEventAt;
-
     private Instant closedAt;
-
     private boolean demo;
-
     private int misses;
-
     private String changeNumber;
-
     private String ticketUrl;
 
     static TrackedTicketEntity of(TrackedTicket ticket) {
-        TrackedTicketEntity entity = new TrackedTicketEntity();
-        entity.ticketKey = ticket.key();
-        entity.status = ticket.status();
-        entity.correlationId = ticket.correlationId();
-        entity.createdAt = ticket.createdAt();
-        entity.lastSeenAt = ticket.lastSeenAt();
-        entity.lastEventAt = ticket.lastEventAt();
-        entity.closedAt = ticket.closedAt();
-        entity.demo = ticket.demo();
-        entity.misses = ticket.misses();
-        entity.changeNumber = ticket.changeNumber();
-        entity.ticketUrl = ticket.url();
-        return entity;
+        return new TrackedTicketEntity(ticket.key(), ticket.status(), ticket.correlationId(), ticket.createdAt(),
+                ticket.lastSeenAt(), ticket.lastEventAt(), ticket.closedAt(), ticket.demo(), ticket.misses(),
+                ticket.changeNumber(), ticket.url());
     }
 
     TrackedTicket toDomain() {

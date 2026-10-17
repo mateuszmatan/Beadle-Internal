@@ -12,11 +12,6 @@ import static org.apache.commons.lang3.Strings.CI;
  */
 public record FollowUp(List<String> closedStatuses, int maxMisses) {
 
-    public static final List<String> CLOSED_STATUSES =
-            List.of("Done", "Closed", "Resolved", "Cancelled", "Canceled", "Rejected", "Won't Do");
-    public static final int MAX_MISSES = 12;
-    public static final FollowUp DEFAULT = new FollowUp(CLOSED_STATUSES, MAX_MISSES);
-
     public FollowUp {
         closedStatuses = clean(closedStatuses);
         if (closedStatuses.isEmpty()) {

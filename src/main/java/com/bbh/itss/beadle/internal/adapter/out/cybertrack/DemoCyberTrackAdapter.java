@@ -45,7 +45,6 @@ class DemoCyberTrackAdapter implements CyberTrackPort {
 
     static final Duration STEP = ofMinutes(2);
     static final List<String> STATUSES = List.of("To Do", "In Progress", "Done");
-    static final String TICKET = "CyberTrack ticket";
 
     private final Map<String, Instant> created = new ConcurrentHashMap<>();
     private final Clock clock;
@@ -116,7 +115,7 @@ class DemoCyberTrackAdapter implements CyberTrackPort {
      */
     private Instant createdAt(String key, Instant now) {
         if (!key.matches(Pattern.quote(prefix()) + "\\d+")) {
-            throw notFound(TICKET, key);
+            throw notFound(CyberTrackTicket.NAME, key);
         }
         return tracked.find(key).map(TrackedTicket::createdAt)
                 .orElseGet(() -> now.minus(STEP.multipliedBy(STATUSES.size() - 1L)));

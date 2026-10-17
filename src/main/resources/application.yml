@@ -80,9 +80,6 @@ spring:
     url: ${DB_URL:jdbc:h2:file:${BEADLE_INTERNAL_DATA_DIR:${user.home}/bbh-devsecops/beadle-internal}/beadle-internal;MODE=Oracle;DEFAULT_NULL_ORDERING=HIGH;AUTO_SERVER=TRUE}
     username: ${DB_USERNAME:sa}
     password: ${DB_PASSWORD:}
-  jpa:
-    hibernate:
-      ddl-auto: none
 management:
   endpoint:
     health:

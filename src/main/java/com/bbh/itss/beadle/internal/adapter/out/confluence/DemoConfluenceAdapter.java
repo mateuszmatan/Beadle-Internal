@@ -22,7 +22,6 @@ import static org.apache.commons.lang3.Strings.CI;
 @ConditionalOnExpression(NOT_CONFIGURED)
 class DemoConfluenceAdapter implements ConfluencePort {
 
-    static final String PAGE = "Confluence page";
     static final String DUPLICATE = "Confluence already has a page titled ";
 
     private final AtomicLong ids = new AtomicLong(100_000);
@@ -84,7 +83,7 @@ class DemoConfluenceAdapter implements ConfluencePort {
     private ConfluencePage existing(String id) {
         ConfluencePage page = pages.get(id);
         if (page == null) {
-            throw notFound(PAGE, id);
+            throw notFound(ConfluencePage.NAME, id);
         }
         return page;
     }

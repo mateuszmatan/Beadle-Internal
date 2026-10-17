@@ -31,8 +31,6 @@ import static java.time.temporal.ChronoUnit.DAYS;
 @RequiredArgsConstructor
 class DemoQTestAdapter implements QTestPort {
 
-    static final String PROJECT = "qTest project";
-    static final String CYCLE = "qTest test cycle";
     static final List<QTestProject> PROJECTS = List.of(new QTestProject(1, "CertScanner"),
             new QTestProject(2, "PayHub"));
     static final Map<Long, List<DemoCycle>> CYCLES = Map.of(
@@ -71,7 +69,7 @@ class DemoQTestAdapter implements QTestPort {
     @Override
     public List<QTestRun> runs(long projectId, long cycleId) {
         DemoCycle found = cyclesOf(projectId).stream().filter(cycle -> cycle.cycle().id() == cycleId).findFirst()
-                .orElseThrow(() -> notFound(CYCLE, cycleId));
+                .orElseThrow(() -> notFound(QTestCycle.NAME, cycleId));
         return found.runs(now(clock).truncatedTo(DAYS));
     }
 
@@ -83,7 +81,7 @@ class DemoQTestAdapter implements QTestPort {
     private static List<DemoCycle> cyclesOf(long projectId) {
         List<DemoCycle> cycles = CYCLES.get(projectId);
         if (cycles == null) {
-            throw notFound(PROJECT, projectId);
+            throw notFound(QTestProject.NAME, projectId);
         }
         return cycles;
     }

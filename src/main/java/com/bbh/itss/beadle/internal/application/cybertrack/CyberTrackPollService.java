@@ -45,7 +45,6 @@ import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 @RequiredArgsConstructor
 public class CyberTrackPollService implements CyberTrackPollUseCase {
 
-    static final String TICKET = "CyberTrack ticket";
     static final String DEMO_TICKET = "the demo CyberTrack made it up, and CyberTrack is configured now";
     static final String REAL_TICKET = "it was created in CyberTrack, and the demo plays CyberTrack now";
 
@@ -101,7 +100,7 @@ public class CyberTrackPollService implements CyberTrackPollUseCase {
     private void missed(TrackedTicket ticket, Instant now, Map<String, String> dropped, Map<String, String> failures) {
         TrackedTicket missed = ticket.missed(now, followUp);
         tracked.save(missed);
-        String reason = notFound(TICKET, ticket.key()).getMessage();
+        String reason = notFound(CyberTrackTicket.NAME, ticket.key()).getMessage();
         if (missed.open()) {
             failures.put(ticket.key(), reason + " (" + missed.misses() + " of " + followUp.maxMisses()
                     + " polls in a row before it is dropped)");

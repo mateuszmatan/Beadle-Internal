@@ -1,12 +1,10 @@
 package com.bbh.itss.beadle.internal.domain.cybertrack;
 
 import com.bbh.itss.beadle.internal.domain.shared.ValidationProblems;
-import lombok.Builder;
 
 import static com.bbh.itss.beadle.internal.domain.shared.Text.isUrl;
 import static org.apache.commons.lang3.StringUtils.trimToNull;
 
-@Builder(toBuilder = true)
 public record SecureCoding(String apoNumber, String bitbucketUrl, String artifactLink, String qcApplicationLink) {
 
     public static final SecureCoding NONE = new SecureCoding(null, null, null, null);

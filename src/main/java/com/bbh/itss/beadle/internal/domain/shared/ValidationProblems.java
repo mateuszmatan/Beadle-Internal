@@ -43,10 +43,6 @@ public class ValidationProblems {
         return this;
     }
 
-    public List<FieldProblem> list() {
-        return List.copyOf(problems);
-    }
-
     public void throwIfAny() {
         if (!problems.isEmpty()) {
             throw new InvalidRequestException(problems);

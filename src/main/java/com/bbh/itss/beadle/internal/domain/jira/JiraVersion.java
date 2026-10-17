@@ -9,6 +9,8 @@ import static java.util.Comparator.reverseOrder;
 
 public record JiraVersion(String name, boolean released, LocalDate releaseDate) {
 
+    public static final String PROJECT = "Jira project";
+
     public static final Comparator<JiraVersion> UNRELEASED_NEWEST_FIRST = comparing(JiraVersion::released)
             .thenComparing(JiraVersion::releaseDate, nullsFirst(reverseOrder()))
             .thenComparing(JiraVersion::name, reverseOrder());

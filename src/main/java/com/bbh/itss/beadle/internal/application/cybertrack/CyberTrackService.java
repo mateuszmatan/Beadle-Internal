@@ -11,6 +11,7 @@ import com.bbh.itss.beadle.internal.domain.cybertrack.CyberTrackTicket;
 import com.bbh.itss.beadle.internal.domain.cybertrack.SecureCodingTicket;
 import com.bbh.itss.beadle.internal.domain.cybertrack.TrackedTicket;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.Clock;
 import java.util.Optional;
@@ -21,11 +22,11 @@ import static com.bbh.itss.beadle.internal.domain.shared.Failures.notFound;
 import static com.bbh.itss.beadle.internal.domain.shared.Timestamps.now;
 import static org.apache.commons.lang3.StringUtils.trimToNull;
 
+@Slf4j
 @UseCase
 @RequiredArgsConstructor
 public class CyberTrackService implements CyberTrackUseCase {
 
-    public static final String TICKET = "CyberTrack ticket";
 
     private final CyberTrackPort cyberTrack;
     private final TrackedTicketPort tracked;
@@ -46,9 +47,12 @@ public class CyberTrackService implements CyberTrackUseCase {
             Optional<TrackedTicket> raised = tracked.openFor(ticket.changeNumber())
                     .filter(open -> open.demo() == demo);
             if (raised.isPresent()) {
+                log.info("Change {} asked again for its secure coding ticket and gets {}", ticket.changeNumber(),
+                        raised.get().key());
                 return raised.get().asCreated();
             }
             CreatedTicket created = cyberTrack.create(ticket);
+            log.info("Raised the CyberTrack ticket {} for change {}", created.key(), ticket.changeNumber());
             tracked.track(TrackedTicket.created(created, ticket.changeNumber(), CallerContext.current().correlationId(),
                     now(clock), demo));
             return created;
@@ -60,7 +64,7 @@ public class CyberTrackService implements CyberTrackUseCase {
     public CyberTrackTicket read(String key) {
         String trimmed = trimToNull(key);
         if (trimmed == null) {
-            throw notFound(TICKET, key);
+            throw notFound(CyberTrackTicket.NAME, key);
         }
         return cyberTrack.read(trimmed);
     }

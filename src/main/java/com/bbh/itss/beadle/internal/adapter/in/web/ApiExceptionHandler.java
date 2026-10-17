@@ -2,6 +2,7 @@ package com.bbh.itss.beadle.internal.adapter.in.web;
 
 import com.bbh.itss.beadle.internal.domain.shared.InvalidRequestException;
 import com.bbh.itss.beadle.internal.domain.shared.InvalidRequestException.FieldProblem;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -26,10 +27,11 @@ import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
-import static org.springframework.http.HttpStatus.NOT_FOUND;
 import static org.springframework.http.HttpStatus.BAD_GATEWAY;
+import static org.springframework.http.HttpStatus.NOT_FOUND;
 import static org.springframework.http.ProblemDetail.forStatusAndDetail;
 
+@Slf4j
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
@@ -61,7 +63,6 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(UncheckedIOException.class)
     ProblemDetail unavailable(UncheckedIOException e) {
-        logger.warn("A system Beadle-Internal relies on could not be reached or refused the call: " + e.getMessage());
         return problem(BAD_GATEWAY, "Bad Gateway", e.getMessage());
     }
 
@@ -74,7 +75,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ProblemDetail unexpected(Exception e) {
-        logger.error("Beadle-Internal could not serve a request", e);
+        log.error("Beadle-Internal could not serve a request", e);
         return problem(INTERNAL_SERVER_ERROR, "Request failed",
                 "Beadle-Internal could not handle the request. The failure is in its log.");
     }

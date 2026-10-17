@@ -1,5 +1,6 @@
-package com.bbh.itss.beadle.internal.config;
+package com.bbh.itss.beadle.internal.adapter.in.web;
 
+import com.bbh.itss.beadle.internal.adapter.ServiceTokenProperties;
 import com.bbh.itss.beadle.internal.application.calllog.CallerContext;
 import com.bbh.itss.beadle.internal.domain.calllog.Caller;
 import jakarta.servlet.FilterChain;
@@ -24,8 +25,6 @@ import static com.bbh.itss.beadle.internal.domain.shared.Text.abbreviateBytes;
 import static com.bbh.itss.beadle.internal.domain.shared.Text.bytes;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.security.MessageDigest.isEqual;
-import static org.apache.commons.lang3.StringUtils.isBlank;
-import static org.apache.commons.lang3.StringUtils.removeStart;
 import static org.apache.commons.lang3.StringUtils.trimToEmpty;
 import static org.apache.commons.lang3.StringUtils.trimToNull;
 import static org.springframework.core.Ordered.HIGHEST_PRECEDENCE;
@@ -38,8 +37,8 @@ import static org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON_VALUE;
 /**
  * Lets through the calls that carry the Beadle service token and runs each one as the caller its headers name:
  * {@code X-Beadle-User} (percent-decoded, then cut to what the call log holds, {@value CallerContext#UNKNOWN_USER}
- * when missing) and {@code X-Correlation-Id} (a fresh one when missing). A correlation id longer than the call log and the followed
- * tickets hold is refused rather than cut, since Beadle-GUI matches the callbacks by it.
+ * when missing) and {@code X-Correlation-Id} (a fresh one when missing). A correlation id longer than the call log
+ * and the followed tickets hold is refused rather than cut, since Beadle-GUI matches the callbacks by it.
  */
 @Slf4j
 @Component
@@ -84,12 +83,10 @@ public class ServiceTokenFilter extends OncePerRequestFilter {
             problem(response, BAD_REQUEST.value(), CORRELATION_PROBLEM);
             return;
         }
-        CallerContext.set(new Caller(userOf(request.getHeader(USER_HEADER)),
-                correlationId == null ? UUID.randomUUID().toString() : correlationId));
-        try {
+        Caller caller = new Caller(userOf(request.getHeader(USER_HEADER)),
+                correlationId == null ? UUID.randomUUID().toString() : correlationId);
+        try (CallerContext.Scope scope = CallerContext.open(caller)) {
             chain.doFilter(request, response);
-        } finally {
-            CallerContext.clear();
         }
     }
 
@@ -100,14 +97,11 @@ public class ServiceTokenFilter extends OncePerRequestFilter {
      * percent-encoding is taken as it came. The decoded name is trimmed and cut to what the call log holds.
      */
     static String userOf(String header) {
-        String user = trimToNull(decoded(trimToNull(header)));
+        String user = header == null ? null : trimToNull(decoded(header.trim()));
         return user == null ? UNKNOWN_USER : abbreviateBytes(user, USER_MAX);
     }
 
     private static String decoded(String value) {
-        if (value == null) {
-            return null;
-        }
         try {
             return URLDecoder.decode(value, UTF_8);
         } catch (IllegalArgumentException notEncoded) {
@@ -123,9 +117,7 @@ public class ServiceTokenFilter extends OncePerRequestFilter {
     }
 
     boolean accepts(String authorization) {
-        if (token.length == 0 || isBlank(authorization) || !authorization.startsWith(BEARER)) {
-            return false;
-        }
-        return isEqual(token, removeStart(authorization, BEARER).trim().getBytes(UTF_8));
+        return token.length > 0 && authorization != null && authorization.startsWith(BEARER)
+                && isEqual(token, authorization.substring(BEARER.length()).trim().getBytes(UTF_8));
     }
 }

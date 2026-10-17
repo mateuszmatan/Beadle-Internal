@@ -1,14 +1,13 @@
 package com.bbh.itss.beadle.internal.adapter.out.jira;
 
+import com.bbh.itss.beadle.internal.adapter.out.http.SystemClient;
 import com.bbh.itss.beadle.internal.application.jira.port.out.JiraPort;
 import com.bbh.itss.beadle.internal.domain.jira.JiraIssue;
 import com.bbh.itss.beadle.internal.domain.jira.JiraVersion;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -24,28 +23,29 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static com.bbh.itss.beadle.internal.adapter.out.http.ExternalSystems.client;
-import static com.bbh.itss.beadle.internal.adapter.out.http.ExternalSystems.refusal;
-import static com.bbh.itss.beadle.internal.adapter.out.http.ExternalSystems.timestamp;
+import static com.bbh.itss.beadle.internal.adapter.out.http.Jql.list;
+import static com.bbh.itss.beadle.internal.adapter.out.http.Jql.quoted;
+import static com.bbh.itss.beadle.internal.adapter.out.http.SystemClient.thrown;
+import static com.bbh.itss.beadle.internal.adapter.out.http.SystemClient.timestamp;
 import static com.bbh.itss.beadle.internal.adapter.out.jira.JiraProperties.CONFIGURED;
 import static com.bbh.itss.beadle.internal.domain.shared.Failures.notFound;
 import static java.time.ZoneOffset.UTC;
-import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toCollection;
+import static org.apache.commons.collections4.ListUtils.emptyIfNull;
 import static org.apache.commons.collections4.ListUtils.partition;
 import static org.apache.commons.lang3.StringUtils.isBlank;
-import static org.springframework.http.MediaType.APPLICATION_JSON;
 
+/**
+ * The BBH Jira of the delivery teams, REST API v2, with the bearer token of the Beadle service account.
+ */
 @Component
 @ConditionalOnExpression(CONFIGURED)
 class JiraAdapter implements JiraPort {
 
-    static final String JIRA = "Jira";
-    static final String PROJECT = "Jira project";
     static final int PAGE_SIZE = 100;
     static final int MAX_ISSUES = 1_000;
-    static final String ORDER = " ORDER BY updated DESC, key ASC";
     static final int EPIC_BATCH = 100;
+    static final String ORDER = " ORDER BY updated DESC, key ASC";
     private static final Comparator<Issue> NEWEST_FIRST = Comparator
             .comparing(Issue::updated, Comparator.nullsLast(Comparator.<Instant>reverseOrder()))
             .thenComparing(Issue::key, JiraAdapter::keyOrder);
@@ -53,12 +53,12 @@ class JiraAdapter implements JiraPort {
     private static final ParameterizedTypeReference<List<Version>> VERSIONS = new ParameterizedTypeReference<>() {
     };
 
-    private final JiraProperties properties;
-    private final RestClient client;
+    private final String epicLinkField;
+    private final SystemClient jira;
 
     JiraAdapter(JiraProperties properties, RestClient.Builder builder) {
-        this.properties = properties;
-        this.client = client(builder, properties.url(), properties.token());
+        this.epicLinkField = properties.epicLinkField();
+        this.jira = new SystemClient("Jira", builder, properties.url(), properties.token());
     }
 
     @Override
@@ -68,15 +68,10 @@ class JiraAdapter implements JiraPort {
 
     @Override
     public List<JiraVersion> versions(String project) {
-        try {
-            List<Version> versions = client.get().uri("/rest/api/2/project/{key}/versions", project)
-                    .accept(APPLICATION_JSON).retrieve().body(VERSIONS);
-            return versions == null ? List.of() : versions.stream().map(Version::toVersion).toList();
-        } catch (HttpClientErrorException.NotFound e) {
-            throw notFound(PROJECT, project);
-        } catch (RestClientException e) {
-            throw refusal(JIRA, "read the versions of " + project, e);
-        }
+        List<Version> versions = jira.call("read the versions of " + project,
+                Map.of(404, thrown(() -> notFound(JiraVersion.PROJECT, project))),
+                client -> client.get().uri("/rest/api/2/project/{key}/versions", project).retrieve().body(VERSIONS));
+        return emptyIfNull(versions).stream().map(Version::toVersion).toList();
     }
 
     /**
@@ -92,7 +87,7 @@ class JiraAdapter implements JiraPort {
         String inVersion = "fixVersion = " + quoted(fixVersion);
         String epics = "project = " + quoted(project) + " AND issuetype = Epic AND ";
         Set<String> linked = search("project = " + quoted(project) + " AND issuetype != Epic AND " + inVersion + ORDER,
-                operation, true).stream().map(issue -> Issue.epicKey(issue.values(), properties.epicLinkField()))
+                operation, true).stream().map(issue -> Issue.epicKey(issue.values(), epicLinkField))
                 .filter(Objects::nonNull).collect(toCollection(LinkedHashSet::new));
         List<List<String>> batches = partition(new ArrayList<>(linked), EPIC_BATCH);
         if (batches.isEmpty()) {
@@ -101,7 +96,7 @@ class JiraAdapter implements JiraPort {
         }
         Map<String, Issue> found = new LinkedHashMap<>();
         for (int index = 0; index < batches.size(); index++) {
-            String keys = "key in " + keys(batches.get(index));
+            String keys = "key in " + list(batches.get(index));
             String jql = epics + (index == 0 ? "(" + inVersion + " OR " + keys + ")" : keys) + ORDER;
             search(jql, operation, false).forEach(issue -> found.putIfAbsent(issue.key(), issue));
         }
@@ -110,45 +105,36 @@ class JiraAdapter implements JiraPort {
 
     @Override
     public List<JiraIssue> stories(String project, String fixVersion, Collection<String> epicKeys) {
-        String keys = keys(epicKeys);
+        String keys = list(epicKeys);
         String jql = "project = " + quoted(project) + " AND issuetype != Epic AND fixVersion = " + quoted(fixVersion)
                 + " AND (parent in " + keys + " OR " + epicLinkClause() + " in " + keys + ")" + ORDER;
         return search(jql, "read the stories of " + fixVersion, true).stream()
-                .map(issue -> issue.toIssue(properties.epicLinkField())).toList();
+                .map(issue -> issue.toIssue(epicLinkField)).toList();
     }
 
     private List<Issue> search(String jql, String operation, boolean validate) {
         List<Issue> issues = new ArrayList<>();
-        try {
-            int total;
-            do {
-                Map<String, Object> body = new LinkedHashMap<>(Map.of("jql", jql, "startAt", issues.size(),
-                        "maxResults", PAGE_SIZE, "fields", List.of("summary", "status", "updated", "parent",
-                                properties.epicLinkField())));
-                if (!validate) {
-                    body.put("validateQuery", false);
-                }
-                SearchResult result = client.post().uri("/rest/api/2/search").contentType(APPLICATION_JSON)
-                        .accept(APPLICATION_JSON).body(body).retrieve().body(SearchResult.class);
-                if (result == null || result.issues() == null || result.issues().isEmpty()) {
-                    break;
-                }
-                issues.addAll(result.issues());
-                total = result.total();
-            } while (issues.size() < total && issues.size() < MAX_ISSUES);
-        } catch (RestClientException e) {
-            throw refusal(JIRA, operation, e);
-        }
+        int total;
+        do {
+            Map<String, Object> body = new LinkedHashMap<>(Map.of("jql", jql, "startAt", issues.size(),
+                    "maxResults", PAGE_SIZE, "fields", List.of("summary", "status", "updated", "parent", epicLinkField)));
+            if (!validate) {
+                body.put("validateQuery", false);
+            }
+            SearchResult result = jira.call(operation, client -> client.post().uri("/rest/api/2/search").body(body)
+                    .retrieve().body(SearchResult.class));
+            if (result == null || emptyIfNull(result.issues()).isEmpty()) {
+                break;
+            }
+            issues.addAll(result.issues());
+            total = result.total();
+        } while (issues.size() < total && issues.size() < MAX_ISSUES);
         return issues;
     }
 
     private String epicLinkClause() {
-        Matcher custom = CUSTOM_FIELD.matcher(properties.epicLinkField());
-        return custom.matches() ? "cf[" + custom.group(1) + "]" : quoted(properties.epicLinkField());
-    }
-
-    private static String keys(Collection<String> keys) {
-        return keys.stream().map(JiraAdapter::quoted).collect(joining(", ", "(", ")"));
+        Matcher custom = CUSTOM_FIELD.matcher(epicLinkField);
+        return custom.matches() ? "cf[" + custom.group(1) + "]" : quoted(epicLinkField);
     }
 
     /**
@@ -167,10 +153,6 @@ class JiraAdapter implements JiraPort {
                 Long.parseLong(right.substring(rightDash + 1)));
     }
 
-    static String quoted(String value) {
-        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
-    }
-
     record Version(String name, boolean released, String releaseDate) {
 
         JiraVersion toVersion() {
@@ -178,7 +160,7 @@ class JiraAdapter implements JiraPort {
         }
     }
 
-    record SearchResult(int startAt, int maxResults, int total, List<Issue> issues) {
+    record SearchResult(int total, List<Issue> issues) {
     }
 
     record Issue(String key, Map<String, Object> fields) {
@@ -192,11 +174,10 @@ class JiraAdapter implements JiraPort {
         }
 
         JiraIssue toIssue(String epicLinkField) {
-            Map<String, Object> values = values();
-            String updated = (String) values.get("updated");
-            return new JiraIssue(key, (String) values.get("summary"), nameOf(values.get("status")),
-                    epicLinkField == null ? null : epicKey(values, epicLinkField),
-                    updated == null ? null : timestamp(updated).atZone(UTC).toLocalDate());
+            Instant updated = updated();
+            return new JiraIssue(key, (String) values().get("summary"), nameOf(values().get("status")),
+                    epicLinkField == null ? null : epicKey(values(), epicLinkField),
+                    updated == null ? null : updated.atZone(UTC).toLocalDate());
         }
 
         static String epicKey(Map<String, Object> values, String epicLinkField) {

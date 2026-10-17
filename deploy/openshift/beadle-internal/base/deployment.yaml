@@ -3,12 +3,10 @@ kind: Deployment
 metadata:
   name: beadle-internal
 spec:
-  replicas: 1
+  replicas: 2
   revisionHistoryLimit: 5
-  # One pod at a time, also during a rollout: every pod polls the CyberTrack tickets it created and would send the
-  # same callbacks to Beadle-GUI.
   strategy:
-    type: Recreate
+    type: RollingUpdate
   template:
     spec:
       securityContext:

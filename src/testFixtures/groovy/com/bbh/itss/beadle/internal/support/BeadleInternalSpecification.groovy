@@ -23,7 +23,8 @@ import static org.springframework.boot.test.context.SpringBootTest.WebEnvironmen
  */
 @SpringBootTest(webEnvironment = RANDOM_PORT, properties = [
         'spring.datasource.url=jdbc:h2:mem:beadle-internal;MODE=Oracle;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000',
-        'beadle.services.token=regression-service-token'])
+        'beadle.services.token=regression-service-token',
+        'beadle.cybertrack.demo-poll=PT0.3S'])
 @ActiveProfiles('local')
 @Import(RegressionClock)
 abstract class BeadleInternalSpecification extends ServiceSpecification {

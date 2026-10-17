@@ -19,8 +19,8 @@ public class CyberTrackPoller {
 
     public static final String DEMO_INTERVAL = "PT10S";
     public static final String LIVE_INTERVAL = "PT5M";
-    static final String INTERVAL = "#{'${beadle.cybertrack.url:}' == '' ? '" + DEMO_INTERVAL
-            + "' : '${beadle.cybertrack.poll:" + LIVE_INTERVAL + "}'}";
+    static final String INTERVAL = "#{'${beadle.cybertrack.url:}' == '' ? '${beadle.cybertrack.demo-poll:" + DEMO_INTERVAL
+            + "}' : '${beadle.cybertrack.poll:" + LIVE_INTERVAL + "}'}";
 
     private final CyberTrackPollUseCase cyberTrack;
 

@@ -127,7 +127,7 @@ public class CyberTrackPollService implements CyberTrackPollUseCase {
 
     private StatusCallback report(TrackedTicket ticket, CyberTrackTicket found, Instant now) {
         StatusCallback callback = new StatusCallback(CYBERTRACK, ticket.key(), found.status(),
-                getIfNull(found.updated(), now), ticket.correlationId());
+                getIfNull(found.updated(), now));
         CallerContext.run(new Caller(SYSTEM_USER, ticket.correlationId()), () -> callbacks.notify(callback));
         tracked.save(ticket.reported(found.status(), now, followUp));
         return callback;

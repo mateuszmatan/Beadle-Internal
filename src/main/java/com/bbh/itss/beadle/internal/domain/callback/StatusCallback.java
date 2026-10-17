@@ -5,8 +5,10 @@ import com.bbh.itss.beadle.internal.domain.shared.CallTarget;
 
 import java.time.Instant;
 
-public record StatusCallback(ExternalSystem system, String key, String status, Instant at, String correlationId)
-        implements CallTarget {
+/**
+ * The body of a callback to Beadle-GUI; the correlation id travels in the {@code X-Correlation-Id} header.
+ */
+public record StatusCallback(ExternalSystem system, String key, String status, Instant at) implements CallTarget {
 
     @Override
     public String callTarget() {

@@ -14,3 +14,6 @@ databaseChangeLog:
   - include:
       file: oracle/005-cybertrack-ticket-change.sql
       relativeToChangelogFile: true
+  - include:
+      file: oracle/006-shedlock.sql
+      relativeToChangelogFile: true

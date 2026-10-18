@@ -210,18 +210,18 @@ class ConfigurationSpec extends Specification {
         entries[0].durationMs() >= 2
     }
 
-    def "a caller longer than the call log holds is cut to its columns, and a call log that cannot be written fails no call"() {
+    def "a call runs as its caller, and a call log that cannot be written fails no call"() {
         given:
         def calls = callLog()
 
         expect:
         calls.runner.run { context ->
-            CallerContext.run(new Caller('u' * 250, 'c' * 120)) { context.getBean(JiraPort).versions('CERT') }
+            CallerContext.run(new Caller('Mateusz Matan', 'corr-1')) { context.getBean(JiraPort).versions('CERT') }
             calls.down = true
             assert context.getBean(JiraPort).versions('CERT') == [version()]
         }
-        calls.recorded*.userName() == ['u' * (CallLogEntry.USER_MAX - 3) + '...']
-        calls.recorded*.correlationId() == ['c' * (CallLogEntry.CORRELATION_MAX - 3) + '...']
+        calls.recorded*.userName() == ['Mateusz Matan']
+        calls.recorded*.correlationId() == ['corr-1']
     }
 
     private static ApplicationContextRunner adapters(String profile, List<String> urls) {

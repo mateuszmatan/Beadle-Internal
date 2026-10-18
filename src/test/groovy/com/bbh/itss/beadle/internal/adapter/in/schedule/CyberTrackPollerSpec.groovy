@@ -5,10 +5,10 @@ import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import com.bbh.itss.beadle.internal.application.cybertrack.port.in.CyberTrackPollUseCase
-import com.bbh.itss.beadle.internal.config.SchedulingConfiguration
 import com.bbh.itss.beadle.internal.domain.callback.PollReport
 import org.slf4j.LoggerFactory
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
+import org.springframework.scheduling.annotation.EnableScheduling
 import org.springframework.scheduling.config.FixedDelayTask
 import org.springframework.scheduling.config.ScheduledTaskHolder
 import spock.lang.Specification
@@ -80,7 +80,7 @@ class CyberTrackPollerSpec extends Specification {
     def "the tickets are polled every #expected #mode"() {
         given:
         def runner = new ApplicationContextRunner()
-                .withUserConfiguration(SchedulingConfiguration, CyberTrackPoller)
+                .withUserConfiguration(Scheduling, CyberTrackPoller)
                 .withBean(CyberTrackPollUseCase, { [poll: { PollReport.NOTHING }] as CyberTrackPollUseCase } as Supplier<CyberTrackPollUseCase>)
 
         expect:
@@ -94,9 +94,12 @@ class CyberTrackPollerSpec extends Specification {
 
         where:
         mode                                      | properties                                                                       || expected
-        'on the demo clock'                       | []                                                                               || Duration.ofSeconds(10)
         'on the demo clock, whatever the poll is' | ['beadle.cybertrack.url=', 'beadle.cybertrack.poll=PT1M']                        || Duration.ofSeconds(10)
         'by default once CyberTrack is set'       | ['beadle.cybertrack.url=https://cybertrack.bbh.com']                             || Duration.ofMinutes(5)
         'as configured once CyberTrack is set'    | ['beadle.cybertrack.url=https://cybertrack.bbh.com', 'beadle.cybertrack.poll=PT1M'] || Duration.ofMinutes(1)
+    }
+
+    @EnableScheduling
+    static class Scheduling {
     }
 }

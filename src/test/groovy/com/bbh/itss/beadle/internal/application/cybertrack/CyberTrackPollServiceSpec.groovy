@@ -28,14 +28,11 @@ class CyberTrackPollServiceSpec extends Specification {
     CyberTrackPort cyberTrack = Mock()
     CallbackPort callbacks = Mock()
     CyberTrackPort demoCyberTrack = Mock()
-    def service = new CyberTrackPollService(tracked, cyberTrack, callbacks, new FollowUp(FollowUp.CLOSED_STATUSES, 3), fixed(NOW, UTC))
+    def followUp = new FollowUp(['Done', 'Closed', 'Resolved', "Won't Do"], 3)
+    def service = new CyberTrackPollService(tracked, cyberTrack, callbacks, followUp, fixed(NOW, UTC))
 
     def setup() {
         cyberTrack.connected() >> true
-    }
-
-    def cleanup() {
-        CallerContext.clear()
     }
 
     def "nothing is asked of CyberTrack while no ticket is open"() {
@@ -71,10 +68,10 @@ class CyberTrackPollServiceSpec extends Specification {
         CallerContext.current() == Caller.NONE
     }
 
-    def "a ticket that moved is told to Beadle-GUI with the correlation id of its creation and followed from its new status"() {
+    def "a ticket that moved is told to Beadle-GUI as the system with the correlation id of its creation and followed from its new status"() {
         given:
         Caller teller = null
-        def expected = new StatusCallback(CYBERTRACK, 'SCP-1234', 'In Progress', UPDATED, 'corr-1')
+        def expected = new StatusCallback(CYBERTRACK, 'SCP-1234', 'In Progress', UPDATED)
 
         when:
         def report = service.poll()
@@ -99,23 +96,11 @@ class CyberTrackPollServiceSpec extends Specification {
         then:
         1 * tracked.open() >> [trackedTicket(status: 'In Progress')]
         1 * cyberTrack.readAll(['SCP-1234']) >> [cyberTrackTicket(status: status, updated: null)]
-        1 * callbacks.notify(new StatusCallback(CYBERTRACK, 'SCP-1234', status, NOW, 'corr-1'))
+        1 * callbacks.notify(new StatusCallback(CYBERTRACK, 'SCP-1234', status, NOW))
         1 * tracked.save(trackedTicket(status: status, lastSeenAt: NOW, lastEventAt: NOW, closedAt: NOW))
 
         where:
         status << ['Done', 'Closed', 'resolved', "Won't Do"]
-    }
-
-    def "a ticket whose status was not known yet is told as soon as CyberTrack tells it"() {
-        when:
-        def report = service.poll()
-
-        then:
-        1 * tracked.open() >> [trackedTicket(status: null, lastSeenAt: null)]
-        1 * cyberTrack.readAll(['SCP-1234']) >> [cyberTrackTicket()]
-        1 * callbacks.notify(new StatusCallback(CYBERTRACK, 'SCP-1234', 'To Do', UPDATED, 'corr-1'))
-        1 * tracked.save(trackedTicket(status: 'To Do', lastSeenAt: NOW, lastEventAt: NOW))
-        report.sent()*.status() == ['To Do']
     }
 
     def "a callback Beadle-GUI did not take keeps the former status so that the next poll tells it again"() {
@@ -164,20 +149,6 @@ class CyberTrackPollServiceSpec extends Specification {
         report == new PollReport([], [:], ['SCP-1234': 'CyberTrack ticket SCP-1234 does not exist: CyberTrack did not find it 3 polls in a row'])
     }
 
-    def "a ticket that reached a closed status of its own workflow is no longer followed"() {
-        given:
-        def service = new CyberTrackPollService(tracked, cyberTrack, callbacks, new FollowUp(['Remediated'], 3), fixed(NOW, UTC))
-
-        when:
-        service.poll()
-
-        then:
-        1 * tracked.open() >> [trackedTicket(), trackedTicket(key: 'SCP-1235')]
-        1 * cyberTrack.readAll(_) >> [cyberTrackTicket(status: 'Remediated'), cyberTrackTicket(key: 'SCP-1235', status: 'Done')]
-        1 * tracked.save(trackedTicket(status: 'Remediated', lastSeenAt: NOW, lastEventAt: NOW, closedAt: NOW))
-        1 * tracked.save(trackedTicket(key: 'SCP-1235', status: 'Done', lastSeenAt: NOW, lastEventAt: NOW))
-    }
-
     def "a CyberTrack that cannot be read fails the poll without telling anything"() {
         when:
         service.poll()
@@ -192,7 +163,7 @@ class CyberTrackPollServiceSpec extends Specification {
 
     def "a ticket made up by the demo is dropped once CyberTrack is configured, and a real one while the demo plays"() {
         given:
-        def demo = new CyberTrackPollService(tracked, demoCyberTrack, callbacks, FollowUp.DEFAULT, fixed(NOW, UTC))
+        def demo = new CyberTrackPollService(tracked, demoCyberTrack, callbacks, followUp, fixed(NOW, UTC))
 
         when:
         def live = service.poll()

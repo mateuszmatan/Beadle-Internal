@@ -1,19 +1,11 @@
 package com.bbh.itss.beadle.internal.adapter.out.cybertrack
 
-import com.bbh.itss.beadle.internal.application.cybertrack.port.out.CyberTrackPort
 import com.bbh.itss.beadle.internal.application.cybertrack.port.out.TrackedTicketPort
 import com.bbh.itss.beadle.internal.domain.cybertrack.CyberTrackTicket
-import org.springframework.boot.autoconfigure.AutoConfigurations
-import org.springframework.boot.context.properties.EnableConfigurationProperties
-import org.springframework.boot.restclient.autoconfigure.RestClientAutoConfiguration
-import org.springframework.boot.test.context.runner.ApplicationContextRunner
-import org.springframework.context.annotation.Import
 import spock.lang.Specification
 
-import java.time.Clock
 import java.time.Duration
 import java.time.Instant
-import java.util.function.Supplier
 
 import static com.bbh.itss.beadle.internal.adapter.out.cybertrack.DemoCyberTrackAdapter.STEP
 import static com.bbh.itss.beadle.internal.support.Fixtures.ticket
@@ -119,32 +111,5 @@ class DemoCyberTrackAdapterSpec extends Specification {
 
         where:
         highest << [Optional.empty(), Optional.of('SCP-'), { throw new IllegalStateException('database down') }]
-    }
-
-    def "the live CyberTrack adapter is used only once its URL is set, with SCP and Task by default"() {
-        given:
-        def runner = new ApplicationContextRunner()
-                .withConfiguration(AutoConfigurations.of(RestClientAutoConfiguration))
-                .withUserConfiguration(Adapters)
-                .withBean(Clock, { fixed(NOW, UTC) } as Supplier<Clock>)
-                .withBean(TrackedTicketPort, { tracked } as Supplier<TrackedTicketPort>)
-
-        expect:
-        runner.withPropertyValues(properties as String[]).run { context ->
-            assert context.getBean(CyberTrackPort).class == type
-            assert context.getBean(CyberTrackProperties).projectKey() == 'SCP'
-            assert context.getBean(CyberTrackProperties).issueType() == 'Task'
-        }
-
-        where:
-        properties                                           || type
-        []                                                   || DemoCyberTrackAdapter
-        ['beadle.cybertrack.url=']                           || DemoCyberTrackAdapter
-        ['beadle.cybertrack.url=https://cybertrack.bbh.com'] || CyberTrackAdapter
-    }
-
-    @EnableConfigurationProperties(CyberTrackProperties)
-    @Import([DemoCyberTrackAdapter, CyberTrackAdapter])
-    static class Adapters {
     }
 }

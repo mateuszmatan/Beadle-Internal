@@ -50,7 +50,7 @@ class Fixtures {
     }
 
     static StatusCallback statusCallback(Map changes = [:]) {
-        copy(changes, new StatusCallback(CYBERTRACK, 'SCP-1234', 'In Progress', UPDATED, 'corr-1'))
+        copy(changes, new StatusCallback(CYBERTRACK, 'SCP-1234', 'In Progress', UPDATED))
     }
 
     static Map secureCodingJson(SecureCoding inputs = secureCoding()) {

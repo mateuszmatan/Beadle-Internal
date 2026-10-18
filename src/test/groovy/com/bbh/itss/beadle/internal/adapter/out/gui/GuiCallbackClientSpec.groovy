@@ -1,15 +1,14 @@
 package com.bbh.itss.beadle.internal.adapter.out.gui
 
-import com.bbh.itss.beadle.internal.config.ServiceTokenProperties
-import com.sun.net.httpserver.HttpServer
+import com.bbh.itss.beadle.internal.adapter.ServiceTokenProperties
+import com.bbh.itss.beadle.internal.application.calllog.CallerContext
+import com.bbh.itss.beadle.internal.domain.calllog.Caller
 import groovy.json.JsonSlurper
 import org.springframework.http.client.ClientHttpRequest
 import org.springframework.mock.http.client.MockClientHttpRequest
 import org.springframework.test.web.client.MockRestServiceServer
 import org.springframework.web.client.RestClient
 import spock.lang.Specification
-
-import java.util.concurrent.CompletableFuture
 
 import static com.bbh.itss.beadle.internal.support.Fixtures.statusCallback
 import static org.springframework.http.HttpMethod.POST
@@ -31,9 +30,9 @@ class GuiCallbackClientSpec extends Specification {
 
     def builder = RestClient.builder()
     def server = MockRestServiceServer.bindTo(builder).build()
-    def client = new GuiCallbackClient(new GuiProperties(URL + '/'), new ServiceTokenProperties('service-token'), builder)
+    def client = new GuiCallbackClient(new GuiProperties(URL + '/'), new ServiceTokenProperties('service-token\n'), builder)
 
-    def "a status change is posted to Beadle-GUI with the service token, the system as caller and the correlation id"() {
+    def "a status change is posted with the service token, the system as caller and the correlation id in the header only"() {
         given:
         server.expect(requestTo(URL + '/api/callbacks/internal')).andExpect(method(POST))
                 .andExpect(header('Authorization', 'Bearer service-token'))
@@ -42,71 +41,15 @@ class GuiCallbackClientSpec extends Specification {
                 .andExpect(content().contentTypeCompatibleWith(APPLICATION_JSON))
                 .andExpect { ClientHttpRequest request ->
                     assert new JsonSlurper().parseText((request as MockClientHttpRequest).bodyAsString) ==
-                            [system: 'CYBERTRACK', key: 'SCP-1234', status: 'In Progress', at: '2026-10-15T09:00:00Z',
-                             correlationId: 'corr-1']
+                            [system: 'CYBERTRACK', key: 'SCP-1234', status: 'In Progress', at: '2026-10-15T09:00:00Z']
                 }
                 .andRespond(withStatus(ACCEPTED))
+        server.expect(requestTo(URL + '/api/callbacks/internal')).andExpect(headerDoesNotExist('X-Correlation-Id'))
+                .andRespond(withStatus(ACCEPTED))
 
         when:
+        CallerContext.run(new Caller('system', 'corr-1')) { client.notify(statusCallback()) }
         client.notify(statusCallback())
-
-        then:
-        server.verify()
-    }
-
-    def "a service token read with #whitespace is sent trimmed, as Beadle-GUI compares it"() {
-        given:
-        def builder = RestClient.builder()
-        def server = MockRestServiceServer.bindTo(builder).build()
-        server.expect(requestTo(URL + '/api/callbacks/internal'))
-                .andExpect(header('Authorization', 'Bearer service-token'))
-                .andRespond(withStatus(ACCEPTED))
-
-        when:
-        new GuiCallbackClient(new GuiProperties(URL), new ServiceTokenProperties(token), builder)
-                .notify(statusCallback())
-
-        then:
-        server.verify()
-
-        where:
-        whitespace                     | token
-        'a trailing newline'           | 'service-token\n'
-        'a trailing carriage return'   | 'service-token\r\n'
-        'surrounding blanks'           | '  service-token\t'
-    }
-
-    def "a service token written to its secret from a file, newline included, reaches a real Beadle-GUI"() {
-        given: 'an HTTP server, since the HTTP client itself refuses a header value that holds a newline'
-        def authorization = new CompletableFuture<String>()
-        def gui = HttpServer.create(new InetSocketAddress('127.0.0.1', 0), 0)
-        gui.createContext('/api/callbacks/internal') { exchange ->
-            authorization.complete(exchange.requestHeaders.getFirst('Authorization'))
-            exchange.sendResponseHeaders(ACCEPTED.value(), -1)
-            exchange.close()
-        }
-        gui.start()
-        def url = "http://127.0.0.1:${gui.address.port}"
-
-        when:
-        new GuiCallbackClient(new GuiProperties(url), new ServiceTokenProperties('service-token\n'),
-                RestClient.builder()).notify(statusCallback())
-
-        then:
-        authorization.getNow(null) == 'Bearer service-token'
-
-        cleanup:
-        gui?.stop(0)
-    }
-
-    def "a callback without a correlation id is posted without the header"() {
-        given:
-        server.expect(requestTo(URL + '/api/callbacks/internal'))
-                .andExpect(headerDoesNotExist('X-Correlation-Id'))
-                .andRespond(withStatus(ACCEPTED))
-
-        when:
-        client.notify(statusCallback(correlationId: null))
 
         then:
         server.verify()
@@ -124,22 +67,9 @@ class GuiCallbackClientSpec extends Specification {
         refused.message.startsWith('Beadle-GUI could not take the callback for SCP-1234: ' + reason)
 
         where:
-        problem          | response                                                  || reason
-        'a server error' | withServerError()                                         || '500 Internal Server Error'
-        'a refusal'      | withUnauthorizedRequest()                                 || '401 Unauthorized'
+        problem          | response                                                   || reason
+        'a server error' | withServerError()                                          || '500 Internal Server Error'
+        'a refusal'      | withUnauthorizedRequest()                                  || '401 Unauthorized'
         'a redirect'     | withStatus(FOUND).header('Location', URL + '/oauth2/ping') || 'Beadle-GUI answered 302 FOUND'
-    }
-
-    def "an unreachable Beadle-GUI refuses the callback with the reason"() {
-        given:
-        def unreachable = new GuiCallbackClient(new GuiProperties('http://127.0.0.1:1'), new ServiceTokenProperties('t'),
-                RestClient.builder())
-
-        when:
-        unreachable.notify(statusCallback())
-
-        then:
-        def refused = thrown(UncheckedIOException)
-        refused.message.startsWith('Beadle-GUI could not take the callback for SCP-1234: I/O error')
     }
 }

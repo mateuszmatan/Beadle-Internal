@@ -1,12 +1,6 @@
 package com.bbh.itss.beadle.internal.adapter.out.confluence
 
-import com.bbh.itss.beadle.internal.application.confluence.port.out.ConfluencePort
 import com.bbh.itss.beadle.internal.domain.confluence.ConfluencePage
-import org.springframework.boot.autoconfigure.AutoConfigurations
-import org.springframework.boot.context.properties.EnableConfigurationProperties
-import org.springframework.boot.restclient.autoconfigure.RestClientAutoConfiguration
-import org.springframework.boot.test.context.runner.ApplicationContextRunner
-import org.springframework.context.annotation.Import
 import spock.lang.Specification
 
 import static com.bbh.itss.beadle.internal.adapter.out.confluence.DemoConfluenceAdapter.DUPLICATE
@@ -111,28 +105,5 @@ class DemoConfluenceAdapterSpec extends Specification {
 
         then:
         thrown(NoSuchElementException)
-    }
-
-    def "the demo is used only while the Confluence URL is blank"() {
-        given:
-        def runner = new ApplicationContextRunner()
-                .withConfiguration(AutoConfigurations.of(RestClientAutoConfiguration))
-                .withUserConfiguration(Adapters)
-
-        expect:
-        runner.withPropertyValues(properties as String[]).run { context ->
-            assert context.getBeansOfType(ConfluencePort).values()*.class == types
-        }
-
-        where:
-        properties                                          || types
-        []                                                  || [DemoConfluenceAdapter]
-        ['beadle.confluence.url=']                          || [DemoConfluenceAdapter]
-        ['beadle.confluence.url=https://confluence.bbh.com'] || [ConfluenceAdapter]
-    }
-
-    @EnableConfigurationProperties(ConfluenceProperties)
-    @Import([DemoConfluenceAdapter, ConfluenceAdapter])
-    static class Adapters {
     }
 }

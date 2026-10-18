@@ -29,18 +29,19 @@ Hexagonal, with Spring MVC controllers as the way in. `ArchitectureSpec` enforce
 com.bbh.itss.beadle.internal
 ├── domain/<area>              records and rules, no framework (jira, cybertrack, confluence, qtest, calllog, ...)
 ├── application/<area>         use cases behind port/in, ports to the outside in port/out
-├── adapter/in/web             controllers, request records, error handling
+├── adapter/in/web             controllers, request records, error handling, the service token filter
 ├── adapter/in/schedule        the CyberTrack poll
-├── adapter/out/<system>       jira, cybertrack, confluence, qtest: a live adapter, plus a demo one for the laptop
+├── adapter/out/<system>       jira, cybertrack, confluence, qtest: the live adapter, a demo one, their properties
 ├── adapter/out/gui            the callbacks to Beadle-GUI
-├── adapter/out/http           the shared HTTP client with logging and the call log
+├── adapter/out/http           the shared HTTP client with its logging
+├── adapter/out/calllog        the call log row written around every call of a port to another system
 ├── adapter/out/persistence    JPA: call log, followed CyberTrack tickets
-└── config                     Spring wiring, the service token filter, properties
+└── config                     Spring wiring and the properties of the CyberTrack follow-up
 ```
 
-A CyberTrack ticket is answered as soon as it is created. A scheduled poll then reads all open tickets in one call
-and posts each change of status to `{BEADLE_GUI_URL}/api/callbacks/internal`. A ticket in a final status is no longer
-followed. A callback that Beadle-GUI does not accept is sent again on the next poll.
+A CyberTrack ticket is answered as soon as it is created. A scheduled poll then reads the open tickets, one search per
+50 keys, and posts each change of status to `{BEADLE_GUI_URL}/api/callbacks/internal`. A ticket in a final status is
+no longer followed. A callback that Beadle-GUI does not accept is sent again on the next poll.
 
 ## Run on a BBH laptop
 
@@ -127,3 +128,4 @@ missing. [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) walks through a full deploymen
   account tokens must be filled in for each environment.
 - The base image tag in the Dockerfile must be set to the BBH-approved UBI 9 OpenJDK 21 image, the same in all three
   repositories.
+- Beadle-GUI does not call the Confluence and qTest endpoints yet.

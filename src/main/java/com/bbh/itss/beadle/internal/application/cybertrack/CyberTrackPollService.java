@@ -33,8 +33,8 @@ import static org.apache.commons.lang3.ObjectUtils.getIfNull;
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 
 /**
- * Follows the CyberTrack tickets Beadle created. The poll reads all open tickets in one call made by {@code system};
- * each callback carries the correlation id of the user action that created its ticket. A ticket CyberTrack no longer
+ * Follows the CyberTrack tickets Beadle created. The poll reads all open tickets in one call of the port made by
+ * {@code system} (one CyberTrack search per 50 keys); each callback carries the correlation id of the user action that created its ticket. A ticket CyberTrack no longer
  * finds is tried again on the next polls and dropped once the {@link FollowUp} gives up on it.
  */
 @UseCase

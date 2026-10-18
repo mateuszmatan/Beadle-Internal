@@ -17,9 +17,7 @@ spring:
           time_zone: UTC
         type:
           preferred_instant_jdbc_type: TIMESTAMP
-          preferred_boolean_jdbc_type: INTEGER
   liquibase:
-    change-log: classpath:db/changelog/db.changelog-master.yaml
     analytics-enabled: false
   http:
     clients:
@@ -33,14 +31,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
-  endpoint:
-    health:
-      show-details: never
-
-logging:
-  level:
-    com.bbh.itss.beadle: INFO
+        include: health
 
 beadle:
   services:
@@ -73,7 +64,7 @@ spring:
     activate:
       on-profile: local
   datasource:
-    url: ${DB_URL:jdbc:h2:file:${BEADLE_INTERNAL_DATA_DIR:${user.home}/bbh-devsecops/beadle-internal}/beadle-internal;MODE=Oracle;DEFAULT_NULL_ORDERING=HIGH;AUTO_SERVER=TRUE}
+    url: ${DB_URL:jdbc:h2:file:${BEADLE_INTERNAL_DATA_DIR:${user.home}/beadle-internal}/beadle-internal;MODE=Oracle;DEFAULT_NULL_ORDERING=HIGH;AUTO_SERVER=TRUE}
     username: ${DB_USERNAME:sa}
     password: ${DB_PASSWORD:}
 management:
@@ -102,22 +93,9 @@ spring:
   datasource:
     hikari:
       maximum-pool-size: ${DB_POOL_SIZE:5}
-management:
-  endpoint:
-    health:
-      show-details: always
 logging:
   level:
     com.bbh.itss.beadle: DEBUG
----
-spring:
-  config:
-    activate:
-      on-profile: qc
-management:
-  endpoint:
-    health:
-      show-details: always
 ---
 spring:
   config:

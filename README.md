@@ -50,7 +50,7 @@ export BEADLE_SERVICE_TOKEN=local-$(whoami)     # the same value as for Beadle-G
 curl -H "Authorization: Bearer $BEADLE_SERVICE_TOKEN" http://localhost:8082/api/internal/status
 ```
 
-The `local` profile (the default) uses an H2 file database in Oracle mode in `~/bbh-devsecops/beadle-internal`. It
+The `local` profile (the default) uses an H2 file database in Oracle mode in `~/beadle-internal`. It
 uses the demo adapters for every system whose URL is not set. The demo CyberTrack moves its tickets from To Do through
 In Progress to Done, two minutes per step. Set a system's URL and token to use the real one.
 

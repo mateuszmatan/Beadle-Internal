@@ -117,9 +117,9 @@ system URLs. Fill in `JIRA_URL`, `CYBERTRACK_URL`, `CONFLUENCE_URL` and `QTEST_U
 There is no Route: Beadle-GUI reaches the service inside the project at `http://beadle-internal:8082`.
 
 The Deployment reads the secrets `beadle-internal-db` (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`), `beadle-services`
-(`BEADLE_SERVICE_TOKEN`, shared by the three services) and, optionally, `beadle-internal-jira`,
-`beadle-internal-cybertrack`, `beadle-internal-confluence` and `beadle-internal-qtest` (`<SYSTEM>_TOKEN`).
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) walks through a full deployment of the three services.
+(`BEADLE_SERVICE_TOKEN`, shared by the three services), `beadle-internal-jira`, `beadle-internal-cybertrack`,
+`beadle-internal-confluence` and `beadle-internal-qtest` (`<SYSTEM>_TOKEN`); the pod does not start while one is
+missing. [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) walks through a full deployment of the three services.
 
 ## Known gaps
 

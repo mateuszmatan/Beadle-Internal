@@ -75,10 +75,10 @@ Only the health endpoints spelled plainly (`/actuator/health`, `/actuator/health
 OpenShift probes. A path that only looks like one, such as `/actuator/health/..` or `/actuator/health;x`, needs the
 token like any other call.
 
-Timeouts are 5 s to connect and 30 s to read. Internal and ProTech give the external systems 5 s to connect and 10 s to
-read, so that a slow system is answered `502` before Beadle-GUI gives up. An unreachable service or a `5xx` answer
-reaches the Beadle-GUI user as `503` with a `detail` naming the service ("Beadle-ProTech did not answer"), and the
-action is still recorded with outcome `FAILURE`.
+Timeouts are 5 s to connect and 30 s to read. Internal and ProTech give the external systems, and their callbacks to
+Beadle-GUI, 5 s to connect and 10 s to read, so that a slow system is answered `502` before Beadle-GUI gives up. An
+unreachable service or a `5xx` answer reaches the Beadle-GUI user as `503` with a `detail` naming the service
+("Beadle-ProTech did not answer"), and the action is still recorded with outcome `FAILURE`.
 
 Base URLs: in Beadle-GUI `beadle.services.internal.url` (`BEADLE_INTERNAL_URL`, local `http://localhost:8082`) and
 `beadle.services.protech.url` (`BEADLE_PROTECH_URL`, local `http://localhost:8083`); in the two services

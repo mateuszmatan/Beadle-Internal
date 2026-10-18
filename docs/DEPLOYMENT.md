@@ -60,6 +60,8 @@ cd /path/to/Beadle-GUI && ./gradlew beadleJar
 docker build -t <registry>/<project>/beadle:<version> . && docker push <registry>/<project>/beadle:<version>
 ```
 
+Give every build a new `<version>`: the pods pull an image only when their node does not have that tag yet.
+
 ### Step 2: create the secrets
 
 ```bash

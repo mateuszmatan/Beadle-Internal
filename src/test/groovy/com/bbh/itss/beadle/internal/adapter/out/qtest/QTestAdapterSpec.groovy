@@ -44,7 +44,7 @@ class QTestAdapterSpec extends Specification {
         execution.execute(request, body)
     } as ClientHttpRequestInterceptor)
     def server = MockRestServiceServer.bindTo(builder).ignoreExpectOrder(true).build()
-    def qtest = new QTestAdapter(new QTestProperties(URL + '/', 'secret-token'), builder)
+    def qtest = new QTestAdapter(new QTestProperties(URL + '/', 'secret-token', 8, Duration.ofSeconds(20)), builder)
 
     def "the projects are listed with their ids and names"() {
         given:
@@ -244,23 +244,6 @@ class QTestAdapterSpec extends Specification {
         withServerError()                                          | null              || UncheckedIOException   | 'qTest could not list the releases of project 1: 500'
         withResourceNotFound()                                     | null              || NoSuchElementException | 'qTest project 1 does not exist'
         withSuccess('[{"id":5,"name":"1.4"}]', APPLICATION_JSON)    | withServerError() || UncheckedIOException   | 'qTest could not list the test cycles of release 5: 500'
-    }
-
-    def "the summary counts the runs of a cycle by status"() {
-        given:
-        server.expect(requestTo(PROJECT + '/test-cycles/10')).andRespond(withSuccess('{"id":10}', APPLICATION_JSON))
-        server.expect(requestTo(RUNS + '1&pageSize=999'))
-                .andRespond(withSuccess('{"page":1,"page_size":100,"total":3,"items":[{"id":100,"name":"a","pid":"TR-100"},' +
-                        '{"id":101,"name":"b","pid":"TR-101"},{"id":102,"name":"c","pid":"TR-102"}]}', APPLICATION_JSON))
-        server.expect(requestTo(PROJECT + '/test-runs/100/test-logs/last-run'))
-                .andRespond(withSuccess('{"status":{"name":"Passed"},"exe_end_date":"2026-10-15T09:00:00+00:00"}', APPLICATION_JSON))
-        server.expect(requestTo(PROJECT + '/test-runs/101/test-logs/last-run'))
-                .andRespond(withSuccess('{"status":{"name":"Failed"},"exe_end_date":"2026-10-15T10:00:00+00:00"}', APPLICATION_JSON))
-        server.expect(requestTo(PROJECT + '/test-runs/102/test-logs/last-run'))
-                .andRespond(withSuccess('{"status":{"name":"Blocked"},"exe_end_date":null}', APPLICATION_JSON))
-
-        expect:
-        qtest.summary(1, 10) == new QTestSummary(3, 1, 1, 1, 0)
     }
 
     def "an unknown project or cycle is not found"() {

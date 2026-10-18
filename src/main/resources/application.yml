@@ -50,12 +50,10 @@ beadle:
   jira:
     url: ${JIRA_URL:}
     token: ${JIRA_TOKEN:}
-    demo: ${JIRA_DEMO:false}
     epic-link-field: ${JIRA_EPIC_LINK_FIELD:customfield_10014}
   cybertrack:
     url: ${CYBERTRACK_URL:}
     token: ${CYBERTRACK_TOKEN:}
-    demo: ${CYBERTRACK_DEMO:false}
     project-key: ${CYBERTRACK_PROJECT_KEY:SCP}
     issue-type: ${CYBERTRACK_ISSUE_TYPE:Task}
     poll: ${CYBERTRACK_POLL:PT5M}
@@ -64,11 +62,9 @@ beadle:
   confluence:
     url: ${CONFLUENCE_URL:}
     token: ${CONFLUENCE_TOKEN:}
-    demo: ${CONFLUENCE_DEMO:false}
   qtest:
     url: ${QTEST_URL:}
     token: ${QTEST_TOKEN:}
-    demo: ${QTEST_DEMO:false}
     concurrency: ${QTEST_CONCURRENCY:8}
     budget: ${QTEST_BUDGET:20s}
 ---
@@ -80,13 +76,13 @@ spring:
     url: ${DB_URL:jdbc:h2:file:${BEADLE_INTERNAL_DATA_DIR:${user.home}/bbh-devsecops/beadle-internal}/beadle-internal;MODE=Oracle;DEFAULT_NULL_ORDERING=HIGH;AUTO_SERVER=TRUE}
     username: ${DB_USERNAME:sa}
     password: ${DB_PASSWORD:}
-  jpa:
-    hibernate:
-      ddl-auto: none
 management:
   endpoint:
     health:
       show-details: always
+beadle:
+  cybertrack:
+    poll: ${CYBERTRACK_POLL:PT10S}
 ---
 spring:
   config:

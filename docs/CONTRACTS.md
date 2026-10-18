@@ -1,107 +1,139 @@
-# Beadle: the three repositories and the contracts between them
+# Beadle: the three services and the contracts between them
 
-Beadle is built from three repositories. This document is the shared contract; every repository carries a copy in
-`docs/CONTRACTS.md` and the code must match it. Code, comments, commit messages and documentation are in English.
+Beadle is three repositories that work together. Every repository carries this file as `docs/CONTRACTS.md`, the
+copies are identical, and the code must match it. [DEPLOYMENT.md](DEPLOYMENT.md), also the same in all three, walks
+through running them together and deploying them.
 
 ```
-                     REST, both ways                      REST (service accounts of Beadle)
- Beadle-GUI  <------------------------------>  Beadle-Internal  --->  BBH Jira, CyberTrack (the Jira of the
- Angular + Java (Spring Boot)                  Java (Spring Boot)     Cybersecurity team), Confluence, qTest
- Oracle / H2: system of record + audit trail   Oracle / H2: call log
-             <------------------------------>  Beadle-ProTech   --->  ProTech (ServiceNow of BBH)
-                     REST, both ways           Java (Spring Boot)
-                                               Oracle / H2: call log, demo state
+                     REST, both ways                      REST (Beadle's service accounts)
+ Beadle-GUI  <------------------------------>  Beadle-Internal  --->  Jira, CyberTrack (the Cybersecurity team's
+ Angular + Spring Boot, 8081                   Spring Boot, 8082      Jira), Confluence, qTest
+ Oracle / H2: system of record, audit trail    Oracle / H2: call log, followed tickets
+             <------------------------------>  Beadle-ProTech   <-->  ProTech (BBH's ServiceNow)
+                     REST, both ways           Spring Boot, 8083      Table API out, webhook in
+                                               Oracle / H2: call log, followed changes
 ```
 
-## Conventions shared by the three repositories
+## Shared conventions
 
-- Java 21, Spring Boot 4.1.1 and the Gradle 8.14 wrapper, Groovy 5 + Spock 2.4 tests, Lombok, Liquibase, Jacoco,
-  exactly as in `gradle/libs.versions.toml` and `settings.gradle` of Beadle-GUI (BBH Nexus when reachable,
-  Gradle Plugin Portal + Maven Central + registry.npmjs.org otherwise; keep that logic as it is).
-- Spring profiles: `local` (default: H2 file database in Oracle mode, demo adapters, test user) and `oracle`,
-  grouped into `rd`, `qc`, `prod` (Oracle from `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`; real adapters).
-  Liquibase runs on every start with `ddl-auto: validate`.
-- Hexagonal layout and naming as in Beadle-GUI: `adapter/in/web`, `adapter/out/<system>`,
-  `application/<area>` with `port/in` and `port/out`, `domain/<area>`, `config`. ArchUnit `ArchitectureSpec` keeps
-  the layers apart.
-- Base packages: `com.bbh.itss.beadle` (Beadle-GUI backend), `com.bbh.itss.beadle.internal` (Beadle-Internal),
-  `com.bbh.itss.beadle.protech` (Beadle-ProTech). Configuration prefix `beadle.`.
-- Names: the ServiceNow instance of BBH is called **ProTech** everywhere in code, configuration, documentation and
-  the interface (`ProTechPort`, `adapter/out/protech`, `beadle.protech.*`, `proTechConnected`). The word
-  ServiceNow appears only where the product or its REST API is meant (for example in the comments of the real
-  adapter and the Table API URLs). **CyberTrack** is the Jira of the Cybersecurity team where secure coding
-  tickets are raised; **Jira** alone means the BBH Jira of the delivery teams (versions, epics, stories). The two
-  never share a package, a client or a configuration block.
-- Every REST API answers JSON. Errors are `application/problem+json` (RFC 9457): `status`, `title`, `detail` and,
-  for validation, `problems: [{"field": "...", "message": "..."}]`. Instants are ISO-8601 in UTC
-  (`2026-10-15T09:00:00Z`), dates are `yyyy-MM-dd`, enums are their Java names.
-- Secrets (tokens, passwords, client secrets) come from environment variables that OpenShift fills from secrets;
-  none is ever written to a repository, a log or a test fixture.
-- Every repository builds and tests with `./gradlew build` and ships a `Dockerfile` plus
-  `deploy/openshift/<app>/{base,overlays/{rd,qc,prod}}` (kustomize), on the pattern of Beadle-GUI.
-- Commit messages end with
-  `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` and
-  `Claude-Session: https://claude.ai/code/session_01DK64WyTTEZusvWgXF1UdQX` on the last two lines.
+- Java 21, Spring Boot 4.1.1, Gradle 8.14, Groovy 5 + Spock 2.4, Lombok, Liquibase, JaCoCo, versions in
+  `gradle/libs.versions.toml`. Plugins and libraries come from the BBH Nexus only: the services build inside the BBH
+  network or on the VPN.
+- Profiles: `local` (the default) runs on a BBH laptop with an H2 file database in Oracle mode and the demo adapters,
+  and Beadle-GUI signs everybody in as one fixed user. `rd`, `qc` and `prod` (grouped as `oracle`) use Oracle from
+  `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` and the real systems only: a service does not start while the address of a
+  system it needs is blank.
+- Liquibase updates the schema at every start and Hibernate only validates it. A changeset that is on `main` is never
+  edited; a change of the schema is a new changeset with a rollback.
+- Hexagonal packages: `domain`, `application` (`port/in`, `port/out`), `adapter/in/web`, `adapter/in/schedule`,
+  `adapter/out/<system>`, `adapter/out/persistence`, `config`. ArchUnit's `ArchitectureSpec` keeps them apart. Base
+  packages `com.bbh.itss.beadle` (Beadle-GUI), `com.bbh.itss.beadle.internal`, `com.bbh.itss.beadle.protech`;
+  configuration prefix `beadle.`.
+- Names:
+  - BBH's ServiceNow instance is **ProTech** in code, configuration, documentation and the interface. The word
+    ServiceNow appears only where its REST API is meant.
+  - **CyberTrack** is the Cybersecurity team's Jira, where secure coding tickets are raised. **Jira** alone is the
+    delivery teams' Jira (versions, epics, stories). The two never share a package, a client or a configuration block.
+  - **Business Service** is Beadle's grouping of products, one name everywhere: `businessServiceId`,
+    `businessServiceName`, `/api/business-services`, the lookup kind `business-services`, the table
+    `BEADLE_BUSINESS_SERVICE`, the actions `BUSINESS_SERVICE_*`. ProTech keeps it in its own field `u_department` and
+    table `cmn_department`. `directBusinessService` is a different field: ProTech's `business_service` of a change.
+- JSON everywhere. Instants are ISO-8601 UTC, dates `yyyy-MM-dd`, enums their Java names.
+- Errors are `application/problem+json` (RFC 9457) with `status`, `title` and `detail`: `Validation failed` (400, with
+  `problems: [{"field": "...", "message": "..."}]`), `Malformed request` (400, a body or value that cannot be read; in
+  Beadle-GUI and Beadle-ProTech), `Not found` (404), `Conflict` (409: a stale `version` in Beadle-GUI, a refusal of the
+  external system in the two services), `Bad Gateway` (502, Internal or ProTech could not reach or use the external
+  system), `Service Unavailable` (503, Beadle-GUI could not reach Internal or ProTech) and `Request failed` (500). Any
+  other error is Spring's own problem, titled with the HTTP reason phrase (`Bad Request`, `Method Not Allowed`, ...).
+- Secrets come from environment variables filled from OpenShift secrets, never from a repository, a log or a test
+  fixture.
+- Logging: SLF4J with Lombok's `@Slf4j` and logback, to the console and to a rolling file `${LOG_PATH}/<app>.log` in
+  every profile (`./logs` on a laptop, `/application/logs` in a pod). Every line carries the correlation id
+  (`%X{correlationId}`).
+- Tests are Spock specifications. `test` holds the unit specs with a JaCoCo gate of 60% of lines. `smokeTest`,
+  `regressionTest` and `performanceTest` cover only the key journeys, with a gate of 30% of lines for the three
+  together (`jacocoSuitesReport`); smoke and performance take a few tens of seconds, regression at most 2 minutes.
+- Each repository ships a `Dockerfile` (UBI 9 OpenJDK 21, user 185, `/application/data`, `/application/logs`) and
+  `deploy/openshift/<app>/{base,overlays/{rd,qc,prod}}` (Kustomize). The three services of an environment run in one
+  OpenShift project, one pod each (`replicas: 1`), so their schedulers need no lock. Only Beadle-GUI has a Route; it
+  reaches the other two inside the project at `http://beadle-internal:8082` and `http://beadle-protech:8083`. The
+  secret `beadle-services` holds `BEADLE_SERVICE_TOKEN` for all three. `deploy/docker` in Beadle-GUI runs the three
+  together with Docker Compose for testing.
 
 ## Calls between the services
 
-Beadle-GUI calls Beadle-Internal and Beadle-ProTech; both call Beadle-GUI back. Every call carries:
+Beadle-GUI calls Beadle-Internal and Beadle-ProTech, and both call Beadle-GUI back. Every call carries:
 
 | Header | Value |
 |---|---|
-| `Authorization` | `Bearer <service token>`: one shared secret per environment, `BEADLE_SERVICE_TOKEN` in all three services (`beadle.services.token`). A request without the right token is answered `401`. |
-| `X-Beadle-User` | the user signed in to Beadle-GUI who caused the call (`system` for a scheduled or callback-triggered call), percent-encoded in UTF-8 as `URLEncoder.encode(name, UTF_8)` writes it, since a header carries ASCII only (`Łukasz Wójcik` travels as `%C5%81ukasz+W%C3%B3jcik`, `Mateusz Matan` as `Mateusz+Matan`); the receiver decodes it with `URLDecoder.decode(value, UTF_8)` and takes a value that is not valid percent-encoding as it came. Internal and ProTech only log it; they sign in to the external systems with the generic service accounts of Beadle. |
-| `X-Correlation-Id` | a UUID minted by Beadle-GUI per user action; Internal and ProTech log it and pass it on in callbacks. |
+| `Authorization` | `Bearer <service token>`: one shared secret per environment, `BEADLE_SERVICE_TOKEN` (`beadle.services.token`) in all three services. A wrong or missing token, or a blank one configured, is answered `401`. |
+| `X-Beadle-User` | The Beadle-GUI user who caused the call (`system` for scheduled and callback-triggered calls), percent-encoded UTF-8 as `URLEncoder.encode(name, UTF_8)` writes it (`Łukasz Wójcik` is `%C5%81ukasz+W%C3%B3jcik`). The receiver decodes it with `URLDecoder.decode`, keeps a value that is not valid percent-encoding as it came, and logs `unknown` when the header is missing. Internal and ProTech only log it: they sign in to the external systems with Beadle's generic service accounts. |
+| `X-Correlation-Id` | A UUID Beadle-GUI mints per user action, at most 64 characters; a longer one is answered `400`, and the receiver mints one when it is missing. Internal and ProTech log it and record it in their call log. A callback carries, in this header, the correlation id of the call that made the service follow the ticket or change; no body carries it. |
 
-Timeouts: connect 5 s, read 30 s. Unreachable services or `5xx` answers surface in Beadle-GUI as a `503` with
-`detail` naming the service ("Beadle-ProTech did not answer"), and the user action is still recorded in the audit
-trail with outcome `FAILURE`.
+Only the health endpoints spelled plainly (`/actuator/health`, `/actuator/health/liveness`, ...) are open, for the
+OpenShift probes. A path that only looks like one, such as `/actuator/health/..` or `/actuator/health;x`, needs the
+token like any other call.
 
-Base URLs in Beadle-GUI: `beadle.services.internal.url` (`BEADLE_INTERNAL_URL`, local default
-`http://localhost:8082`) and `beadle.services.protech.url` (`BEADLE_PROTECH_URL`, local default
-`http://localhost:8083`). Base URL of Beadle-GUI in the two services: `beadle.gui.url` (`BEADLE_GUI_URL`, local
-default `http://localhost:8081`). Ports: GUI 8081, Internal 8082, ProTech 8083.
+Timeouts are 5 s to connect and 30 s to read. An unreachable service or a `5xx` answer reaches the Beadle-GUI user
+as `503` with a `detail` naming the service ("Beadle-ProTech did not answer"), and the action is still recorded with
+outcome `FAILURE`.
+
+Base URLs: in Beadle-GUI `beadle.services.internal.url` (`BEADLE_INTERNAL_URL`, local `http://localhost:8082`) and
+`beadle.services.protech.url` (`BEADLE_PROTECH_URL`, local `http://localhost:8083`); in the two services
+`beadle.gui.url` (`BEADLE_GUI_URL`, local `http://localhost:8081`).
+
+Both services answer `GET /api/<service>/call-log?correlationId=&from=&to=&page=0&size=50` (`size` 1 to 500) with
+`{"page": 0, "size": 50, "total": 12, "entries": [{"id", "at", "userName", "correlationId", "system", "operation",
+"target", "outcome", "message", "durationMs"}]}`, newest first: every call they made to an external system or to
+Beadle-GUI, for diagnosis.
 
 ## Beadle-ProTech REST API (`/api/protech`)
 
-Mirrors the `ProTechPort` and `ProTechLookupPort` of Beadle-GUI one to one, so that
-`ProductionChangeService` in Beadle-GUI keeps working through a REST adapter.
+Mirrors Beadle-GUI's `ProTechPort` and `ProTechLookupPort` one to one.
 
 | Method and path | Body | Answer |
 |---|---|---|
 | `GET /api/protech/status` | | `{"connected": false, "mode": "demo"}` or `{"connected": true, "mode": "live"}` |
 | `POST /api/protech/changes` | a `Change` (the draft) | `201` `{"number": "CHG0001234", "url": "https://.../CHG0001234" or null}` |
 | `POST /api/protech/changes/{number}/tasks` | a `ChangeTask` | `201` `{"number": "CTASK0001234"}` |
-| `POST /api/protech/changes/read` | `[Change, ...]` (the changes Beadle-GUI knows) | `{"CHG0001234": Change, ...}`: the current state of each one as ProTech holds it |
+| `POST /api/protech/changes/read` | `[Change, ...]` (the changes Beadle-GUI knows) | `{"CHG0001234": Change, ...}`, each as ProTech holds it now; a change ProTech does not have is left out |
 | `PUT /api/protech/changes/{number}` | a `Change` | `204` |
-| `POST /api/protech/changes/{number}/reminders` | `{"role": "BUSINESS" or null, "task": "CTASK0001234" or null}` | `["Rebecca Lawson", ...]`: the people reminded |
-| `GET /api/protech/lookups/{kind}?q=&limit=20` | | `[{"value": "...", "detail": "..."}]`; `kind` is one of `users`, `business-services`, `departments`, `assignment-groups`, `releases`, `configuration-items`, `incidents`, `problems`, `clients` |
+| `POST /api/protech/changes/{number}/reminders` | `{"role": "BUSINESS" or null, "task": "CTASK0001234" or null}` | `["Rebecca Lawson", ...]`, the people reminded |
+| `GET /api/protech/lookups/{kind}?q=&limit=20` | | `[{"value": "...", "detail": "..."}]`; `kind` is one of `users`, `business-services`, `assignment-groups`, `releases`, `configuration-items`, `incidents`, `problems`, `clients` |
+| `POST /api/protech/webhook` | `{"number": "CHG0001234"}` | `202`; for ProTech, see below |
 
-`Change` and `ChangeTask` are the JSON Jackson makes of the records `ProductionChange` and `ChangeTask` of
-Beadle-GUI (`domain/change`), with every nested record (`ChangeSchedule`, `ChangeTemplate` and its
-`Approvers`, `Timing`, `Planning`, `PrivilegedAccess`, `TaskDetails`, `ChangeApproval`, `WorkflowStep`, `Reminder`,
-`ChangeUpdate`) and enum (`ChangeState`, `ApprovalRole`, `ApprovalState`, `TaskState`) by its Java field names.
-Beadle-GUI serialises its domain records; Beadle-ProTech has its own copy of the records (cut out with their
-history) and must not rename a field without changing this document and Beadle-GUI together.
+`Change` and `ChangeTask` are the Jackson JSON of Beadle-GUI's records `ProductionChange` and `ChangeTask`
+(`domain/change`) with their nested records (`ChangeSchedule`, `ChangeTemplate` with `Approvers`, `Timing`,
+`Planning`, `PrivilegedAccess`, `RiskAssessment` and `SecureCoding`; `TaskDetails`, `ChangeApproval`, `WorkflowStep`,
+`Reminder`, `ChangeUpdate`) and enums (`ChangeState`, `ApprovalRole`, `ApprovalState`, `TaskState`), by their Java field names.
+The business service travels as `businessServiceId` and `businessServiceName` of the change, `template.businessService`
+and `ChangeUpdate.businessServiceName`. Beadle-ProTech keeps its own copy of these records; a field is renamed only in
+both repositories and this file together. Which ProTech table and field holds each one is in Beadle-ProTech's
+`docs/PROTECH-MAPPING.md`, and each is a property under `beadle.protech.fields.*` (for example
+`beadle.protech.fields.change.business-service`, default `u_department`).
 
-Callback to Beadle-GUI, sent whenever ProTech moved a change (state, approval, task) and Beadle-ProTech noticed
-(the demo adapter notices when its clock-driven workflow advances; the live adapter when it polls ProTech or when
-ProTech calls its webhook):
+Every change raised or read is followed until it is closed. Beadle-ProTech asks ProTech what moved every
+`beadle.protech.poll` (default `PT1M`); the webhook makes it look at one change at once. ProTech calls the webhook from
+a business rule with its own token, `PROTECH_WEBHOOK_TOKEN` (`beadle.protech.webhook-token`), which opens that path
+alone, so the service token never leaves the OpenShift project. The demo adapter moves its changes on its own clock.
+
+Callback when ProTech moved a change past what Beadle-GUI knows:
 
 `POST {beadle.gui.url}/api/callbacks/protech` with
-`{"number": "CHG0001234", "event": "STATE_CHANGED" | "APPROVAL_CHANGED" | "TASK_CHANGED", "state": "IMPLEMENTATION", "at": "2026-10-15T09:00:00Z", "correlationId": "..."}`.
-Beadle-GUI answers `202`, reads the change again through `POST /api/protech/changes/read` and records the event in
-the audit trail as actor `system:protech`.
+`{"number": "CHG0001234", "event": "STATE_CHANGED" | "APPROVAL_CHANGED" | "TASK_CHANGED", "state": "IMPLEMENTATION", "at": "2026-10-15T09:00:00Z"}`.
+Beadle-GUI answers `202`, reads the change again through `POST /api/protech/changes/read` and records the event as
+user `system:protech`; like the two services, it answers `401` without the token and `400` to an `X-Correlation-Id`
+longer than 64 characters. A callback that is not accepted is sent again at the next look.
 
 ## Beadle-Internal REST API (`/api/internal`)
 
 | Method and path | Body | Answer |
 |---|---|---|
 | `GET /api/internal/status` | | `{"jira": {"connected": false, "mode": "demo"}, "cyberTrack": {...}, "confluence": {...}, "qtest": {...}}` |
-| `GET /api/internal/jira/projects/{key}/versions` | | `[{"name": "1.4.0", "released": false, "releaseDate": "2026-11-01" or null}]` (`JiraVersion`) |
-| `GET /api/internal/jira/projects/{key}/epics?fixVersion=` | | `[{"key": "CERT-12", "summary": "...", "status": "In Progress", "epicKey": null, "updated": "2026-10-01"}]` (`JiraIssue`) |
-| `GET /api/internal/jira/projects/{key}/stories?fixVersion=&epicKeys=CERT-12,CERT-13` | | `[JiraIssue]` with `epicKey` set |
-| `POST /api/internal/cybertrack/tickets` | `{"changeNumber": "CHG0001234", "applicationName": "CertScanner", "implementationDate": "2026-10-20", "inputs": {"apoNumber": "...", "bitbucketUrl": "...", "artifactLink": "...", "qcApplicationLink": "..."}}` (the former `SecureCodingTicket`) | `201` `{"key": "SCP-123", "url": "https://.../browse/SCP-123" or null}` |
+| `GET /api/internal/jira/projects/{key}/versions` | | `[{"name": "1.4.0", "released": false, "releaseDate": "2026-11-01" or null}]` |
+| `GET /api/internal/jira/projects/{key}/epics?fixVersion=` | | `[{"key": "CERT-12", "summary": "...", "status": "In Progress", "epicKey": null, "updated": "2026-10-01"}]` |
+| `GET /api/internal/jira/projects/{key}/stories?fixVersion=&epicKeys=CERT-12,CERT-13` | | the same issues, with `epicKey` set |
+| `POST /api/internal/cybertrack/tickets` | `{"changeNumber": "CHG0001234", "applicationName": "CertScanner", "implementationDate": "2026-10-20", "inputs": {"apoNumber": "...", "bitbucketUrl": "...", "artifactLink": "...", "qcApplicationLink": "..."}}` | `201` `{"key": "SCP-123", "url": "https://.../browse/SCP-123" or null}` |
 | `GET /api/internal/cybertrack/tickets/{key}` | | `{"key": "SCP-123", "status": "To Do", "url": ..., "updated": "2026-10-15T09:00:00Z"}` |
 | `GET /api/internal/confluence/pages?spaceKey=&title=` | | `[{"id": "123", "spaceKey": "BEADLE", "title": "...", "version": 3, "url": "..."}]` |
 | `GET /api/internal/confluence/pages/{id}` | | the page with `body` (Confluence storage format) |
@@ -112,54 +144,51 @@ the audit trail as actor `system:protech`.
 | `GET /api/internal/qtest/projects/{id}/test-runs?cycleId=` | | `[{"id": 100, "name": "...", "pid": "TR-100", "status": "Passed", "executedAt": "..." or null}]` |
 | `GET /api/internal/qtest/projects/{id}/test-cycles/{cycleId}/summary` | | `{"total": 42, "passed": 40, "failed": 1, "blocked": 0, "unexecuted": 1}` |
 
-Real clients: Jira Cloud/Server REST API v2 (`/rest/api/2/...`, bearer token of the Beadle service account),
-CyberTrack the same API on its own base URL and token (`beadle.cybertrack.url`, `beadle.cybertrack.token`,
-`project-key` default `SCP`, `issue-type` default `Task`; the former `JiraCyberTrackAdapter` is the starting point),
-Confluence REST API (`/rest/api/content`, bearer token), qTest REST API v3 (`/api/v3/projects/...`, bearer token).
-Each client lives behind a port with a demo adapter used when its URL is blank, exactly as `CyberTrackProperties`
-did it with `CONFIGURED` / `NOT_CONFIGURED`.
+Real clients, each behind a port with a demo adapter for the laptop: Jira REST API v2 (`/rest/api/2/...`), CyberTrack
+the same API on its own base URL and token (`beadle.cybertrack.url`, `beadle.cybertrack.token`, `project-key` default
+`SCP`, `issue-type` default `Task`), Confluence REST API (`/rest/api/content`) and qTest REST API v3
+(`/api/v3/projects/...`), all with bearer tokens of Beadle's service accounts.
 
-Callback to Beadle-GUI, sent when a CyberTrack ticket Beadle created changes status (live adapter: polling every
-`beadle.cybertrack.poll` = PT5M of the open tickets it created; demo adapter: a clock-driven transition):
+Callback when a CyberTrack ticket Beadle created changes status (the live adapter reads the open tickets every
+`beadle.cybertrack.poll`, default `PT5M`; the demo adapter moves them on its clock):
 
-`POST {beadle.gui.url}/api/callbacks/internal` with
-`{"system": "CYBERTRACK", "key": "SCP-123", "status": "Done", "at": "...", "correlationId": "..."}`; Beadle-GUI
-answers `202` and records it as actor `system:internal`.
+`POST {beadle.gui.url}/api/callbacks/internal` with `{"system": "CYBERTRACK", "key": "SCP-123", "status": "Done", "at": "..."}`.
+Beadle-GUI answers `202` and records it as user `system:internal`. A callback that is not accepted is sent again at
+the next poll.
 
 ## Audit trail in Beadle-GUI
 
 Beadle-GUI is the system of record and the only place with an audit trail of user actions. Internal and ProTech
-keep a call log of their own (who caused the call, correlation id, system, operation, target, outcome, message,
-duration), in their own tables `BEADLE_INTERNAL_CALL_LOG` and `BEADLE_PROTECH_CALL_LOG`.
+keep their own call logs (`BEADLE_INTERNAL_CALL_LOG`, `BEADLE_PROTECH_CALL_LOG`).
 
-Table `BEADLE_ACTION_HISTORY` (Liquibase change set `002-action-history.sql` on top of `001-baseline.sql`): `ID`, `AT` (timestamp, UTC), `USER_NAME`, `ACTION`, `OBJECT_TYPE`,
-`OBJECT_ID`, `OBJECT_KEY` (the CHG, CTASK, product code or ticket key a person would search for), `DETAILS`
-(CLOB, JSON of the request without secrets, trimmed to 32 KB), `OUTCOME` (`SUCCESS` or `FAILURE`), `MESSAGE`
-(the error message on failure), `CORRELATION_ID`, `DURATION_MS`. The application only inserts; nothing updates or
-deletes a row. Indexes on `AT`, `USER_NAME`, `ACTION`, `OBJECT_KEY`.
+Table `BEADLE_ACTION_HISTORY`: `ID`, `AT` (UTC), `USER_NAME`, `ACTION`, `OBJECT_TYPE`, `OBJECT_ID`, `OBJECT_KEY` (the
+CHG, CTASK, product code or ticket key a person searches for), `DETAILS` (CLOB, the request as JSON with its
+secrets masked; above 256 KB `{"truncated": true, "bytes": n, ...}`), `OUTCOME` (`SUCCESS` or `FAILURE`), `MESSAGE` (the error on failure), `CORRELATION_ID`,
+`DURATION_MS`. Rows are only inserted. Indexes on `AT`, `USER_NAME`, `ACTION`, `OBJECT_KEY`.
 
-Every use case that changes something or calls another system records exactly one row, in the same transaction
-when there is one, and a `FAILURE` row when the use case throws. Actions (`ACTION` values):
-`CHANGE_PREVIEWED`, `CHANGE_RAISED`, `CHANGE_EDITED`, `CHANGE_TASKS_CREATED`, `SECURE_CODING_TICKET_CREATED`,
-`REMINDER_SENT`, `CHANGE_SYNCED`, `PRODUCT_CREATED`, `PRODUCT_UPDATED`, `PRODUCT_DELETED`,
-`CHANGE_PROFILE_UPDATED`, `BUSINESS_SERVICE_CREATED`, `BUSINESS_SERVICE_RENAMED`, `BUSINESS_SERVICE_DELETED`, `USER_SIGNED_IN`,
-`CALLBACK_PROTECH`, `CALLBACK_INTERNAL`. Reads are not recorded, except `CHANGE_SYNCED` when opening a change
-pulled a newer state from ProTech.
+Every use case that changes something or calls another system records exactly one row, in its transaction when it
+has one, and a `FAILURE` row when it throws or its request is refused before it runs (a field problem, a missing CSRF
+token of a signed-in user, a callback with the service token but a correlation id that is too long). A caller who
+proved nothing, without a session or the service token, or whose sign-in at Ping failed, is only logged. Actions: `CHANGE_PREVIEWED`, `CHANGE_RAISED`, `CHANGE_EDITED`,
+`CHANGE_TASKS_CREATED`, `SECURE_CODING_TICKET_CREATED`, `REMINDER_SENT`, `CHANGE_SYNCED`, `PRODUCT_CREATED`,
+`PRODUCT_UPDATED`, `PRODUCT_DELETED`, `CHANGE_PROFILE_UPDATED`, `BUSINESS_SERVICE_CREATED`, `BUSINESS_SERVICE_RENAMED`,
+`BUSINESS_SERVICE_DELETED`, `USER_SIGNED_IN` (the first API call of a session), `USER_SIGNED_OUT`, `CALLBACK_PROTECH`,
+`CALLBACK_INTERNAL`. Reads are not recorded, except `CHANGE_SYNCED` when opening a change pulled a newer state from
+ProTech.
 
-REST API: `GET /api/action-history?user=&action=&objectType=&objectKey=&outcome=&from=&to=&page=0&size=50` answers
-`{"content": [...], "page": 0, "size": 50, "total": 1234}` newest first; `GET /api/action-history/users` and
-`GET /api/action-history/actions` answer the distinct values for the filter lists. Page "Action History" at
-`/action-history` in the Angular interface, listed in the sections of the application after Admin.
+`GET /api/action-history?user=&action=&objectType=&objectKey=&outcome=&from=&to=&page=0&size=50` answers
+`{"content": [...], "page": 0, "size": 50, "total": 1234}`, newest first. `GET /api/action-history/users` and
+`GET /api/action-history/actions` answer the values for the filter lists. The Angular page is "Action History" at
+`/action-history`.
 
 ## Signing in to Beadle-GUI
 
-Users sign in with Ping (OpenID Connect) through Spring Security's OAuth2 login; registration id `ping`,
-`spring.security.oauth2.client.registration.ping.{client-id,client-secret}` from `PING_CLIENT_ID` /
-`PING_CLIENT_SECRET`, `provider.ping.issuer-uri` from `PING_ISSUER_URI`, scopes `openid profile email`. The signed-in
-user's name is `name` (fallback `preferred_username`, then `sub`) of the ID token. Profile `local` has no Ping:
-`beadle.auth.mode=local` signs everybody in as `beadle.signed-in-user` (default `Mateusz Matan`); profiles rd, qc
-and prod use `beadle.auth.mode=oidc`. `/api/**` requires a session except `/api/callbacks/**` (service token) and
-`/actuator/health`; the single-page application routes are public and the Angular app sends the browser to
-`/oauth2/authorization/ping` when an API call answers `401`. `GET /api/me` answers
-`{"name": "...", "email": "..." or null}`; `POST /logout` ends the session. The user name goes into every audit row
-and into `X-Beadle-User` of every call to Internal and ProTech; the external systems never see it.
+Users sign in with Ping (OpenID Connect) through Spring Security's OAuth2 login: registration `ping`, client id and
+secret from `PING_CLIENT_ID` and `PING_CLIENT_SECRET`, issuer from `PING_ISSUER_URI`, scopes `openid profile email`.
+The user's name is the ID token's `name` (then `preferred_username`, then `sub`). Profile `local` has no Ping
+(`beadle.auth.mode=local`) and signs everybody in as `beadle.auth.user` (`BEADLE_SIGNED_IN_USER`, default
+`Mateusz Matan`); `rd`, `qc` and `prod` use `oidc` and refuse to start in `local`. `/api/**` needs a session, except `/api/callbacks/**` (service token) and
+`/actuator/health`. The Angular app sends the browser to `/oauth2/authorization/ping` when an API call answers
+`401`. `GET /api/me` answers `{"name": "...", "email": "..." or null}` and `POST /logout` ends the session. The
+user's name goes into every audit row and into `X-Beadle-User` of every call to Internal and ProTech; the external
+systems never see it.

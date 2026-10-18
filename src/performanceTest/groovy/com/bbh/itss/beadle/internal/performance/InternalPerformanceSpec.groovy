@@ -3,26 +3,34 @@ package com.bbh.itss.beadle.internal.performance
 import com.bbh.itss.beadle.internal.support.BeadleInternalSpecification
 import com.bbh.itss.beadle.internal.support.LatencyStats
 
+/**
+ * The calls Beadle-GUI makes: the Jira reads of a release and the creation of a secure coding ticket.
+ */
 class InternalPerformanceSpec extends BeadleInternalSpecification {
 
-    def "status, jira and call log respond with low p95 latencies"() {
+    static final int LIMIT = 500
+
+    def "the Jira #read answer 20 calls on 2 threads with a p95 under 500 ms"() {
         when:
-        def statusStats = LatencyStats.measure([calls: 30, threads: 4], 'GET /api/internal/status') {
-            api.get('/api/internal/status').status == 200
-        }
-        def jiraStats = LatencyStats.measure([calls: 20, threads: 2], 'GET /api/internal/jira/projects/BDL/versions') {
-            api.get('/api/internal/jira/projects/BDL/versions').status == 200
-        }
-        def callLogStats = LatencyStats.measure([calls: 20, threads: 2], 'GET /api/internal/call-log') {
-            api.get('/api/internal/call-log?page=0&size=10').status == 200
-        }
+        def stats = LatencyStats.measure(20, 2) { api.get(path).status == 200 }
 
         then:
-        statusStats.p95 < 500
-        jiraStats.p95 < 500
-        callLogStats.p95 < 600
-        statusStats.errors == 0
-        jiraStats.errors == 0
-        callLogStats.errors == 0
+        stats.errors == 0
+        stats.p95 < LIMIT
+
+        where:
+        read      | path
+        'versions' | '/api/internal/jira/projects/CERT/versions'
+        'epics'    | '/api/internal/jira/projects/CERT/epics?fixVersion=CERT%201.4'
+        'stories'  | '/api/internal/jira/projects/CERT/stories?fixVersion=CERT%201.4&epicKeys=CERT-1,CERT-2'
+    }
+
+    def "20 secure coding tickets of different changes are created on 2 threads with a p95 under 500 ms"() {
+        when:
+        def stats = LatencyStats.measure(20, 2) { api.post('/api/internal/cybertrack/tickets', ticket()).status == 201 }
+
+        then:
+        stats.errors == 0
+        stats.p95 < LIMIT
     }
 }

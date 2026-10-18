@@ -2,6 +2,8 @@ package com.bbh.itss.beadle.internal.domain.confluence;
 
 public record ConfluencePage(String id, String spaceKey, String title, int version, String url, String body) {
 
+    public static final String NAME = "Confluence page";
+
     public ConfluencePage withoutBody() {
         return new ConfluencePage(id, spaceKey, title, version, url, null);
     }

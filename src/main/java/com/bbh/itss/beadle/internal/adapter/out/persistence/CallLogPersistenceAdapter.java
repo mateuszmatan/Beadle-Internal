@@ -5,35 +5,34 @@ import com.bbh.itss.beadle.internal.domain.calllog.CallLogEntry;
 import com.bbh.itss.beadle.internal.domain.calllog.CallLogPage;
 import com.bbh.itss.beadle.internal.domain.calllog.CallLogQuery;
 import jakarta.persistence.criteria.Predicate;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.springframework.data.domain.Sort.Direction.DESC;
-import static org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW;
+import static org.springframework.transaction.annotation.Propagation.REQUIRES_NEW;
 
+/**
+ * The call log: each entry is written in a transaction of its own, so that it stays even when the call it records
+ * failed the transaction around it.
+ */
 @Component
+@RequiredArgsConstructor
 class CallLogPersistenceAdapter implements CallLogPort {
 
     private final CallLogJpaRepository entries;
-    private final TransactionTemplate ownTransaction;
-
-    CallLogPersistenceAdapter(CallLogJpaRepository entries, PlatformTransactionManager transactionManager) {
-        this.entries = entries;
-        this.ownTransaction = new TransactionTemplate(transactionManager);
-        this.ownTransaction.setPropagationBehavior(PROPAGATION_REQUIRES_NEW);
-    }
 
     @Override
+    @Transactional(propagation = REQUIRES_NEW)
     public CallLogEntry record(CallLogEntry entry) {
-        return ownTransaction.execute(status -> entries.save(CallLogEntity.of(entry)).toDomain());
+        return entries.save(CallLogEntity.of(entry)).toDomain();
     }
 
     @Override

@@ -1,18 +1,15 @@
 package com.bbh.itss.beadle.internal.domain.cybertrack;
 
 import com.bbh.itss.beadle.internal.domain.shared.ValidationProblems;
-import lombok.Builder;
 
 import static com.bbh.itss.beadle.internal.domain.shared.Text.isUrl;
 import static org.apache.commons.lang3.StringUtils.trimToNull;
 
-@Builder(toBuilder = true)
 public record SecureCoding(String apoNumber, String bitbucketUrl, String artifactLink, String qcApplicationLink) {
 
     public static final SecureCoding NONE = new SecureCoding(null, null, null, null);
     public static final int NUMBER_MAX = 40;
     public static final int LINK_MAX = 500;
-    public static final String REQUIRED = "is required";
     public static final String LINK_MESSAGE = "must be a link starting with https:// or http://";
 
     public SecureCoding {
@@ -30,10 +27,8 @@ public record SecureCoding(String apoNumber, String bitbucketUrl, String artifac
     }
 
     void require(ValidationProblems problems) {
-        problems.require("apoNumber", apoNumber, REQUIRED)
-                .require("bitbucketUrl", bitbucketUrl, REQUIRED)
-                .require("artifactLink", artifactLink, REQUIRED)
-                .require("qcApplicationLink", qcApplicationLink, REQUIRED);
+        problems.require("apoNumber", apoNumber).require("bitbucketUrl", bitbucketUrl)
+                .require("artifactLink", artifactLink).require("qcApplicationLink", qcApplicationLink);
         validate(problems);
     }
 

@@ -1,16 +1,20 @@
 package com.bbh.itss.beadle.internal.support
 
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import spock.lang.Specification
 
 import java.time.Instant
+import java.util.concurrent.atomic.AtomicInteger
 
 import static java.nio.charset.StandardCharsets.UTF_8
 import static java.time.temporal.ChronoUnit.SECONDS
@@ -18,39 +22,45 @@ import static org.springframework.boot.test.context.SpringBootTest.WebEnvironmen
 
 /**
  * Runs Beadle-Internal on a random port with the demo adapters on an in-memory H2 in Oracle mode, a clock that only
- * moves when a spec moves it, and {@link GuiStub} as Beadle-GUI. Every spec shares the one application, so a spec
- * tells its data apart by the correlation id of its calls or by a unique name.
+ * moves when a spec moves it, and {@link GuiStub} as Beadle-GUI. Every spec of a suite shares the one application, so
+ * a spec tells its data apart by the correlation id of its calls or by a unique name.
  */
 @SpringBootTest(webEnvironment = RANDOM_PORT, properties = [
-        'spring.datasource.url=jdbc:h2:mem:beadle-internal;MODE=Oracle;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000',
-        'beadle.services.token=regression-service-token',
-        'beadle.cybertrack.demo-poll=PT0.3S'])
+        'spring.datasource.url=jdbc:h2:mem:beadle-internal;MODE=Oracle;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1',
+        'beadle.services.token=suite-service-token',
+        'beadle.cybertrack.poll=PT0.2S'])
 @ActiveProfiles('local')
-@Import(RegressionClock)
-abstract class BeadleInternalSpecification extends ServiceSpecification {
+@Import(SuiteClock)
+abstract class BeadleInternalSpecification extends Specification {
 
-    static final String TOKEN = 'regression-service-token'
+    static final String TOKEN = 'suite-service-token'
     static final String USER = 'Mateusz Matan'
     static final GuiStub GUI = GuiStub.start()
+    static final AtomicInteger CHANGES = new AtomicInteger(30_000)
 
     @DynamicPropertySource
     static void beadleGui(DynamicPropertyRegistry registry) {
         registry.add('beadle.gui.url') { GUI.url }
     }
 
+    @Value('${local.server.port}')
+    int port
+
+    @Autowired
+    JdbcTemplate jdbc
+
     @Autowired
     MutableClock clock
 
     String correlationId = UUID.randomUUID().toString()
 
-    @Override
-    ServiceClient getApi() {
-        super.api.withHeaders([Authorization: "Bearer $TOKEN" as String, 'X-Beadle-User': URLEncoder.encode(USER, UTF_8),
-                               'X-Correlation-Id': correlationId])
+    ServiceClient getAnonymous() {
+        new ServiceClient("http://localhost:$port")
     }
 
-    ServiceClient getAnonymous() {
-        super.api
+    ServiceClient getApi() {
+        anonymous.withHeaders([Authorization     : "Bearer $TOKEN" as String, 'X-Beadle-User': URLEncoder.encode(USER, UTF_8),
+                               'X-Correlation-Id': correlationId])
     }
 
     /**
@@ -62,16 +72,23 @@ abstract class BeadleInternalSpecification extends ServiceSpecification {
         (response.json.entries as List<Map>).reverse()
     }
 
-    static String uniqueName(String prefix) {
-        "$prefix ${UUID.randomUUID().toString().take(8)}"
+    /**
+     * A secure coding ticket request as Beadle-GUI sends it, for a change no other call of the suite used.
+     */
+    static Map ticket(Map changes = [:]) {
+        [changeNumber: String.format('CHG%07d', CHANGES.incrementAndGet()), applicationName: 'CertScanner',
+         implementationDate: '2026-10-20',
+         inputs: [apoNumber: 'APO-12345', bitbucketUrl: 'https://bitbucket.bbh.com/projects/CERT/repos/cert',
+                  artifactLink: 'https://nexus.bbh.com/cert/cert-1.4.jar', qcApplicationLink: 'https://cert.qc.bbh.com']] +
+                changes
     }
 
     @TestConfiguration(proxyBeanMethods = false)
-    static class RegressionClock {
+    static class SuiteClock {
 
         @Bean
         @Primary
-        MutableClock regressionClock() {
+        MutableClock suiteClock() {
             new MutableClock(Instant.now().truncatedTo(SECONDS))
         }
     }

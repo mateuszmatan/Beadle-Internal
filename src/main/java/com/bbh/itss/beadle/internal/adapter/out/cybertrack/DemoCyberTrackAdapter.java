@@ -1,5 +1,6 @@
 package com.bbh.itss.beadle.internal.adapter.out.cybertrack;
 
+import com.bbh.itss.beadle.internal.adapter.out.http.ConditionalOnSystemUrl;
 import com.bbh.itss.beadle.internal.application.cybertrack.port.out.CyberTrackPort;
 import com.bbh.itss.beadle.internal.application.cybertrack.port.out.TrackedTicketPort;
 import com.bbh.itss.beadle.internal.domain.cybertrack.CreatedTicket;
@@ -8,7 +9,7 @@ import com.bbh.itss.beadle.internal.domain.cybertrack.SecureCodingTicket;
 import com.bbh.itss.beadle.internal.domain.cybertrack.TrackedTicket;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.security.SecureRandom;
@@ -24,7 +25,6 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
-import static com.bbh.itss.beadle.internal.adapter.out.cybertrack.CyberTrackProperties.NOT_CONFIGURED;
 import static com.bbh.itss.beadle.internal.domain.shared.Failures.notFound;
 import static com.bbh.itss.beadle.internal.domain.shared.Timestamps.now;
 import static java.lang.Math.min;
@@ -39,13 +39,13 @@ import static java.time.Duration.ofMinutes;
  */
 @Slf4j
 @Component
-@ConditionalOnExpression(NOT_CONFIGURED)
+@Profile("local")
+@ConditionalOnSystemUrl(value = "cybertrack", set = false)
 @RequiredArgsConstructor
 class DemoCyberTrackAdapter implements CyberTrackPort {
 
     static final Duration STEP = ofMinutes(2);
     static final List<String> STATUSES = List.of("To Do", "In Progress", "Done");
-    static final String TICKET = "CyberTrack ticket";
 
     private final Map<String, Instant> created = new ConcurrentHashMap<>();
     private final Clock clock;
@@ -116,7 +116,7 @@ class DemoCyberTrackAdapter implements CyberTrackPort {
      */
     private Instant createdAt(String key, Instant now) {
         if (!key.matches(Pattern.quote(prefix()) + "\\d+")) {
-            throw notFound(TICKET, key);
+            throw notFound(CyberTrackTicket.NAME, key);
         }
         return tracked.find(key).map(TrackedTicket::createdAt)
                 .orElseGet(() -> now.minus(STEP.multipliedBy(STATUSES.size() - 1L)));

@@ -1,17 +1,17 @@
 package com.bbh.itss.beadle.internal.adapter.out.qtest;
 
+import com.bbh.itss.beadle.internal.adapter.out.http.ConditionalOnSystemUrl;
+import com.bbh.itss.beadle.internal.adapter.out.http.SystemClient;
 import com.bbh.itss.beadle.internal.application.qtest.port.out.QTestPort;
 import com.bbh.itss.beadle.internal.domain.qtest.QTestCycle;
 import com.bbh.itss.beadle.internal.domain.qtest.QTestProject;
 import com.bbh.itss.beadle.internal.domain.qtest.QTestRun;
 import com.bbh.itss.beadle.internal.domain.qtest.QTestSummary;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -32,17 +32,16 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
-import static com.bbh.itss.beadle.internal.adapter.out.http.ExternalSystems.client;
-import static com.bbh.itss.beadle.internal.adapter.out.http.ExternalSystems.refusal;
-import static com.bbh.itss.beadle.internal.adapter.out.http.ExternalSystems.timestamp;
-import static com.bbh.itss.beadle.internal.adapter.out.qtest.QTestProperties.CONFIGURED;
+import static com.bbh.itss.beadle.internal.adapter.out.http.SystemClient.thrown;
+import static com.bbh.itss.beadle.internal.adapter.out.http.SystemClient.timestamp;
 import static com.bbh.itss.beadle.internal.domain.qtest.QTestSummary.UNEXECUTED;
 import static com.bbh.itss.beadle.internal.domain.shared.Failures.notFound;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
+import static org.apache.commons.collections4.ListUtils.emptyIfNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.Strings.CI;
-import static org.springframework.http.MediaType.APPLICATION_JSON;
 
 /**
  * Reads qTest Manager through its v3 API. The runs of a cycle come 999 a page, the most qTest gives; their status
@@ -52,13 +51,12 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
  * {@code beadle.qtest.budget} is refused and its calls are interrupted, so that Beadle-GUI gets an answer before it
  * gives up waiting.
  */
+@Slf4j
 @Component
-@ConditionalOnExpression(CONFIGURED)
+@ConditionalOnSystemUrl("qtest")
 class QTestAdapter implements QTestPort {
 
     static final String QTEST = "qTest";
-    static final String PROJECT = "qTest project";
-    static final String CYCLE = "qTest test cycle";
     static final int PAGE_SIZE = 999;
     static final int MAX_RUNS = 2_000;
     static final String CYCLES_UNDER = "/api/v3/projects/{id}/test-cycles?parentId={parent}&parentType={type}"
@@ -74,12 +72,12 @@ class QTestAdapter implements QTestPort {
     private static final ParameterizedTypeReference<List<Release>> RELEASES = new ParameterizedTypeReference<>() {
     };
 
-    private final RestClient client;
+    private final SystemClient qtest;
     private final Semaphore reads;
     private final Duration budget;
 
     QTestAdapter(QTestProperties properties, RestClient.Builder builder) {
-        this.client = client(builder, properties.url(), properties.token());
+        this.qtest = new SystemClient(QTEST, builder, properties.url(), properties.token());
         this.reads = new Semaphore(properties.concurrency(), true);
         this.budget = properties.budget();
     }
@@ -91,14 +89,9 @@ class QTestAdapter implements QTestPort {
 
     @Override
     public List<QTestProject> projects() {
-        try {
-            List<Project> projects = client.get().uri("/api/v3/projects").accept(APPLICATION_JSON).retrieve()
-                    .body(PROJECTS);
-            return projects == null ? List.of()
-                    : projects.stream().map(project -> new QTestProject(project.id(), project.name())).toList();
-        } catch (RestClientException e) {
-            throw refusal(QTEST, "list the projects", e);
-        }
+        List<Project> projects = qtest.call("list the projects",
+                client -> client.get().uri("/api/v3/projects").retrieve().body(PROJECTS));
+        return emptyIfNull(projects).stream().map(project -> new QTestProject(project.id(), project.name())).toList();
     }
 
     /**
@@ -110,14 +103,14 @@ class QTestAdapter implements QTestPort {
     public List<QTestCycle> cycles(long projectId) {
         return withinBudget("list the test cycles of project " + projectId, () -> {
             List<QTestCycle> flat = new ArrayList<>();
-            try {
-                flatten(cyclesUnder(projectId, ROOT_ID, ROOT), flat);
-            } catch (HttpClientErrorException.NotFound e) {
-                throw notFound(PROJECT, projectId);
-            } catch (RestClientException e) {
-                throw refusal(QTEST, "list the test cycles of project " + projectId, e);
-            }
-            concurrently(releases(projectId), release -> releaseCycles(projectId, release))
+            flatten(cyclesUnder(projectId, ROOT_ID, ROOT, "project " + projectId,
+                    thrown(() -> notFound(QTestProject.NAME, projectId))), flat);
+            List<Release> releases = qtest.call("list the releases of project " + projectId,
+                    Map.of(404, thrown(() -> notFound(QTestProject.NAME, projectId))),
+                    client -> client.get().uri("/api/v3/projects/{id}/releases", projectId).retrieve().body(RELEASES));
+            // a release deleted since it was listed has no cycles left
+            concurrently(emptyIfNull(releases),
+                    release -> cyclesUnder(projectId, release.id(), RELEASE, "release " + release.id(), List::of))
                     .forEach(cycles -> flatten(cycles, flat));
             return flat;
         });
@@ -141,7 +134,10 @@ class QTestAdapter implements QTestPort {
     private List<QTestRun> read(long projectId, long cycleId, boolean statusOnly) {
         List<Run> runs = runsOf(projectId, cycleId);
         List<Run> unread = runs.stream().filter(run -> run.needsLastResult(statusOnly)).toList();
-        List<Log> logs = concurrently(unread, run -> lastLog(projectId, run.id()));
+        List<Log> logs = concurrently(unread, run -> qtest.call("read the last result of test run " + run.id(),
+                Map.of(404, () -> null), client -> client.get()
+                        .uri("/api/v3/projects/{id}/test-runs/{run}/test-logs/last-run", projectId, run.id())
+                        .retrieve().body(Log.class)));
         Map<Long, Log> lastResults = new HashMap<>();
         for (int index = 0; index < unread.size(); index++) {
             lastResults.put(unread.get(index).id(), logs.get(index));
@@ -149,73 +145,32 @@ class QTestAdapter implements QTestPort {
         return runs.stream().map(run -> run.toRun(lastResults.get(run.id()))).toList();
     }
 
-    private List<Cycle> cyclesUnder(long projectId, long parentId, String parentType) {
-        return client.get().uri(CYCLES_UNDER, projectId, parentId, parentType).accept(APPLICATION_JSON).retrieve()
-                .body(CYCLES);
-    }
-
-    private List<Cycle> releaseCycles(long projectId, Release release) {
-        try {
-            return cyclesUnder(projectId, release.id(), RELEASE);
-        } catch (HttpClientErrorException.NotFound e) {
-            return List.of();  // a release deleted since it was listed has no cycles left
-        } catch (RestClientException e) {
-            throw refusal(QTEST, "list the test cycles of release " + release.id(), e);
-        }
-    }
-
-    private List<Release> releases(long projectId) {
-        try {
-            List<Release> releases = client.get().uri("/api/v3/projects/{id}/releases", projectId)
-                    .accept(APPLICATION_JSON).retrieve().body(RELEASES);
-            return releases == null ? List.of() : releases;
-        } catch (HttpClientErrorException.NotFound e) {
-            throw notFound(PROJECT, projectId);
-        } catch (RestClientException e) {
-            throw refusal(QTEST, "list the releases of project " + projectId, e);
-        }
+    private List<Cycle> cyclesUnder(long projectId, long parentId, String parentType, String parent,
+                                    Supplier<List<Cycle>> unknown) {
+        return qtest.call("list the test cycles of " + parent, Map.of(404, unknown),
+                client -> client.get().uri(CYCLES_UNDER, projectId, parentId, parentType).retrieve().body(CYCLES));
     }
 
     private List<Run> runsOf(long projectId, long cycleId) {
-        try {
-            client.get().uri("/api/v3/projects/{id}/test-cycles/{cycleId}", projectId, cycleId)
-                    .accept(APPLICATION_JSON).retrieve().body(Cycle.class);
-        } catch (HttpClientErrorException.NotFound e) {
-            throw notFound(CYCLE, cycleId);
-        } catch (RestClientException e) {
-            throw refusal(QTEST, "read the test cycle " + cycleId, e);
-        }
+        qtest.call("read the test cycle " + cycleId, Map.of(404, thrown(() -> notFound(QTestCycle.NAME, cycleId))),
+                client -> client.get().uri("/api/v3/projects/{id}/test-cycles/{cycleId}", projectId, cycleId)
+                        .retrieve().body(Cycle.class));
         List<Run> runs = new ArrayList<>();
-        try {
-            boolean more;
-            int page = 0;
-            do {
-                RunPage fetched = client.get()
-                        .uri("/api/v3/projects/{id}/test-runs?parentId={cycle}&parentType=test-cycle"
-                                + "&expand=descendants&page={page}&pageSize={size}",
-                                projectId, cycleId, ++page, PAGE_SIZE)
-                        .accept(APPLICATION_JSON).retrieve().body(RunPage.class);
-                if (fetched == null || fetched.items() == null || fetched.items().isEmpty()) {
-                    break;
-                }
-                runs.addAll(fetched.items());
-                more = fetched.total() == null ? fetched.items().size() >= PAGE_SIZE : runs.size() < fetched.total();
-            } while (more && runs.size() < MAX_RUNS);
-        } catch (RestClientException e) {
-            throw refusal(QTEST, "list the test runs of test cycle " + cycleId, e);
-        }
+        boolean more;
+        int page = 0;
+        do {
+            int next = ++page;
+            RunPage fetched = qtest.call("list the test runs of test cycle " + cycleId, client -> client.get()
+                    .uri("/api/v3/projects/{id}/test-runs?parentId={cycle}&parentType=test-cycle"
+                            + "&expand=descendants&page={page}&pageSize={size}", projectId, cycleId, next, PAGE_SIZE)
+                    .retrieve().body(RunPage.class));
+            if (fetched == null || emptyIfNull(fetched.items()).isEmpty()) {
+                break;
+            }
+            runs.addAll(fetched.items());
+            more = fetched.total() == null ? fetched.items().size() >= PAGE_SIZE : runs.size() < fetched.total();
+        } while (more && runs.size() < MAX_RUNS);
         return runs;
-    }
-
-    private Log lastLog(long projectId, long runId) {
-        try {
-            return client.get().uri("/api/v3/projects/{id}/test-runs/{run}/test-logs/last-run", projectId, runId)
-                    .accept(APPLICATION_JSON).retrieve().body(Log.class);
-        } catch (HttpClientErrorException.NotFound e) {
-            return null;
-        } catch (RestClientException e) {
-            throw refusal(QTEST, "read the last result of test run " + runId, e);
-        }
     }
 
     /**
@@ -229,6 +184,7 @@ class QTestAdapter implements QTestPort {
             return task.get(budget.toNanos(), NANOSECONDS);
         } catch (TimeoutException e) {
             task.cancel(true);
+            log.warn("qTest could not {} within {}", operation, seconds(budget));
             throw new UncheckedIOException(QTEST + " could not " + operation + " within " + seconds(budget)
                     + ": it answers too slowly or the listing is too large", new IOException(e));
         } catch (InterruptedException e) {

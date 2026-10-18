@@ -14,6 +14,8 @@ import static org.apache.commons.lang3.StringUtils.trimToEmpty;
 @AllArgsConstructor(access = PRIVATE)
 public class ValidationProblems {
 
+    public static final String REQUIRED = "is required";
+
     private final String prefix;
     private final List<FieldProblem> problems;
 
@@ -29,9 +31,9 @@ public class ValidationProblems {
         problems.add(new FieldProblem(prefix + field, message));
     }
 
-    public ValidationProblems require(String field, Object value, String message) {
+    public ValidationProblems require(String field, Object value) {
         if (value == null || value instanceof Collection<?> values && values.isEmpty()) {
-            add(field, message);
+            add(field, REQUIRED);
         }
         return this;
     }
@@ -41,10 +43,6 @@ public class ValidationProblems {
             add(field, "is too long: it may take at most " + maxBytes + " bytes");
         }
         return this;
-    }
-
-    public List<FieldProblem> list() {
-        return List.copyOf(problems);
     }
 
     public void throwIfAny() {

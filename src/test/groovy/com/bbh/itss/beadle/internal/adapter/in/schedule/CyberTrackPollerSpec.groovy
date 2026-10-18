@@ -5,10 +5,10 @@ import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import com.bbh.itss.beadle.internal.application.cybertrack.port.in.CyberTrackPollUseCase
-import com.bbh.itss.beadle.internal.config.SchedulingConfiguration
 import com.bbh.itss.beadle.internal.domain.callback.PollReport
 import org.slf4j.LoggerFactory
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
+import org.springframework.scheduling.annotation.EnableScheduling
 import org.springframework.scheduling.config.FixedDelayTask
 import org.springframework.scheduling.config.ScheduledTaskHolder
 import spock.lang.Specification
@@ -49,13 +49,13 @@ class CyberTrackPollerSpec extends Specification {
         where:
         report << [PollReport.NOTHING,
                    new PollReport([statusCallback()], ['SCP-1235': 'Beadle-GUI could not take the callback for SCP-1235: 503'],
-                           ['SCP-1236': 'the demo CyberTrack made it up'])]
+                           ['SCP-1236': 'CyberTrack did not find it 12 polls in a row'])]
         messages << [[],
                      ['INFO Told Beadle-GUI that CyberTrack ticket SCP-1234 is now In Progress',
                       'WARN CyberTrack ticket SCP-1235 could not be followed up and is tried again on the next tick: ' +
                               'Beadle-GUI could not take the callback for SCP-1235: 503',
                       'WARN CyberTrack ticket SCP-1236 is no longer followed and Beadle-GUI hears no more of it: ' +
-                              'the demo CyberTrack made it up']]
+                              'CyberTrack did not find it 12 polls in a row']]
     }
 
     def "a tick never throws the #failure.class.simpleName the poll ran into, it logs it and tries again on the next tick"() {
@@ -77,26 +77,24 @@ class CyberTrackPollerSpec extends Specification {
                     new IllegalStateException('database down')]
     }
 
-    def "the tickets are polled every #expected #mode"() {
+    def "the tickets are polled every beadle.cybertrack.poll"() {
         given:
         def runner = new ApplicationContextRunner()
-                .withUserConfiguration(SchedulingConfiguration, CyberTrackPoller)
+                .withUserConfiguration(Scheduling, CyberTrackPoller)
                 .withBean(CyberTrackPollUseCase, { [poll: { PollReport.NOTHING }] as CyberTrackPollUseCase } as Supplier<CyberTrackPollUseCase>)
+                .withPropertyValues('beadle.cybertrack.poll=PT1M')
 
         expect:
-        runner.withPropertyValues(properties as String[]).run { context ->
+        runner.run { context ->
             def tasks = context.getBeansOfType(ScheduledTaskHolder).values()*.scheduledTasks.flatten()
             assert tasks.size() == 1
             def task = tasks.first().task as FixedDelayTask
-            assert task.intervalDuration == expected
-            assert task.initialDelayDuration == expected
+            assert task.intervalDuration == Duration.ofMinutes(1)
+            assert task.initialDelayDuration == Duration.ofMinutes(1)
         }
+    }
 
-        where:
-        mode                                      | properties                                                                       || expected
-        'on the demo clock'                       | []                                                                               || Duration.ofSeconds(10)
-        'on the demo clock, whatever the poll is' | ['beadle.cybertrack.url=', 'beadle.cybertrack.poll=PT1M']                        || Duration.ofSeconds(10)
-        'by default once CyberTrack is set'       | ['beadle.cybertrack.url=https://cybertrack.bbh.com']                             || Duration.ofMinutes(5)
-        'as configured once CyberTrack is set'    | ['beadle.cybertrack.url=https://cybertrack.bbh.com', 'beadle.cybertrack.poll=PT1M'] || Duration.ofMinutes(1)
+    @EnableScheduling
+    static class Scheduling {
     }
 }

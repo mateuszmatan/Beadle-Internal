@@ -11,10 +11,8 @@ import spock.lang.Specification
 
 import java.time.Instant
 
-import static com.bbh.itss.beadle.internal.adapter.out.cybertrack.CyberTrackAdapter.CREATE
 import static com.bbh.itss.beadle.internal.adapter.out.cybertrack.CyberTrackAdapter.NO_FIELDS
 import static com.bbh.itss.beadle.internal.adapter.out.cybertrack.CyberTrackAdapter.NO_KEY
-import static com.bbh.itss.beadle.internal.adapter.out.cybertrack.CyberTrackAdapter.READ
 import static com.bbh.itss.beadle.internal.support.Fixtures.ticket
 import static org.springframework.http.HttpMethod.GET
 import static org.springframework.http.HttpMethod.POST
@@ -78,8 +76,8 @@ class CyberTrackAdapterSpec extends Specification {
 
         then:
         def refused = thrown(UncheckedIOException)
-        refused.message.startsWith('CyberTrack could not ' + CREATE + ': ' + reason)
-        refused.message.length() <= ('CyberTrack could not ' + CREATE + ': ').length() + 300
+        refused.message.startsWith('CyberTrack could not create the secure coding ticket: ' + reason)
+        refused.message.length() <= ('CyberTrack could not create the secure coding ticket: ').length() + 300
 
         where:
         problem               | response                                                                        || reason
@@ -99,7 +97,7 @@ class CyberTrackAdapterSpec extends Specification {
 
         then:
         def refused = thrown(UncheckedIOException)
-        refused.message.startsWith('CyberTrack could not ' + CREATE + ': I/O error')
+        refused.message.startsWith('CyberTrack could not create the secure coding ticket: I/O error')
     }
 
     def "a ticket is read with its status and the time of its last change in #notation"() {
@@ -132,7 +130,7 @@ class CyberTrackAdapterSpec extends Specification {
         where:
         problem          | response                                                     || exception              | reason
         'not found'      | withResourceNotFound().body('{"errorMessages":["Issue Does Not Exist"]}') || NoSuchElementException | 'CyberTrack ticket SCP-9 does not exist'
-        'a server error' | withServerError().body('{"errorMessages":["boom"]}')         || UncheckedIOException   | 'CyberTrack could not ' + READ + ' SCP-9: 500'
+        'a server error' | withServerError().body('{"errorMessages":["boom"]}')         || UncheckedIOException   | 'CyberTrack could not read the ticket SCP-9: 500'
         'no fields'      | withSuccess('{"key":"SCP-9"}', APPLICATION_JSON)             || UncheckedIOException   | NO_FIELDS + 'SCP-9'
     }
 
@@ -192,7 +190,7 @@ class CyberTrackAdapterSpec extends Specification {
 
         then:
         def refused = thrown(UncheckedIOException)
-        refused.message.startsWith('CyberTrack could not ' + CyberTrackAdapter.READ_ALL + ' SCP-1, SCP-2: 400 Bad Request')
+        refused.message.startsWith('CyberTrack could not read the tickets SCP-1, SCP-2: 400 Bad Request')
     }
 
     private CyberTrackAdapter adapter(String projectKey, String issueType) {

@@ -1,56 +1,70 @@
 package com.bbh.itss.beadle.internal.config
 
 import org.yaml.snakeyaml.Yaml
+import spock.lang.Shared
 import spock.lang.Specification
 
 import static groovy.io.FileType.FILES
 
+/**
+ * The OpenShift manifests: one pod of Beadle-Internal in the one project of the Beadle services, reached by Beadle-GUI
+ * through the Service only, configured by its own ConfigMap and Secrets plus the service token shared in the project.
+ */
 class OpenShiftManifestsSpec extends Specification {
 
     static final File MANIFESTS = new File('deploy/openshift/beadle-internal')
 
-    def "nothing of Beadle-Internal is published outside the cluster, as only Beadle-GUI calls it: #file"() {
+    @Shared
+    Map service = documents('base/service.yaml').first()
+
+    @Shared
+    Map deployment = documents('base/deployment.yaml').first()
+
+    @Shared
+    Map container = deployment.spec.template.spec.containers.first()
+
+    def "nothing of Beadle-Internal is published outside the cluster, and no overlay adds a resource: #file.name"() {
+        given:
+        List<Map> manifest = new Yaml().loadAll(file.text).findAll()
+
         expect:
-        documents(file).every { !(it.kind in ['Route', 'Ingress']) }
+        manifest.every { !(it.kind in ['Route', 'Ingress']) && !it.namespace && !it.metadata?.namespace }
+        !file.path.contains('overlays') || manifest.first().subMap(['resources', 'components']) == [resources: ['../../base']]
+        !file.path.contains('overlays') || manifest.first().configMapGenerator.first().literals.first() ==
+                "SPRING_PROFILES_ACTIVE=${file.parentFile.name}"
 
         where:
         file << manifests()
     }
 
-    def "the base applies the Deployment and the Service only, and no overlay adds a resource or a component"() {
+    def "one pod runs behind the Service that Beadle-GUI calls at http://beadle-internal:8082"() {
         expect:
-        kustomization('base').resources == ['deployment.yaml', 'service.yaml']
-        ['rd', 'qc', 'prod'].every { environment ->
-            def overlay = kustomization("overlays/$environment")
-            overlay.resources == ['../../base'] && !overlay.containsKey('components')
-        }
-    }
-
-    def "Beadle-GUI reaches the API inside the cluster at http://beadle-internal:8082 through the Service"() {
-        given:
-        Map service = documents(new File(MANIFESTS, 'base/service.yaml')).first()
-        Map container = documents(new File(MANIFESTS, 'base/deployment.yaml')).first().spec.template.spec.containers.first()
-
-        expect:
-        service.kind == 'Service'
+        deployment.spec.replicas == 1
         service.metadata.name == 'beadle-internal'
         service.spec.type in [null, 'ClusterIP']
         service.spec.ports == [[name: 'http', port: 8082, targetPort: 'http', protocol: 'TCP']]
-        container.ports.find { it.name == 'http' }.containerPort == 8082
+        container.ports == [[name: 'http', containerPort: 8082, protocol: 'TCP']]
     }
 
-    private static Map kustomization(String directory) {
-        documents(new File(MANIFESTS, "$directory/kustomization.yaml")).first()
+    def "the pod is configured by its own ConfigMap and Secrets, shares the service token of the project and is probed on its health groups"() {
+        expect:
+        container.envFrom.collect { (it.configMapRef ?: it.secretRef).name } ==
+                ['beadle-internal-config', 'beadle-internal-db', 'beadle-services', 'beadle-internal-jira',
+                 'beadle-internal-cybertrack', 'beadle-internal-confluence', 'beadle-internal-qtest']
+        documents('base/kustomization.yaml').first().configMapGenerator ==
+                [[name: 'beadle-internal-config', literals: ['BEADLE_GUI_URL=http://beadle:8081']]]
+        [container.startupProbe, container.livenessProbe, container.readinessProbe]*.httpGet ==
+                [[path: '/actuator/health/liveness', port: 'http'], [path: '/actuator/health/liveness', port: 'http'],
+                 [path: '/actuator/health/readiness', port: 'http']]
     }
 
-    private static List<Map> documents(File file) {
-        new Yaml().loadAll(file.text).findAll { it != null }.collect { it as Map }
+    private static List<Map> documents(String path) {
+        new Yaml().loadAll(new File(MANIFESTS, path).text).findAll().collect { it as Map }
     }
 
     private static List<File> manifests() {
         List<File> files = []
         MANIFESTS.eachFileRecurse(FILES) { files << it }
-        assert files.size() >= 6
         files.sort()
     }
 }

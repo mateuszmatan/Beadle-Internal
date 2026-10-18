@@ -2,34 +2,30 @@ package com.bbh.itss.beadle.internal.smoke
 
 import com.bbh.itss.beadle.internal.support.BeadleInternalSpecification
 
+/**
+ * What Beadle-GUI needs of Beadle-Internal: its health, the status, the Jira versions and a secure coding ticket.
+ */
 class InternalSmokeSpec extends BeadleInternalSpecification {
 
-    def "the service reports UP on health endpoints"() {
-        when:
-        def health = anonymous.get('/actuator/health')
-        def liveness = anonymous.get('/actuator/health/liveness')
-        def readiness = anonymous.get('/actuator/health/readiness')
+    static final Map DEMO = [connected: false, mode: 'demo']
 
-        then:
-        health.status == 200
-        health.json.status == 'UP'
-        liveness.status == 200
-        liveness.json.status == 'UP'
-        readiness.status == 200
-        readiness.json.status == 'UP'
+    def "the health, liveness and readiness are UP and open without a token"() {
+        expect:
+        ['/actuator/health', '/actuator/health/liveness', '/actuator/health/readiness'].every {
+            def health = anonymous.get(it)
+            health.status == 200 && health.json.status == 'UP'
+        }
     }
 
-    def "the service reports internal system statuses and serves call log"() {
+    def "the status answers, a Jira project lists its versions and a secure coding ticket is created, with the token only"() {
         when:
-        def status = api.get('/api/internal/status')
-        def callLog = api.get('/api/internal/call-log?page=0&size=10')
+        def created = api.post('/api/internal/cybertrack/tickets', ticket())
 
         then:
-        status.status == 200
-        status.json.containsKey('jira')
-        status.json.containsKey('confluence')
-        status.json.containsKey('cyberTrack')
-        status.json.containsKey('qtest')
-        callLog.status == 200
+        api.get('/api/internal/status').json == [jira: DEMO, cyberTrack: DEMO, confluence: DEMO, qtest: DEMO]
+        !api.get('/api/internal/jira/projects/CERT/versions').json.empty
+        created.status == 201
+        created.json.key ==~ /SCP-\d+/
+        anonymous.get('/api/internal/status').status == 401
     }
 }

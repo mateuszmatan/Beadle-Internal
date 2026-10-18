@@ -10,20 +10,8 @@ labels:
 resources:
   - deployment.yaml
   - service.yaml
+# Only what differs from application.yml; SPRING_PROFILES_ACTIVE and the system URLs are set by the overlays.
 configMapGenerator:
   - name: beadle-internal-config
     literals:
-      - SPRING_PROFILES_ACTIVE=rd
       - BEADLE_GUI_URL=http://beadle:8081
-      - JIRA_URL=
-      - JIRA_EPIC_LINK_FIELD=customfield_10014
-      - CYBERTRACK_URL=
-      - CYBERTRACK_PROJECT_KEY=SCP
-      - CYBERTRACK_ISSUE_TYPE=Task
-      - CYBERTRACK_POLL=PT5M
-      - CYBERTRACK_CLOSED_STATUSES=Done,Closed,Resolved,Cancelled,Canceled,Rejected,Won't Do
-      - CYBERTRACK_MAX_MISSES=12
-      - CONFLUENCE_URL=
-      - QTEST_URL=
-      - QTEST_CONCURRENCY=8
-      - QTEST_BUDGET=20s

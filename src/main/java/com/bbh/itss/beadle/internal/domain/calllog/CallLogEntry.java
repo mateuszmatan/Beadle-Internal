@@ -6,7 +6,7 @@ public record CallLogEntry(Long id, Instant at, String userName, String correlat
                            String operation, String target, Outcome outcome, String message, long durationMs) {
 
     public static final int USER_MAX = 200;
-    public static final int CORRELATION_MAX = 100;
+    public static final int CORRELATION_MAX = 64;
     public static final int TARGET_MAX = 500;
     public static final int MESSAGE_MAX = 2000;
 }

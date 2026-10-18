@@ -15,6 +15,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import static com.bbh.itss.beadle.internal.application.calllog.CallerContext.CORRELATION_HEADER;
 import static com.bbh.itss.beadle.internal.application.calllog.CallerContext.UNKNOWN_USER;
@@ -46,6 +47,7 @@ import static org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON_VALUE;
 public class ServiceTokenFilter extends OncePerRequestFilter {
 
     public static final String OPEN_PATH = "/actuator/health";
+    static final Pattern OPEN = Pattern.compile(Pattern.quote(OPEN_PATH) + "(/[A-Za-z0-9_-]+)*");
     public static final String BEARER = "Bearer ";
     public static final String DETAIL = "The call needs the Beadle service token as Authorization: Bearer <token>.";
     public static final String CORRELATION_TOO_LONG = "is too long: it may take at most " + CORRELATION_MAX + " bytes";
@@ -64,16 +66,24 @@ public class ServiceTokenFilter extends OncePerRequestFilter {
         }
     }
 
+    /**
+     * Only the health endpoints spelled plainly are open: the request URI as sent, without a dot segment, a path
+     * parameter, an encoded character or an empty segment. Such a URI could otherwise start with {@value #OPEN_PATH}
+     * and still lead the dispatcher somewhere else ({@code /actuator/health/../../api/internal/status}), so it needs
+     * the token like any other call.
+     */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getRequestURI();
-        return path.equals(OPEN_PATH) || path.startsWith(OPEN_PATH + "/");
+        String uri = request.getRequestURI();
+        String context = request.getContextPath();
+        return uri != null && uri.startsWith(context) && OPEN.matcher(uri.substring(context.length())).matches();
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         if (!accepts(request.getHeader(AUTHORIZATION))) {
+            log.warn("Refused {} {}: the service token is missing or wrong", request.getMethod(), request.getRequestURI());
             response.setHeader(WWW_AUTHENTICATE, "Bearer");
             problem(response, UNAUTHORIZED.value(), PROBLEM);
             return;

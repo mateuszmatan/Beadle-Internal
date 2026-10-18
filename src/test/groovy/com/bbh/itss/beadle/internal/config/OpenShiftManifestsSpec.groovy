@@ -7,7 +7,7 @@ import spock.lang.Specification
 import static groovy.io.FileType.FILES
 
 /**
- * The OpenShift manifests: two pods of Beadle-Internal in the one project of the Beadle services, reached by Beadle-GUI
+ * The OpenShift manifests: one pod of Beadle-Internal in the one project of the Beadle services, reached by Beadle-GUI
  * through the Service only, configured by ConfigMaps and Secrets named after the service.
  */
 class OpenShiftManifestsSpec extends Specification {
@@ -35,9 +35,9 @@ class OpenShiftManifestsSpec extends Specification {
         file << manifests()
     }
 
-    def "two pods run behind the Service that Beadle-GUI calls at http://beadle-internal:8082"() {
+    def "one pod runs behind the Service that Beadle-GUI calls at http://beadle-internal:8082"() {
         expect:
-        deployment.spec.replicas == 2
+        deployment.spec.replicas == 1
         service.metadata.name == 'beadle-internal'
         service.spec.type in [null, 'ClusterIP']
         service.spec.ports == [[name: 'http', port: 8082, targetPort: 'http', protocol: 'TCP']]

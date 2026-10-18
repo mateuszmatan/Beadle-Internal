@@ -6,7 +6,6 @@ spock = "2.4-groovy-5.0"
 jacoco = "0.8.15"
 archunit = "1.4.2"
 commons-collections4 = "4.5.0"
-shedlock = "7.10.1"
 
 [libraries]
 groovy = { module = "org.apache.groovy:groovy" }
@@ -16,8 +15,6 @@ spock-core = { module = "org.spockframework:spock-core" }
 spock-spring = { module = "org.spockframework:spock-spring" }
 archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
 commons-collections4 = { module = "org.apache.commons:commons-collections4", version.ref = "commons-collections4" }
-shedlock-spring = { module = "net.javacrumbs.shedlock:shedlock-spring", version.ref = "shedlock" }
-shedlock-jdbc = { module = "net.javacrumbs.shedlock:shedlock-provider-jdbc-template", version.ref = "shedlock" }
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }

@@ -35,8 +35,6 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-restclient'
     implementation 'org.apache.commons:commons-lang3'
     implementation libs.commons.collections4
-    implementation libs.shedlock.spring
-    implementation libs.shedlock.jdbc
     runtimeOnly 'com.h2database:h2'
     runtimeOnly 'com.oracle.database.jdbc:ojdbc11'
 

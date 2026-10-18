@@ -1,12 +1,7 @@
 package com.bbh.itss.beadle.internal.adapter.out.persistence
 
-import com.bbh.itss.beadle.internal.adapter.in.schedule.CyberTrackPoller
-import com.bbh.itss.beadle.internal.application.cybertrack.port.in.CyberTrackPollUseCase
-import com.bbh.itss.beadle.internal.config.CyberTrackFollowUpProperties
-import com.bbh.itss.beadle.internal.config.SchedulingConfiguration
 import com.bbh.itss.beadle.internal.domain.calllog.CallLogPage
 import com.bbh.itss.beadle.internal.domain.calllog.CallLogQuery
-import com.bbh.itss.beadle.internal.domain.callback.PollReport
 import com.bbh.itss.beadle.internal.domain.cybertrack.FollowUp
 import liquibase.Liquibase
 import liquibase.Scope
@@ -14,11 +9,7 @@ import liquibase.changelog.FastCheckService
 import liquibase.database.DatabaseFactory
 import liquibase.database.jvm.JdbcConnection
 import liquibase.resource.ClassLoaderResourceAccessor
-import net.javacrumbs.shedlock.core.LockConfiguration
-import net.javacrumbs.shedlock.core.LockProvider
-import org.spockframework.spring.SpringBean
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase
 import org.springframework.context.annotation.Import
@@ -31,7 +22,6 @@ import spock.lang.Specification
 
 import java.sql.Connection
 import java.sql.DriverManager
-import java.time.Duration
 import java.time.Instant
 
 import static com.bbh.itss.beadle.internal.domain.calllog.ExternalSystem.CONFLUENCE
@@ -44,23 +34,19 @@ import static org.springframework.transaction.annotation.Propagation.NOT_SUPPORT
 
 /**
  * The tables of Beadle-Internal on H2 in Oracle mode, built by the Liquibase changesets and validated by Hibernate as
- * on Oracle: the call log, the followed CyberTrack tickets and the ShedLock row of the poll.
+ * on Oracle: the call log and the followed CyberTrack tickets.
  */
 @DataJpaTest(properties = [
         'spring.datasource.url=jdbc:h2:mem:persistence;MODE=Oracle;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1',
-        'spring.datasource.username=sa',
-        'beadle.cybertrack.demo-poll=PT1H'])
+        'spring.datasource.username=sa'])
 @AutoConfigureTestDatabase(replace = NONE)
 @Transactional(propagation = NOT_SUPPORTED)
-@Import([CallLogPersistenceAdapter, TrackedTicketPersistenceAdapter, SchedulingConfiguration, CyberTrackPoller, Properties])
+@Import([CallLogPersistenceAdapter, TrackedTicketPersistenceAdapter])
 class PersistenceSpec extends Specification {
 
     static final Instant LATER = Instant.parse('2026-10-15T09:30:00Z')
     static final Instant NOON = Instant.parse('2026-10-15T12:00:00Z')
     static final FollowUp FOLLOW_UP = new FollowUp(['Done'], 3)
-
-    @SpringBean
-    CyberTrackPollUseCase poll = Mock()
 
     @Autowired
     CallLogPersistenceAdapter callLog
@@ -69,19 +55,13 @@ class PersistenceSpec extends Specification {
     TrackedTicketPersistenceAdapter tickets
 
     @Autowired
-    CyberTrackPoller poller
-
-    @Autowired
-    LockProvider locks
-
-    @Autowired
     JdbcTemplate jdbc
 
     @Autowired
     PlatformTransactionManager transactionManager
 
     def setup() {
-        ['BEADLE_INTERNAL_CYBERTRACK_TICKET', 'BEADLE_INTERNAL_CALL_LOG', 'BEADLE_INTERNAL_SHEDLOCK'].each {
+        ['BEADLE_INTERNAL_CYBERTRACK_TICKET', 'BEADLE_INTERNAL_CALL_LOG'].each {
             jdbc.update("DELETE FROM $it")
         }
     }
@@ -202,26 +182,6 @@ class PersistenceSpec extends Specification {
         'no system'          | null      | 'SUCCESS'
     }
 
-    def "the poll runs on one pod at a time: a tick while another pod holds the ShedLock row polls nothing"() {
-        given: 'the other pod holds the lock of the poll'
-        def held = locks.lock(new LockConfiguration(Instant.now(), CyberTrackPoller.LOCK, Duration.ofMinutes(10), Duration.ZERO))
-
-        when:
-        poller.tick()
-
-        then:
-        held.present
-        0 * poll.poll()
-
-        when: 'the other pod is done'
-        held.get().unlock()
-        poller.tick()
-
-        then:
-        1 * poll.poll() >> PollReport.NOTHING
-        jdbc.queryForObject('SELECT COUNT(*) FROM BEADLE_INTERNAL_SHEDLOCK WHERE NAME = ?', Integer, CyberTrackPoller.LOCK) == 1
-    }
-
     def "every changeset rolls back cleanly and applies again"() {
         given:
         System.setProperty('liquibase.analytics.enabled', 'false')
@@ -231,7 +191,7 @@ class PersistenceSpec extends Specification {
 
         when:
         liquibase.update('')
-        liquibase.rollback(6, '')
+        liquibase.rollback(5, '')
         Scope.currentScope.getSingleton(FastCheckService).clearCache()
 
         then:
@@ -241,8 +201,8 @@ class PersistenceSpec extends Specification {
         liquibase.update('')
 
         then:
-        tables(connection) == ['BEADLE_INTERNAL_CALL_LOG', 'BEADLE_INTERNAL_CYBERTRACK_TICKET', 'BEADLE_INTERNAL_SHEDLOCK',
-                               'DATABASECHANGELOG', 'DATABASECHANGELOGLOCK']
+        tables(connection) == ['BEADLE_INTERNAL_CALL_LOG', 'BEADLE_INTERNAL_CYBERTRACK_TICKET', 'DATABASECHANGELOG',
+                               'DATABASECHANGELOGLOCK']
 
         cleanup:
         liquibase?.close()
@@ -255,9 +215,5 @@ class PersistenceSpec extends Specification {
             names << found.getString('TABLE_NAME')
         }
         names.sort()
-    }
-
-    @EnableConfigurationProperties(CyberTrackFollowUpProperties)
-    static class Properties {
     }
 }

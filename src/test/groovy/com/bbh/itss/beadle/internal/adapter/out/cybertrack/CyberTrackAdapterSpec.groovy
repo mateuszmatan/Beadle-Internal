@@ -2,6 +2,7 @@ package com.bbh.itss.beadle.internal.adapter.out.cybertrack
 
 import com.bbh.itss.beadle.internal.domain.cybertrack.CreatedTicket
 import com.bbh.itss.beadle.internal.domain.cybertrack.CyberTrackTicket
+import com.bbh.itss.beadle.internal.domain.shared.RefusedException
 import groovy.json.JsonSlurper
 import org.springframework.http.client.ClientHttpRequest
 import org.springframework.mock.http.client.MockClientHttpRequest
@@ -75,16 +76,17 @@ class CyberTrackAdapterSpec extends Specification {
         cyberTrack.create(ticket())
 
         then:
-        def refused = thrown(UncheckedIOException)
-        refused.message.startsWith('CyberTrack could not create the secure coding ticket: ' + reason)
-        refused.message.length() <= ('CyberTrack could not create the secure coding ticket: ').length() + 300
+        def refused = thrown(type)
+        refused.message.startsWith("CyberTrack $failed create the secure coding ticket: $reason")
+        refused.message.length() <= "CyberTrack $failed create the secure coding ticket: ".length() + 300
 
         where:
-        problem               | response                                                                        || reason
-        'a refusal'           | withBadRequest().body('{"errors":{"summary":"Summary is required."}}')          || '400 Bad Request'
-        'a missing key'       | withSuccess('{"id":"10001"}', APPLICATION_JSON)                                 || NO_KEY
-        'an empty key'        | withSuccess('{"key":" "}', APPLICATION_JSON)                                    || NO_KEY
-        'a long server error' | withServerError().body('{"errorMessages":["' + 'x' * 600 + '"]}')               || '500 Internal Server Error'
+        problem               | response                                                                        || failed       | reason
+        'a refusal'           | withBadRequest().body('{"errors":{"summary":"Summary is required."}}')          || 'refused to' | '400 Bad Request'
+        'a missing key'       | withSuccess('{"id":"10001"}', APPLICATION_JSON)                                 || 'could not'  | NO_KEY
+        'an empty key'        | withSuccess('{"key":" "}', APPLICATION_JSON)                                    || 'could not'  | NO_KEY
+        'a long server error' | withServerError().body('{"errorMessages":["' + 'x' * 600 + '"]}')               || 'could not'  | '500 Internal Server Error'
+        type = failed == 'refused to' ? RefusedException : UncheckedIOException
     }
 
     def "an unreachable CyberTrack is refused with the reason"() {
@@ -189,8 +191,8 @@ class CyberTrackAdapterSpec extends Specification {
         cyberTrack.readAll(['SCP-1', 'SCP-2'])
 
         then:
-        def refused = thrown(UncheckedIOException)
-        refused.message.startsWith('CyberTrack could not read the tickets SCP-1, SCP-2: 400 Bad Request')
+        def refused = thrown(RefusedException)
+        refused.message.startsWith('CyberTrack refused to read the tickets SCP-1, SCP-2: 400 Bad Request')
     }
 
     private CyberTrackAdapter adapter(String projectKey, String issueType) {

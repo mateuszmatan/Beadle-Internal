@@ -207,7 +207,7 @@ class UseCasesSpec extends Specification {
                     create   : { SecureCodingTicket ticket ->
                         Thread.sleep(100)
                         if (ticket.changeNumber() == 'CHG9') {
-                            throw new UncheckedIOException('CyberTrack could not create: 400', new IOException())
+                            throw new UncheckedIOException('CyberTrack could not create: 503', new IOException())
                         }
                         new CreatedTicket('SCP-' + (1234 + created++), null)
                     }] as CyberTrackPort

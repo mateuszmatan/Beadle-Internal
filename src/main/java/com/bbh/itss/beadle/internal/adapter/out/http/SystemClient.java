@@ -1,5 +1,6 @@
 package com.bbh.itss.beadle.internal.adapter.out.http;
 
+import com.bbh.itss.beadle.internal.domain.shared.RefusedException;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.client.RestClient;
@@ -13,6 +14,7 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -28,14 +30,17 @@ import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 /**
  * One system Beadle-Internal calls over REST with the bearer token of its generic service account (or the Beadle
  * service token for Beadle-GUI). The URL and the token are trimmed: a secret written from a file ends in a newline,
- * which the HTTP client refuses to send. A call that the system refuses or that does not reach it fails with an
- * {@link UncheckedIOException} naming the system and the operation, which the API answers {@code 502}, unless the
- * caller says what that HTTP status means (a {@code 404} for a key the system does not know, for example).
+ * which the HTTP client refuses to send. Unless the caller says what an HTTP status means (a {@code 404} for a key
+ * the system does not know, for example), a call the system refuses (a {@code 4xx} other than a failed sign-in, a
+ * time-out or a throttle) fails with a {@link RefusedException}, which the API answers {@code 409}, and a call that
+ * does not reach the system or that it fails with an {@link UncheckedIOException}, answered {@code 502}; both name
+ * the system and the operation.
  */
 @Slf4j
 public final class SystemClient {
 
     public static final int MAX_REASON = 300;
+    private static final Set<Integer> UNAVAILABLE = Set.of(401, 403, 407, 408, 429);
     private static final DateTimeFormatter ATLASSIAN_TIMESTAMP =
             DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSSZ");
 
@@ -101,9 +106,13 @@ public final class SystemClient {
         }
     }
 
-    private UncheckedIOException refusal(String operation, Integer status, RestClientException cause, long started) {
+    private RuntimeException refusal(String operation, Integer status, RestClientException cause, long started) {
         String reason = truncate(defaultIfBlank(cause.getMessage(), cause.getClass().getSimpleName()), MAX_REASON);
         log.warn("{} failed to {} with status {} after {} ms: {}", name, operation, status, millisSince(started), reason);
+        if (cause instanceof RestClientResponseException response && response.getStatusCode().is4xxClientError()
+                && !UNAVAILABLE.contains(status)) {
+            return new RefusedException(name + " refused to " + operation + ": " + reason);
+        }
         return new UncheckedIOException(name + " could not " + operation + ": " + reason, new IOException(cause));
     }
 

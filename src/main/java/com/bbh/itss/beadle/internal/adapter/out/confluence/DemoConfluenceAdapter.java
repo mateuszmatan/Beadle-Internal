@@ -5,6 +5,7 @@ import com.bbh.itss.beadle.internal.application.confluence.port.out.ConfluencePo
 import com.bbh.itss.beadle.internal.domain.confluence.ConfluencePage;
 import com.bbh.itss.beadle.internal.domain.confluence.ConfluencePageUpdate;
 import com.bbh.itss.beadle.internal.domain.confluence.NewConfluencePage;
+import com.bbh.itss.beadle.internal.domain.shared.RefusedException;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
@@ -93,7 +94,7 @@ class DemoConfluenceAdapter implements ConfluencePort {
         boolean taken = pages.values().stream().anyMatch(page -> !page.id().equals(exceptId)
                 && CI.equals(page.spaceKey(), spaceKey) && CI.equals(page.title(), title));
         if (taken) {
-            throw new IllegalStateException(DUPLICATE + title + " in space " + spaceKey.toUpperCase());
+            throw new RefusedException(DUPLICATE + title + " in space " + spaceKey.toUpperCase());
         }
     }
 

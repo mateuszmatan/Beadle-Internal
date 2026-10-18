@@ -83,7 +83,7 @@ class ApiSpec extends Specification {
         jira.versions('CERT') >> [version(), version(name: 'CERT 1.5', releaseDate: null)]
         jira.versions('NOPE') >> { throw new NoSuchElementException('Jira project NOPE does not exist') }
         jira.versions('DOWN') >> { throw new UncheckedIOException('Jira could not read the versions of DOWN: 503', new IOException()) }
-        jira.versions('BOOM') >> { throw new UnsupportedOperationException('at com.bbh') }
+        jira.versions('BOOM') >> { throw new IllegalStateException('at com.bbh') }
         jira.epics('CERT', 'CERT 1.4') >> [issue()]
         jira.epics('CERT', '') >> { throw InvalidRequestException.of('fixVersion', 'is required') }
         jira.stories('CERT', 'CERT 1.4', ['CERT-12', 'CERT-13']) >> [issue(key: 'CERT-20', epicKey: 'CERT-12', updated: null)]

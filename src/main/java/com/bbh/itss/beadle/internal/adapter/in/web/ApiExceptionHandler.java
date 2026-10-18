@@ -1,6 +1,7 @@
 package com.bbh.itss.beadle.internal.adapter.in.web;
 
 import com.bbh.itss.beadle.internal.domain.shared.InvalidRequestException;
+import com.bbh.itss.beadle.internal.domain.shared.RefusedException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -18,6 +19,10 @@ import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 import static org.springframework.http.ProblemDetail.forStatusAndDetail;
 
+/**
+ * Answers every failure as a problem: 404 for what does not exist, 409 for what a system refused, 502 when a system
+ * could not be reached or failed the call, 400 for a request at fault and 500 otherwise.
+ */
 @Slf4j
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
@@ -27,8 +32,8 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(NOT_FOUND, "Not found", e.getMessage());
     }
 
-    @ExceptionHandler(IllegalStateException.class)
-    ProblemDetail conflict(IllegalStateException e) {
+    @ExceptionHandler(RefusedException.class)
+    ProblemDetail conflict(RefusedException e) {
         return problem(CONFLICT, "Conflict", e.getMessage());
     }
 

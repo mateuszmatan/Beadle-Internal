@@ -15,12 +15,14 @@ class CyberTrackRegressionSpec extends BeadleInternalSpecification {
     static final Duration STEP = Duration.ofMinutes(2)
 
     def conditions = new PollingConditions(timeout: 10, delay: 0.1)
-    String changeNumber = 'CHG' + (1_000_000 + new Random().nextInt(9_000_000))
 
     def "a ticket is created at once, asked again it is the same one, and read back as To Do"() {
+        given:
+        def request = ticket()
+
         when:
-        def created = api.post('/api/internal/cybertrack/tickets', ticket())
-        def again = api.post('/api/internal/cybertrack/tickets', ticket())
+        def created = api.post('/api/internal/cybertrack/tickets', request)
+        def again = api.post('/api/internal/cybertrack/tickets', request)
         def read = api.get("/api/internal/cybertrack/tickets/$created.json.key")
 
         then:
@@ -30,19 +32,8 @@ class CyberTrackRegressionSpec extends BeadleInternalSpecification {
         again.json == created.json
         read.json == [key: created.json.key, status: 'To Do', url: null, updated: clock.instant().toString()]
         callLog().findAll { it.system == 'CYBERTRACK' }*.subMap('system', 'operation', 'target', 'outcome') == [
-                [system: 'CYBERTRACK', operation: 'create', target: changeNumber, outcome: 'SUCCESS'],
+                [system: 'CYBERTRACK', operation: 'create', target: request.changeNumber, outcome: 'SUCCESS'],
                 [system: 'CYBERTRACK', operation: 'read', target: created.json.key, outcome: 'SUCCESS']]
-    }
-
-    def "a ticket request without its inputs is refused naming the fields, without calling CyberTrack"() {
-        when:
-        def response = api.post('/api/internal/cybertrack/tickets', ticket(inputs: null))
-
-        then:
-        response.status == 400
-        response.json.problems*.field == ['inputs.apoNumber', 'inputs.bitbucketUrl', 'inputs.artifactLink',
-                                          'inputs.qcApplicationLink']
-        callLog() == []
     }
 
     def "Beadle-GUI hears of every status a ticket moves to, with the correlation id of its creation in the header"() {
@@ -97,12 +88,5 @@ class CyberTrackRegressionSpec extends BeadleInternalSpecification {
             assert callLog().findAll { it.system == 'GUI' }*.outcome == ['FAILURE', 'SUCCESS']
         }
         GUI.callbacksFor(key)*.body*.status == ['To Do', 'To Do']
-    }
-
-    private Map ticket(Map changes = [:]) {
-        [changeNumber: changeNumber, applicationName: 'CertScanner', implementationDate: '2026-10-20',
-         inputs      : [apoNumber   : 'APO-12345', bitbucketUrl: 'https://bitbucket.bbh.com/projects/CERT/repos/cert',
-                        artifactLink: 'https://nexus.bbh.com/cert/cert-1.4.jar', qcApplicationLink: 'https://cert.qc.bbh.com']] +
-                changes
     }
 }

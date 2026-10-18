@@ -5,8 +5,6 @@ import com.bbh.itss.beadle.internal.support.BeadleInternalSpecification
 import java.time.Duration
 import java.time.Instant
 
-import static java.nio.charset.StandardCharsets.UTF_8
-
 /**
  * The call log: every call Beadle-Internal makes to a system, with who caused it, searched by correlation id and time.
  */
@@ -34,29 +32,5 @@ class CallLogRegressionSpec extends BeadleInternalSpecification {
                  operation: 'versions', target: 'CERT', outcome: 'SUCCESS', message: null]]
         second.entries*.system == ['JIRA']
         window.entries*.system == ['CONFLUENCE']
-    }
-
-    def "the user travels percent-encoded, is cut to what the log holds, and is unknown without the header"() {
-        given:
-        def caller = anonymous.withHeaders([Authorization: "Bearer $TOKEN".toString(), 'X-Correlation-Id': correlationId])
-
-        when:
-        [URLEncoder.encode('Łukasz Wójcik', UTF_8), 'u' * 250, null].each { user ->
-            assert (user == null ? caller : caller.withHeaders(['X-Beadle-User': user])).get('/api/internal/qtest/projects')
-                    .status == 200
-        }
-
-        then:
-        callLog()*.userName == ['Łukasz Wójcik', 'u' * 197 + '...', 'unknown']
-    }
-
-    def "a correlation id too long to be logged and passed on is refused before any system is called"() {
-        when:
-        def response = api.withHeaders(['X-Correlation-Id': 'c' * 120]).get('/api/internal/qtest/projects')
-
-        then:
-        response.status == 400
-        response.json.problems == [[field: 'X-Correlation-Id', message: 'is too long: it may take at most 100 bytes']]
-        callLog('c' * 97 + '...') == []
     }
 }

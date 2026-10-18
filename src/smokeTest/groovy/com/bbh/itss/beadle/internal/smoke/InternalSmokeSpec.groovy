@@ -2,31 +2,30 @@ package com.bbh.itss.beadle.internal.smoke
 
 import com.bbh.itss.beadle.internal.support.BeadleInternalSpecification
 
+/**
+ * What Beadle-GUI needs of Beadle-Internal: its health, the status, the Jira versions and a secure coding ticket.
+ */
 class InternalSmokeSpec extends BeadleInternalSpecification {
 
     static final Map DEMO = [connected: false, mode: 'demo']
 
-    def "the health endpoints are UP and open without a token: #path"() {
-        when:
-        def health = anonymous.get(path)
-
-        then:
-        health.status == 200
-        health.json.status == 'UP'
-
-        where:
-        path << ['/actuator/health', '/actuator/health/liveness', '/actuator/health/readiness']
+    def "the health, liveness and readiness are UP and open without a token"() {
+        expect:
+        ['/actuator/health', '/actuator/health/liveness', '/actuator/health/readiness'].every {
+            def health = anonymous.get(it)
+            health.status == 200 && health.json.status == 'UP'
+        }
     }
 
-    def "the endpoints Beadle-GUI calls answer with the service token and refuse a call without it"() {
-        expect:
+    def "the status answers, a Jira project lists its versions and a secure coding ticket is created, with the token only"() {
+        when:
+        def created = api.post('/api/internal/cybertrack/tickets', ticket())
+
+        then:
         api.get('/api/internal/status').json == [jira: DEMO, cyberTrack: DEMO, confluence: DEMO, qtest: DEMO]
-        api.get('/api/internal/jira/projects/CERT/versions').status == 200
-        api.post('/api/internal/cybertrack/tickets', [changeNumber: 'CHG0030001', applicationName: 'CertScanner',
-                                                      implementationDate: '2026-10-20',
-                                                      inputs: [apoNumber: 'APO-1', bitbucketUrl: 'https://bitbucket.bbh.com/c',
-                                                               artifactLink: 'https://nexus.bbh.com/c.jar',
-                                                               qcApplicationLink: 'https://c.qc.bbh.com']]).status == 201
+        !api.get('/api/internal/jira/projects/CERT/versions').json.empty
+        created.status == 201
+        created.json.key ==~ /SCP-\d+/
         anonymous.get('/api/internal/status').status == 401
     }
 }

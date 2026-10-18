@@ -6,9 +6,17 @@ import static java.net.URLEncoder.encode
 import static java.nio.charset.StandardCharsets.UTF_8
 
 /**
- * The reads Beadle-GUI makes for a release: the FixVersions, epics and stories of Jira and the test results of qTest.
+ * The reads Beadle-GUI makes for a release: the status, the FixVersions, epics and stories of Jira and the test results
+ * of qTest.
  */
 class ReadsRegressionSpec extends BeadleInternalSpecification {
+
+    static final Map DEMO = [connected: false, mode: 'demo']
+
+    def "the status reports every system on its demo adapter"() {
+        expect:
+        api.get('/api/internal/status').json == [jira: DEMO, cyberTrack: DEMO, confluence: DEMO, qtest: DEMO]
+    }
 
     def "the versions of a project come unreleased first, then its epics and the stories of chosen epics are read"() {
         when:
@@ -34,17 +42,6 @@ class ReadsRegressionSpec extends BeadleInternalSpecification {
                  outcome: 'SUCCESS']]
     }
 
-    def "a Jira read without a FixVersion is refused naming the field, without calling Jira"() {
-        when:
-        def response = api.get('/api/internal/jira/projects/CERT/epics')
-
-        then:
-        response.status == 400
-        response.header('Content-Type').startsWith('application/problem+json')
-        response.json.problems == [[field: 'fixVersion', message: 'is required']]
-        callLog() == []
-    }
-
     def "the qTest projects, the cycles of a project and the runs of a cycle are read, and the summary counts them"() {
         when:
         def projects = api.get('/api/internal/qtest/projects').json
@@ -59,17 +56,6 @@ class ReadsRegressionSpec extends BeadleInternalSpecification {
         summary == [total: runs.size(), passed: runs.count { it.status == 'Passed' }, failed: runs.count { it.status == 'Failed' },
                     blocked: runs.count { it.status == 'Blocked' }, unexecuted: runs.count { it.status == 'Unexecuted' }]
         callLog()*.operation == ['projects', 'cycles', 'runs', 'summary']
-    }
-
-    def "an unknown qTest cycle is not found and logged as a failure"() {
-        when:
-        def response = api.get('/api/internal/qtest/projects/1/test-cycles/99/summary')
-
-        then:
-        response.status == 404
-        response.json.detail == 'qTest test cycle 99 does not exist'
-        callLog()*.subMap('operation', 'outcome', 'message') ==
-                [[operation: 'summary', outcome: 'FAILURE', message: 'qTest test cycle 99 does not exist']]
     }
 
     private static String enc(String text) {

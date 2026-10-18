@@ -14,6 +14,7 @@ import org.springframework.test.context.DynamicPropertySource
 import spock.lang.Specification
 
 import java.time.Instant
+import java.util.concurrent.atomic.AtomicInteger
 
 import static java.nio.charset.StandardCharsets.UTF_8
 import static java.time.temporal.ChronoUnit.SECONDS
@@ -35,6 +36,7 @@ abstract class BeadleInternalSpecification extends Specification {
     static final String TOKEN = 'suite-service-token'
     static final String USER = 'Mateusz Matan'
     static final GuiStub GUI = GuiStub.start()
+    static final AtomicInteger CHANGES = new AtomicInteger(30_000)
 
     @DynamicPropertySource
     static void beadleGui(DynamicPropertyRegistry registry) {
@@ -68,6 +70,17 @@ abstract class BeadleInternalSpecification extends Specification {
         def response = api.get("/api/internal/call-log?correlationId=$correlation&size=500")
         assert response.status == 200: response
         (response.json.entries as List<Map>).reverse()
+    }
+
+    /**
+     * A secure coding ticket request as Beadle-GUI sends it, for a change no other call of the suite used.
+     */
+    static Map ticket(Map changes = [:]) {
+        [changeNumber: String.format('CHG%07d', CHANGES.incrementAndGet()), applicationName: 'CertScanner',
+         implementationDate: '2026-10-20',
+         inputs: [apoNumber: 'APO-12345', bitbucketUrl: 'https://bitbucket.bbh.com/projects/CERT/repos/cert',
+                  artifactLink: 'https://nexus.bbh.com/cert/cert-1.4.jar', qcApplicationLink: 'https://cert.qc.bbh.com']] +
+                changes
     }
 
     @TestConfiguration(proxyBeanMethods = false)

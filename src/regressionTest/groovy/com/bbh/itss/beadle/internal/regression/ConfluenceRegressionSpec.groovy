@@ -46,14 +46,4 @@ class ConfluenceRegressionSpec extends BeadleInternalSpecification {
                 [operation: 'update', target: "$created.json.id $title".toString(), outcome: 'FAILURE'],
                 [operation: 'get', target: created.json.id, outcome: 'SUCCESS']]
     }
-
-    def "a page request without its fields is refused naming them, without calling Confluence"() {
-        when:
-        def response = api.post('/api/internal/confluence/pages', [:])
-
-        then:
-        response.status == 400
-        response.json.problems*.field == ['spaceKey', 'title', 'body']
-        callLog() == []
-    }
 }

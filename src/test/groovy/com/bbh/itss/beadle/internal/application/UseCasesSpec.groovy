@@ -30,6 +30,7 @@ import java.time.LocalDate
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 
+import static com.bbh.itss.beadle.internal.application.calllog.CallerContext.MDC_KEY
 import static com.bbh.itss.beadle.internal.domain.status.SystemStatus.of
 import static com.bbh.itss.beadle.internal.support.Fixtures.callLogEntry
 import static com.bbh.itss.beadle.internal.support.Fixtures.cycle
@@ -245,14 +246,14 @@ class UseCasesSpec extends Specification {
         expect:
         CallerContext.current() == Caller.NONE
         CallerContext.as(USER) {
-            assert CallerContext.as(system) { [CallerContext.current(), MDC.get('correlationId')] } == [system, 'tick-1']
+            assert CallerContext.as(system) { [CallerContext.current(), MDC.get(MDC_KEY)] } == [system, 'tick-1']
             Caller elsewhere = null
             Thread.start { elsewhere = CallerContext.current() }.join()
             assert elsewhere == Caller.NONE
-            [CallerContext.current(), MDC.get('correlationId')]
+            [CallerContext.current(), MDC.get(MDC_KEY)]
         } == [USER, 'corr-1']
         CallerContext.current() == Caller.NONE
-        MDC.get('correlationId') == null
+        MDC.get(MDC_KEY) == null
 
         when:
         CallerContext.run(system) { throw new IllegalStateException('boom') }

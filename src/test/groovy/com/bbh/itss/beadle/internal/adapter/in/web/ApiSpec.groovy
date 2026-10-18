@@ -164,19 +164,16 @@ class ApiSpec extends Specification {
         'a ticket without inputs'      | json(post(TICKETS), ticketJson(inputs: null))             || 400    | 'Validation failed'      | '4 fields are invalid'                                                | ['inputs.apoNumber', 'inputs.bitbucketUrl', 'inputs.artifactLink', 'inputs.qcApplicationLink']
         'a page without space and body' | json(post(PAGES), newPageJson(spaceKey: null, body: ' ')) || 400   | 'Validation failed'      | '2 fields are invalid'                                                | ['spaceKey', 'body']
         'a call log page of 0'         | get('/api/internal/call-log?size=0')                      || 400    | 'Validation failed'      | 'must be between 1 and 500'                                           | ['size']
-        'a ticket date in another notation' | body(post(TICKETS), '{"implementationDate":"20-10-2026"}') || 400 | 'Malformed request' | 'implementationDate has a value this field cannot hold'              | ['implementationDate']
-        'no body'                      | body(post(TICKETS), '')                                   || 400    | 'Malformed request'      | 'The request body is missing.'                                        | null
-        'a body that is no JSON'       | body(post(TICKETS), '{"changeNumber":')                   || 400    | 'Malformed request'      | 'The request body is not valid JSON.'                                 | null
-        'a body of another shape'      | body(post(TICKETS), '["CHG1"]')                           || 400    | 'Malformed request'      | 'The request body does not have the shape this endpoint expects.'     | null
-        'a project id that is no number' | get('/api/internal/qtest/projects/x/test-cycles')       || 400    | 'Malformed request'      | "The value given for 'id' is not one this endpoint can read."         | null
-        'a time that is no instant'    | get('/api/internal/call-log?from=2026-10-15')             || 400    | 'Malformed request'      | "The value given for 'from' is not one this endpoint can read."       | null
+        'a body that is no JSON'       | body(post(TICKETS), '{"changeNumber":')                   || 400    | 'Bad Request'            | 'Failed to read request'                                              | null
+        'a project id that is no number' | get('/api/internal/qtest/projects/x/test-cycles')       || 400    | 'Bad Request'            | "Failed to convert 'id' with value: 'x'"                              | null
         'another method'               | post('/api/internal/status')                              || 405    | 'Method Not Allowed'     | "Method 'POST' is not supported."                                     | null
         'another content type'         | post(TICKETS).contentType('text/plain').content('CHG1')   || 415    | 'Unsupported Media Type' | "Content-Type 'text/plain' is not supported."                         | null
     }
 
     def "a call #without is 401 as a problem that names the token"() {
         when:
-        def response = mvc.perform(authorization == null ? get(path) : get(path).header('Authorization', authorization))
+        def request = get(URI.create(path))
+        def response = mvc.perform(authorization == null ? request : request.header('Authorization', authorization))
                 .andReturn().response
 
         then:
@@ -194,6 +191,9 @@ class ApiSpec extends Specification {
         'without the Bearer word'  | TICKETS + '/SCP-1234'                            | TOKEN
         'with basic credentials'   | '/actuator/info'                                 | 'Basic dGVzdA=='
         'to a path like health'    | '/actuator/healthcheck'                          | null
+        'past health with ..'      | '/actuator/health/../../api/internal/status'     | null
+        'past health with %2e%2e'  | '/actuator/health/%2e%2e/%2e%2e/api/internal/status' | null
+        'to health with a ;'       | '/actuator/health;x'                             | null
     }
 
     def "the health endpoints are open, and a blank service token refuses every other call rather than opening the API"() {

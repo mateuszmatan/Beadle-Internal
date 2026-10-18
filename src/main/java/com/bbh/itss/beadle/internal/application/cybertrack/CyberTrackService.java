@@ -14,8 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.time.Clock;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Stream;
 
 import static com.bbh.itss.beadle.internal.domain.shared.Failures.notFound;
 import static com.bbh.itss.beadle.internal.domain.shared.Timestamps.now;
@@ -26,20 +25,23 @@ import static org.apache.commons.lang3.StringUtils.trimToNull;
 @RequiredArgsConstructor
 public class CyberTrackService implements CyberTrackUseCase {
 
+    static final int LOCKS = 64;
+
     private final CyberTrackPort cyberTrack;
     private final TrackedTicketPort tracked;
     private final Clock clock;
-    private final ConcurrentMap<String, Object> changes = new ConcurrentHashMap<>();
+    private final Object[] locks = Stream.generate(Object::new).limit(LOCKS).toArray();
 
     /**
      * Creates the secure coding ticket of a change once: while a ticket created for the same change is still followed,
      * a second request (Beadle-GUI retrying after its own time-out) gets that ticket instead of a new one. The answer
      * comes straight after the creation, which is the only call made to CyberTrack; the poll tells Beadle-GUI the
-     * status the ticket starts in.
+     * status the ticket starts in. The requests of a change take one of {@value #LOCKS} locks, so that the locks do not
+     * grow with the changes.
      */
     @Override
     public CreatedTicket create(SecureCodingTicket ticket) {
-        synchronized (changes.computeIfAbsent(ticket.changeNumber(), change -> new Object())) {
+        synchronized (locks[Math.floorMod(ticket.changeNumber().hashCode(), LOCKS)]) {
             Optional<TrackedTicket> existing = tracked.openFor(ticket.changeNumber());
             if (existing.isPresent()) {
                 log.info("Change {} asked again for its secure coding ticket and gets {}", ticket.changeNumber(),

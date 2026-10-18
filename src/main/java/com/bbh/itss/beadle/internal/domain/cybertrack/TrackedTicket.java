@@ -10,7 +10,7 @@ import java.time.Instant;
  * the one of the last callback), {@code null} while CyberTrack could not tell it yet. {@code misses} counts the polls
  * in a row that did not find the ticket; it is no longer followed once they reach the limit of the
  * {@link FollowUp}. {@code changeNumber} and {@code url} are those of the secure coding ticket, so that a second
- * request for the same change is answered with the ticket already raised.
+ * request for the same change is answered with the ticket already created.
  */
 @With
 public record TrackedTicket(String key, String status, String correlationId, Instant createdAt, Instant lastSeenAt,

@@ -21,8 +21,8 @@ public interface TrackedTicketPort {
     List<TrackedTicket> open();
 
     /**
-     * The newest ticket not closed yet that was raised for a change. A lookup that fails finds nothing, so that the
-     * ticket is raised rather than the request failed.
+     * The newest ticket not closed yet that was created for a change. A lookup that fails finds nothing, so that the
+     * ticket is created rather than the request failed.
      */
     Optional<TrackedTicket> openFor(String changeNumber);
 

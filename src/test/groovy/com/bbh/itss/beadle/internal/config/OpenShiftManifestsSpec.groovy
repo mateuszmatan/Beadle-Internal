@@ -51,6 +51,7 @@ class OpenShiftManifestsSpec extends Specification {
         container.envFrom.collect { (it.configMapRef ?: it.secretRef).name } ==
                 ['beadle-internal-config', 'beadle-internal-db', 'beadle-services', 'beadle-internal-jira',
                  'beadle-internal-cybertrack', 'beadle-internal-confluence', 'beadle-internal-qtest']
+        container.envFrom.every { !it.secretRef?.optional }
         documents('base/kustomization.yaml').first().configMapGenerator ==
                 [[name: 'beadle-internal-config', literals: ['BEADLE_GUI_URL=http://beadle:8081']]]
         [container.startupProbe, container.livenessProbe, container.readinessProbe]*.httpGet ==

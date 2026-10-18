@@ -81,7 +81,7 @@ class ConfigurationSpec extends Specification {
          budget: env.getProperty('beadle.qtest.budget')] ==
                 [server: '8082', ddl: 'validate', health: 'always', gui: 'http://localhost:8081', urls: [''], poll: 'PT10S',
                  misses: '12', budget: '20s']
-        env.getProperty('spring.datasource.url') == "jdbc:h2:file:${System.getProperty('user.home')}/bbh-devsecops/beadle-internal/beadle-internal;MODE=Oracle;DEFAULT_NULL_ORDERING=HIGH;AUTO_SERVER=TRUE"
+        env.getProperty('spring.datasource.url') == "jdbc:h2:file:${System.getProperty('user.home')}/beadle-internal/beadle-internal;MODE=Oracle;DEFAULT_NULL_ORDERING=HIGH;AUTO_SERVER=TRUE"
         environment([], [BEADLE_INTERNAL_DATA_DIR: '/var/beadle']).getProperty('spring.datasource.url')
                 .startsWith('jdbc:h2:file:/var/beadle/beadle-internal;')
         new ClockConfiguration().clock().zone == UTC
@@ -106,14 +106,14 @@ class ConfigurationSpec extends Specification {
         env.getProperty('spring.jpa.hibernate.ddl-auto') == 'validate'
         env.getProperty('beadle.cybertrack.poll') == 'PT5M'
         env.getProperty('spring.datasource.hikari.maximum-pool-size') == poolSize
-        env.getProperty('management.endpoint.health.show-details') == health
-        env.getProperty('logging.level.com.bbh.itss.beadle') == level
+        env.getProperty('management.endpoint.health.show-details', 'never') == health
+        env.getProperty('logging.level.com.bbh.itss.beadle', 'INFO') == level
 
         where:
-        profile | variables            || poolSize | health   | level
-        'rd'    | [:]                  || '5'      | 'always' | 'DEBUG'
-        'qc'    | [:]                  || '10'     | 'always' | 'INFO'
-        'prod'  | [DB_POOL_SIZE: '40'] || '40'     | 'never'  | 'INFO'
+        profile | variables            || poolSize | health  | level
+        'rd'    | [:]                  || '5'      | 'never' | 'DEBUG'
+        'qc'    | [:]                  || '10'     | 'never' | 'INFO'
+        'prod'  | [DB_POOL_SIZE: '40'] || '40'     | 'never' | 'INFO'
     }
 
     def "the prod profile does not start without the address of its database"() {

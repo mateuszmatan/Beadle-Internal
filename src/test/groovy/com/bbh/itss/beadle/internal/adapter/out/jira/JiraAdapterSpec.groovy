@@ -1,5 +1,6 @@
 package com.bbh.itss.beadle.internal.adapter.out.jira
 
+import com.bbh.itss.beadle.internal.domain.shared.RefusedException
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 import org.springframework.http.client.ClientHttpRequest
@@ -205,14 +206,15 @@ class JiraAdapterSpec extends Specification {
         call(jira)
 
         then:
-        def refused = thrown(UncheckedIOException)
-        refused.message.startsWith('Jira could not ' + operation + ': ' + reason)
+        def refused = thrown(type)
+        refused.message.startsWith("Jira $failed $operation: $reason")
 
         where:
-        operation                       | url                                        | response                                      | call                                                                || reason
-        'read the versions of CERT'     | URL + '/rest/api/2/project/CERT/versions'  | withServerError()                             | ({ JiraAdapter it -> it.versions('CERT') })                          || '500 Internal Server Error'
-        'read the epics of CERT 1.4'    | SEARCH                                     | withBadRequest().body('{"errorMessages":["Field cf[10014] does not exist"]}') | ({ JiraAdapter it -> it.epics('CERT', 'CERT 1.4') }) || '400 Bad Request'
-        'read the stories of CERT 1.4'  | SEARCH                                     | withSuccess('{"startAt":0,"total":1,"issues":"oops"}', APPLICATION_JSON) | ({ JiraAdapter it -> it.stories('CERT', 'CERT 1.4', ['CERT-12']) }) || 'Error while extracting response'
+        operation                       | url                                        | response                                      | call                                                                || failed       | reason
+        'read the versions of CERT'     | URL + '/rest/api/2/project/CERT/versions'  | withServerError()                             | ({ JiraAdapter it -> it.versions('CERT') })                          || 'could not'  | '500 Internal Server Error'
+        'read the epics of CERT 1.4'    | SEARCH                                     | withBadRequest().body('{"errorMessages":["Field cf[10014] does not exist"]}') | ({ JiraAdapter it -> it.epics('CERT', 'CERT 1.4') }) || 'refused to' | '400 Bad Request'
+        'read the stories of CERT 1.4'  | SEARCH                                     | withSuccess('{"startAt":0,"total":1,"issues":"oops"}', APPLICATION_JSON) | ({ JiraAdapter it -> it.stories('CERT', 'CERT 1.4', ['CERT-12']) }) || 'could not'  | 'Error while extracting response'
+        type = failed == 'refused to' ? RefusedException : UncheckedIOException
     }
 
     private static RequestMatcher body(Map expected) {

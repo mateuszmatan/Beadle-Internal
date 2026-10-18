@@ -30,6 +30,7 @@ import java.time.LocalDate
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 
+import static com.bbh.itss.beadle.internal.application.calllog.CallerContext.MDC_KEY
 import static com.bbh.itss.beadle.internal.domain.status.SystemStatus.of
 import static com.bbh.itss.beadle.internal.support.Fixtures.callLogEntry
 import static com.bbh.itss.beadle.internal.support.Fixtures.cycle
@@ -110,7 +111,7 @@ class UseCasesSpec extends Specification {
         field = fields.join(' and ')
     }
 
-    def "Confluence pages are found without their bodies, read, created and updated by their trimmed id"() {
+    def "Confluence pages are found, read, created and updated by their trimmed id"() {
         given:
         def service = new ConfluenceService(confluence)
 
@@ -125,7 +126,7 @@ class UseCasesSpec extends Specification {
         1 * confluence.get('100001') >> page()
         1 * confluence.create(newPage()) >> page(id: '100009', version: 1)
         1 * confluence.update('100001', pageUpdate()) >> page(version: 4)
-        found == [page(body: null)]
+        found == [page()]
         read == page()
         created.id() == '100009'
         updated.version() == 4
@@ -197,7 +198,7 @@ class UseCasesSpec extends Specification {
         result == trackedTicket().asCreated()
     }
 
-    def "two requests for the same change at once raise one ticket, and a ticket CyberTrack refused is not followed"() {
+    def "two requests for the same change at once create one ticket, and a ticket CyberTrack refused is not followed"() {
         given:
         Map<String, TrackedTicket> followed = [:].asSynchronized()
         def memory = [openFor: { String change -> Optional.ofNullable(followed.values().find { it.changeNumber() == change }) },
@@ -207,7 +208,7 @@ class UseCasesSpec extends Specification {
                     create   : { SecureCodingTicket ticket ->
                         Thread.sleep(100)
                         if (ticket.changeNumber() == 'CHG9') {
-                            throw new UncheckedIOException('CyberTrack could not create: 400', new IOException())
+                            throw new UncheckedIOException('CyberTrack could not create: 503', new IOException())
                         }
                         new CreatedTicket('SCP-' + (1234 + created++), null)
                     }] as CyberTrackPort
@@ -245,14 +246,14 @@ class UseCasesSpec extends Specification {
         expect:
         CallerContext.current() == Caller.NONE
         CallerContext.as(USER) {
-            assert CallerContext.as(system) { [CallerContext.current(), MDC.get('correlationId')] } == [system, 'tick-1']
+            assert CallerContext.as(system) { [CallerContext.current(), MDC.get(MDC_KEY)] } == [system, 'tick-1']
             Caller elsewhere = null
             Thread.start { elsewhere = CallerContext.current() }.join()
             assert elsewhere == Caller.NONE
-            [CallerContext.current(), MDC.get('correlationId')]
+            [CallerContext.current(), MDC.get(MDC_KEY)]
         } == [USER, 'corr-1']
         CallerContext.current() == Caller.NONE
-        MDC.get('correlationId') == null
+        MDC.get(MDC_KEY) == null
 
         when:
         CallerContext.run(system) { throw new IllegalStateException('boom') }

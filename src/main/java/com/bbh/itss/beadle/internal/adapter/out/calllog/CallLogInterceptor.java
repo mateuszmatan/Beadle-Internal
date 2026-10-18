@@ -1,4 +1,4 @@
-package com.bbh.itss.beadle.internal.config;
+package com.bbh.itss.beadle.internal.adapter.out.calllog;
 
 import com.bbh.itss.beadle.internal.application.callback.port.out.CallbackPort;
 import com.bbh.itss.beadle.internal.application.calllog.CallerContext;
@@ -45,9 +45,14 @@ import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.trimToNull;
 import static org.springframework.util.ClassUtils.hasMethod;
 
+/**
+ * Writes a row of the call log around every call of a port to another system: who caused it, the correlation id, the
+ * system, the operation (the name of the port method), its target, the outcome with the message of a failure, and the
+ * duration. A call log that cannot be written never fails the call.
+ */
 @Slf4j
 @RequiredArgsConstructor
-class CallLogInterceptor implements MethodInterceptor {
+public class CallLogInterceptor implements MethodInterceptor {
 
     static final String UNLOGGED = "connected";
     static final Map<Class<?>, ExternalSystem> SYSTEMS = Map.of(JiraPort.class, JIRA, CyberTrackPort.class, CYBERTRACK,
@@ -56,7 +61,7 @@ class CallLogInterceptor implements MethodInterceptor {
     private final ObjectProvider<CallLogPort> callLog;
     private final ObjectProvider<Clock> clock;
 
-    static Pointcut pointcut() {
+    public static Pointcut pointcut() {
         return new StaticMethodMatcherPointcut() {
             @Override
             public boolean matches(Method method, Class<?> targetClass) {
@@ -79,18 +84,15 @@ class CallLogInterceptor implements MethodInterceptor {
     public Object invoke(MethodInvocation invocation) throws Throwable {
         Method method = invocation.getMethod();
         Class<?> targetClass = invocation.getThis() == null ? method.getDeclaringClass() : invocation.getThis().getClass();
-        Optional<ExternalSystem> system = systemOf(method, targetClass);
-        if (system.isEmpty()) {
-            return invocation.proceed();
-        }
+        ExternalSystem system = systemOf(method, targetClass).orElseThrow();
         Instant at = now(clock.getIfAvailable(Clock::systemUTC));
         long started = System.nanoTime();
         try {
             Object result = invocation.proceed();
-            record(system.get(), method, invocation.getArguments(), at, started, SUCCESS, null);
+            record(system, method, invocation.getArguments(), at, started, SUCCESS, null);
             return result;
         } catch (Throwable e) {
-            record(system.get(), method, invocation.getArguments(), at, started, FAILURE,
+            record(system, method, invocation.getArguments(), at, started, FAILURE,
                     defaultIfBlank(e.getMessage(), e.getClass().getSimpleName()));
             throw e;
         }

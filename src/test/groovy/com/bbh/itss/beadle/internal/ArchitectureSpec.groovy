@@ -24,6 +24,8 @@ import spock.lang.Specification
 
 import java.util.function.Predicate
 
+import static com.tngtech.archunit.base.DescribedPredicate.alwaysTrue
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage
 import static com.tngtech.archunit.lang.SimpleConditionEvent.violated
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods
@@ -74,6 +76,9 @@ class ArchitectureSpec extends Specification {
          noClasses().that().resideInAPackage(ADAPTER_IN).should().dependOnClassesThat().resideInAPackage(ADAPTER_OUT),
          noClasses().that().resideInAPackage(ADAPTER_OUT).should().dependOnClassesThat().resideInAPackage(ADAPTER_IN),
          noClasses().that().resideInAPackage(ADAPTER_IN).should().dependOnClassesThat().resideInAPackage(BASE + '.application..port.out..'),
+         noClasses().that().resideInAPackage(ADAPTER_OUT).should().dependOnClassesThat().resideInAPackage(BASE + '.application..port.in..'),
+         slices().matching(BASE + '.adapter.out.(*)..').should().notDependOnEachOther()
+                 .ignoreDependency(alwaysTrue(), resideInAPackage(BASE + '.adapter.out.http..')),
          noClasses().that().resideInAPackage(ADAPTER).should().dependOnClassesThat().resideInAPackage(CONFIG),
          classes().that(are('controllers or controller advice') { [RestController, RestControllerAdvice].any(it.&isAnnotatedWith) })
                  .should().resideInAPackage(BASE + '.adapter.in.web..'),

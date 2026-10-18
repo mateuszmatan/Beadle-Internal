@@ -1,5 +1,6 @@
 package com.bbh.itss.beadle.internal.adapter.out.http
 
+import com.bbh.itss.beadle.internal.domain.shared.RefusedException
 import org.springframework.test.web.client.MockRestServiceServer
 import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.client.RestClient
@@ -12,6 +13,7 @@ import static com.bbh.itss.beadle.internal.adapter.out.http.SystemClient.timesta
 import static org.springframework.http.MediaType.APPLICATION_JSON
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withBadRequest
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
@@ -59,7 +61,7 @@ class SystemClientSpec extends Specification {
         stale.message == 'stale'
     }
 
-    def "a call answered with #answered is refused naming the system and the operation"() {
+    def "a call answered with #answered fails naming the system and the operation"() {
         given:
         server.expect(requestTo('https://jira.bbh.com/x')).andRespond(response)
 
@@ -67,15 +69,16 @@ class SystemClientSpec extends Specification {
         new SystemClient('Jira', builder, 'https://jira.bbh.com', 't').call('read x') { it.get().uri('/x').retrieve().body(String) }
 
         then:
-        def refused = thrown(UncheckedIOException)
-        refused.message.startsWith(message)
-        refused.message.length() <= 'Jira could not read x: '.length() + SystemClient.MAX_REASON
+        def failed = thrown(type)
+        failed.message.startsWith(message)
+        failed.message.length() <= 'Jira refused to read x: '.length() + SystemClient.MAX_REASON
 
         where:
-        answered                | response                                         || message
-        'a server error'        | withServerError()                                || 'Jira could not read x: 500 Internal Server Error'
-        'a reason too long'     | { throw new ResourceAccessException('y' * 400) } || 'Jira could not read x: ' + 'y' * 300
-        'a reason without text' | { throw new ResourceAccessException('') }        || 'Jira could not read x: ResourceAccessException'
+        answered                | response                                         || type                 | message
+        'a refusal'             | withBadRequest()                                 || RefusedException     | 'Jira refused to read x: 400 Bad Request'
+        'a server error'        | withServerError()                                || UncheckedIOException | 'Jira could not read x: 500 Internal Server Error'
+        'a reason too long'     | { throw new ResourceAccessException('y' * 400) } || UncheckedIOException | 'Jira could not read x: ' + 'y' * 300
+        'a reason without text' | { throw new ResourceAccessException('') }        || UncheckedIOException | 'Jira could not read x: ResourceAccessException'
     }
 
     def "a timestamp is read in ISO or Atlassian notation, and none stays none"() {

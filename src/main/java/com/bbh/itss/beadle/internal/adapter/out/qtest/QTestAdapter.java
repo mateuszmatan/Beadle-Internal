@@ -9,6 +9,7 @@ import com.bbh.itss.beadle.internal.domain.qtest.QTestRun;
 import com.bbh.itss.beadle.internal.domain.qtest.QTestSummary;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -178,7 +179,7 @@ class QTestAdapter implements QTestPort {
      * it still has under way.
      */
     private <T> T withinBudget(String operation, Callable<T> work) {
-        FutureTask<T> task = new FutureTask<>(work);
+        FutureTask<T> task = new FutureTask<>(withMdc(work));
         Thread.ofVirtual().name("qtest-read").start(task);
         try {
             return task.get(budget.toNanos(), NANOSECONDS);
@@ -210,7 +211,7 @@ class QTestAdapter implements QTestPort {
         try {
             List<Future<R>> futures = new ArrayList<>(items.size());
             for (T item : items) {
-                futures.add(executor.submit(() -> withPermit(item, read)));
+                futures.add(executor.submit(withMdc(() -> withPermit(item, read))));
             }
             List<R> results = new ArrayList<>(items.size());
             for (Future<R> future : futures) {
@@ -234,6 +235,19 @@ class QTestAdapter implements QTestPort {
         } finally {
             reads.release();
         }
+    }
+
+    /**
+     * The work with the logging MDC of the thread that hands it over, so that its log lines carry the correlation id.
+     */
+    private static <T> Callable<T> withMdc(Callable<T> work) {
+        Map<String, String> mdc = MDC.getCopyOfContextMap();
+        return () -> {
+            if (mdc != null) {
+                MDC.setContextMap(mdc);
+            }
+            return work.call();
+        };
     }
 
     private static RuntimeException unwrapped(ExecutionException e) {
@@ -263,13 +277,13 @@ class QTestAdapter implements QTestPort {
     record Project(long id, String name) {
     }
 
-    record Release(long id, String name) {
+    record Release(long id) {
     }
 
     record Cycle(long id, String name, String pid, @JsonProperty("test-cycles") List<Cycle> children) {
     }
 
-    record RunPage(Integer page, @JsonProperty("page_size") Integer pageSize, Integer total, List<Run> items) {
+    record RunPage(Integer total, List<Run> items) {
     }
 
     /**

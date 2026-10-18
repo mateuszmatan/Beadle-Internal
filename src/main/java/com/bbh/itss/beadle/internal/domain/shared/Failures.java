@@ -16,7 +16,7 @@ public final class Failures {
         return new NoSuchElementException(entity + " " + id + " does not exist");
     }
 
-    public static IllegalStateException staleVersion() {
-        return new IllegalStateException(STALE_VERSION);
+    public static RefusedException staleVersion() {
+        return new RefusedException(STALE_VERSION);
     }
 }

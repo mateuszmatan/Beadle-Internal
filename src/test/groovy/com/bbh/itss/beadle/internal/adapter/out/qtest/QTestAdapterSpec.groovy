@@ -2,6 +2,7 @@ package com.bbh.itss.beadle.internal.adapter.out.qtest
 
 import com.bbh.itss.beadle.internal.domain.qtest.QTestSummary
 import groovy.json.JsonOutput
+import org.slf4j.MDC
 import org.springframework.http.client.ClientHttpRequest
 import org.springframework.http.client.ClientHttpRequestInterceptor
 import org.springframework.test.web.client.MockRestServiceServer
@@ -15,6 +16,7 @@ import java.time.Instant
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
 
+import static com.bbh.itss.beadle.internal.application.calllog.CallerContext.MDC_KEY
 import static com.bbh.itss.beadle.internal.support.Fixtures.cycle
 import static com.bbh.itss.beadle.internal.support.Fixtures.project
 import static com.bbh.itss.beadle.internal.support.Fixtures.run
@@ -37,10 +39,12 @@ class QTestAdapterSpec extends Specification {
     static final String RELEASES = PROJECT + '/releases'
 
     def calls = new ConcurrentLinkedQueue<String>()
+    def correlationIds = new ConcurrentLinkedQueue<String>()
     def inFlight = new AtomicInteger()
     def mostInFlight = new AtomicInteger()
     def builder = RestClient.builder().requestInterceptor({ request, body, execution ->
         calls << request.URI.toString()
+        correlationIds << String.valueOf(MDC.get(MDC_KEY))
         execution.execute(request, body)
     } as ClientHttpRequestInterceptor)
     def server = MockRestServiceServer.bindTo(builder).ignoreExpectOrder(true).build()
@@ -86,6 +90,24 @@ class QTestAdapterSpec extends Specification {
                             cycle(id: 20L, name: 'Regression', pid: 'CL-20'),
                             cycle(id: 30L, name: 'SIT', pid: 'CL-30'), cycle(id: 31L, name: 'SIT rerun', pid: 'CL-31')]
         server.verify()
+    }
+
+    def "the reads on threads of their own log under the correlation id of the caller"() {
+        given:
+        server.expect(requestTo(ROOT_CYCLES)).andRespond(withSuccess('[]', APPLICATION_JSON))
+        server.expect(requestTo(RELEASES)).andRespond(withSuccess('[{"id":5}]', APPLICATION_JSON))
+        server.expect(requestTo(PROJECT + '/test-cycles?parentId=5&parentType=release&expand=descendants'))
+                .andRespond(withSuccess('[]', APPLICATION_JSON))
+        MDC.put(MDC_KEY, 'corr-1')
+
+        when:
+        qtest.cycles(1)
+
+        then:
+        correlationIds as List == ['corr-1'] * 3
+
+        cleanup:
+        MDC.clear()
     }
 
     def "the test runs of a cycle come page by page with the status and time of their last result"() {

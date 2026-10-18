@@ -1,6 +1,7 @@
 package com.bbh.itss.beadle.internal.adapter.out.confluence
 
 import com.bbh.itss.beadle.internal.domain.confluence.ConfluencePage
+import com.bbh.itss.beadle.internal.domain.shared.RefusedException
 import groovy.json.JsonSlurper
 import org.springframework.http.client.ClientHttpRequest
 import org.springframework.mock.http.client.MockClientHttpRequest
@@ -42,7 +43,7 @@ class ConfluenceAdapterSpec extends Specification {
     def server = MockRestServiceServer.bindTo(builder).build()
     def confluence = new ConfluenceAdapter(new ConfluenceProperties(URL + '/', 'secret-token'), builder)
 
-    def "pages are found by space and title, with their version and link but without their body"() {
+    def "pages are found by space and title, with their version and link"() {
         given:
         server.expect(requestToUriTemplate(CONTENT + '?type=page&spaceKey={s}&title={t}&expand=space,version&limit=50',
                 'DSO', 'Beadle release notes'))
@@ -56,7 +57,7 @@ class ConfluenceAdapterSpec extends Specification {
 
         then:
         confluence.connected()
-        pages == [page(url: URL + '/display/DSO/Beadle+release+notes', body: null),
+        pages == [page(url: URL + '/display/DSO/Beadle+release+notes'),
                   new ConfluencePage('100002', 'DSO', 'Other', 1, null, null)]
         server.verify()
     }
@@ -142,15 +143,16 @@ class ConfluenceAdapterSpec extends Specification {
         call(confluence)
 
         then:
-        def refused = thrown(UncheckedIOException)
-        refused.message.startsWith('Confluence could not ' + operation + ': ' + reason)
+        def refused = thrown(type)
+        refused.message.startsWith("Confluence $failed $operation: $reason")
 
         where:
-        operation                                   | url                                                        | response                                                  | call                                                                   || reason
-        'find the page Notes in space DSO'          | CONTENT + '?type=page&spaceKey=DSO&title=Notes&expand=space,version&limit=50' | withServerError()                        | ({ ConfluenceAdapter it -> it.find('DSO', 'Notes') })                  || '500 Internal Server Error'
-        'read the page 100001'                      | CONTENT + '/100001?expand=space,version,body.storage'      | withSuccess('{}', APPLICATION_JSON)                       | ({ ConfluenceAdapter it -> it.get('100001') })                         || NO_CONTENT
-        'create the page Change CHG0031001 in space DSO' | CONTENT + '?expand=space,version,body.storage'        | withBadRequest().body('{"message":"A page with this title already exists"}') | ({ ConfluenceAdapter it -> it.create(newPage()) }) || '400 Bad Request'
-        'update the page 100001'                    | CONTENT + '/100001?expand=space,version,body.storage'      | withServerError()                                         | ({ ConfluenceAdapter it -> it.update('100001', pageUpdate()) })       || '500 Internal Server Error'
+        operation                                   | url                                                        | response                                                  | call                                                                   || failed       | reason
+        'find the page Notes in space DSO'          | CONTENT + '?type=page&spaceKey=DSO&title=Notes&expand=space,version&limit=50' | withServerError()                        | ({ ConfluenceAdapter it -> it.find('DSO', 'Notes') })                  || 'could not'  | '500 Internal Server Error'
+        'read the page 100001'                      | CONTENT + '/100001?expand=space,version,body.storage'      | withSuccess('{}', APPLICATION_JSON)                       | ({ ConfluenceAdapter it -> it.get('100001') })                         || 'could not'  | NO_CONTENT
+        'create the page Change CHG0031001 in space DSO' | CONTENT + '?expand=space,version,body.storage'        | withBadRequest().body('{"message":"A page with this title already exists"}') | ({ ConfluenceAdapter it -> it.create(newPage()) }) || 'refused to' | '400 Bad Request'
+        'update the page 100001'                    | CONTENT + '/100001?expand=space,version,body.storage'      | withServerError()                                         | ({ ConfluenceAdapter it -> it.update('100001', pageUpdate()) })       || 'could not'  | '500 Internal Server Error'
+        type = failed == 'refused to' ? RefusedException : UncheckedIOException
     }
 
     private static RequestMatcher body(Map expected) {

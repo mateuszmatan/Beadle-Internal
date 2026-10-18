@@ -32,7 +32,7 @@ through running them together and deploying them.
 - Names:
   - BBH's ServiceNow instance is **ProTech** in code, configuration, documentation and the interface. The word
     ServiceNow appears only where its REST API is meant.
-  - **CyberTrack** is the Cybersecurity team's Jira, where secure coding tickets are raised. **Jira** alone is the
+  - **CyberTrack** is the Cybersecurity team's Jira, where secure coding tickets are created. **Jira** alone is the
     delivery teams' Jira (versions, epics, stories). The two never share a package, a client or a configuration block.
   - **Business Service** is Beadle's grouping of products, one name everywhere: `businessServiceId`,
     `businessServiceName`, `/api/business-services`, the lookup kind `business-services`, the table
@@ -41,10 +41,11 @@ through running them together and deploying them.
 - JSON everywhere. Instants are ISO-8601 UTC, dates `yyyy-MM-dd`, enums their Java names.
 - Errors are `application/problem+json` (RFC 9457) with `status`, `title` and `detail`: `Validation failed` (400, with
   `problems: [{"field": "...", "message": "..."}]`), `Malformed request` (400, a body or value that cannot be read; in
-  Beadle-GUI and Beadle-ProTech), `Not found` (404), `Conflict` (409: a stale `version` in Beadle-GUI, a refusal of the
-  external system in the two services), `Bad Gateway` (502, Internal or ProTech could not reach or use the external
-  system), `Service Unavailable` (503, Beadle-GUI could not reach Internal or ProTech) and `Request failed` (500). Any
-  other error is Spring's own problem, titled with the HTTP reason phrase (`Bad Request`, `Method Not Allowed`, ...).
+  Beadle-GUI and Beadle-ProTech), `Not found` (404), `Conflict` (409: a stale `version`, or in Internal and ProTech a
+  refusal of the external system, that is a `4xx` other than `401`, `403`, `407`, `408` and `429`), `Bad Gateway` (502,
+  Internal or ProTech could not reach the external system, sign in to it or get an answer in time, or it failed),
+  `Service Unavailable` (503, Beadle-GUI could not reach Internal or ProTech) and `Request failed` (500). Any other
+  error is Spring's own problem, titled with the HTTP reason phrase (`Bad Request`, `Method Not Allowed`, ...).
 - Secrets come from environment variables filled from OpenShift secrets, never from a repository, a log or a test
   fixture.
 - Logging: SLF4J with Lombok's `@Slf4j` and logback, to the console and to a rolling file `${LOG_PATH}/<app>.log` in
@@ -68,15 +69,16 @@ Beadle-GUI calls Beadle-Internal and Beadle-ProTech, and both call Beadle-GUI ba
 |---|---|
 | `Authorization` | `Bearer <service token>`: one shared secret per environment, `BEADLE_SERVICE_TOKEN` (`beadle.services.token`) in all three services. A wrong or missing token, or a blank one configured, is answered `401`. |
 | `X-Beadle-User` | The Beadle-GUI user who caused the call (`system` for scheduled and callback-triggered calls), percent-encoded UTF-8 as `URLEncoder.encode(name, UTF_8)` writes it (`Łukasz Wójcik` is `%C5%81ukasz+W%C3%B3jcik`). The receiver decodes it with `URLDecoder.decode`, keeps a value that is not valid percent-encoding as it came, and logs `unknown` when the header is missing. Internal and ProTech only log it: they sign in to the external systems with Beadle's generic service accounts. |
-| `X-Correlation-Id` | A UUID Beadle-GUI mints per user action, at most 64 characters; a longer one is answered `400`, and the receiver mints one when it is missing. Internal and ProTech log it and record it in their call log. A callback carries, in this header, the correlation id of the call that made the service follow the ticket or change; no body carries it. |
+| `X-Correlation-Id` | A UUID Beadle-GUI mints per user action, at most 64 bytes of UTF-8; a longer one is answered `400`, and the receiver mints one when it is missing. Internal and ProTech log it and record it in their call log. A callback carries, in this header, the correlation id of the call that made the service follow the ticket or change; no body carries it. |
 
 Only the health endpoints spelled plainly (`/actuator/health`, `/actuator/health/liveness`, ...) are open, for the
 OpenShift probes. A path that only looks like one, such as `/actuator/health/..` or `/actuator/health;x`, needs the
 token like any other call.
 
-Timeouts are 5 s to connect and 30 s to read. An unreachable service or a `5xx` answer reaches the Beadle-GUI user
-as `503` with a `detail` naming the service ("Beadle-ProTech did not answer"), and the action is still recorded with
-outcome `FAILURE`.
+Timeouts are 5 s to connect and 30 s to read. Internal and ProTech give the external systems, and their callbacks to
+Beadle-GUI, 5 s to connect and 10 s to read, so that a slow system is answered `502` before Beadle-GUI gives up. An
+unreachable service or a `5xx` answer reaches the Beadle-GUI user as `503` with a `detail` naming the service
+("Beadle-ProTech did not answer"), and the action is still recorded with outcome `FAILURE`.
 
 Base URLs: in Beadle-GUI `beadle.services.internal.url` (`BEADLE_INTERNAL_URL`, local `http://localhost:8082`) and
 `beadle.services.protech.url` (`BEADLE_PROTECH_URL`, local `http://localhost:8083`); in the two services
@@ -112,7 +114,7 @@ both repositories and this file together. Which ProTech table and field holds ea
 `docs/PROTECH-MAPPING.md`, and each is a property under `beadle.protech.fields.*` (for example
 `beadle.protech.fields.change.business-service`, default `u_department`).
 
-Every change raised or read is followed until it is closed. Beadle-ProTech asks ProTech what moved every
+Every change created or read is followed until it is closed. Beadle-ProTech asks ProTech what moved every
 `beadle.protech.poll` (default `PT1M`); the webhook makes it look at one change at once. ProTech calls the webhook from
 a business rule with its own token, `PROTECH_WEBHOOK_TOKEN` (`beadle.protech.webhook-token`), which opens that path
 alone, so the service token never leaves the OpenShift project. The demo adapter moves its changes on its own clock.
@@ -123,7 +125,7 @@ Callback when ProTech moved a change past what Beadle-GUI knows:
 `{"number": "CHG0001234", "event": "STATE_CHANGED" | "APPROVAL_CHANGED" | "TASK_CHANGED", "state": "IMPLEMENTATION", "at": "2026-10-15T09:00:00Z"}`.
 Beadle-GUI answers `202`, reads the change again through `POST /api/protech/changes/read` and records the event as
 user `system:protech`; like the two services, it answers `401` without the token and `400` to an `X-Correlation-Id`
-longer than 64 characters. A callback that is not accepted is sent again at the next look.
+longer than 64 bytes. A callback that is not accepted is sent again at the next look.
 
 ## Beadle-Internal REST API (`/api/internal`)
 
@@ -166,15 +168,16 @@ CHG, CTASK, product code or ticket key a person searches for), `DETAILS` (CLOB, 
 secrets masked; above 256 KB `{"truncated": true, "bytes": n, ...}`), `OUTCOME` (`SUCCESS` or `FAILURE`), `MESSAGE` (the error on failure), `CORRELATION_ID`,
 `DURATION_MS`. Rows are only inserted. Indexes on `AT`, `USER_NAME`, `ACTION`, `OBJECT_KEY`.
 
-Every use case that changes something or calls another system records exactly one row, in its transaction when it
-has one, and a `FAILURE` row when it throws or its request is refused before it runs (a field problem, a missing CSRF
-token of a signed-in user, a callback with the service token but a correlation id that is too long). A caller who
-proved nothing, without a session or the service token, or whose sign-in at Ping failed, is only logged. Actions: `CHANGE_PREVIEWED`, `CHANGE_RAISED`, `CHANGE_EDITED`,
+Every use case that changes something, in Beadle or in another system, records exactly one row, in its transaction
+when it has one, and a `FAILURE` row when it throws or its request is refused before it runs (a field problem, a
+missing CSRF token of a signed-in user, a callback with the service token but a correlation id that is too long). A
+caller who proved nothing, without a session or the service token, or whose sign-in at Ping failed, is only logged,
+and a sign-out is recorded only for a signed-in user. Actions: `CHANGE_PREVIEWED`, `CHANGE_CREATED`, `CHANGE_EDITED`,
 `CHANGE_TASKS_CREATED`, `SECURE_CODING_TICKET_CREATED`, `REMINDER_SENT`, `CHANGE_SYNCED`, `PRODUCT_CREATED`,
 `PRODUCT_UPDATED`, `PRODUCT_DELETED`, `CHANGE_PROFILE_UPDATED`, `BUSINESS_SERVICE_CREATED`, `BUSINESS_SERVICE_RENAMED`,
 `BUSINESS_SERVICE_DELETED`, `USER_SIGNED_IN` (the first API call of a session), `USER_SIGNED_OUT`, `CALLBACK_PROTECH`,
-`CALLBACK_INTERNAL`. Reads are not recorded, except `CHANGE_SYNCED` when opening a change pulled a newer state from
-ProTech.
+`CALLBACK_INTERNAL`. Reads are not recorded, except `CHANGE_PREVIEWED` (a new change checked before it is created)
+and `CHANGE_SYNCED` (opening a change pulled a newer state from ProTech).
 
 `GET /api/action-history?user=&action=&objectType=&objectKey=&outcome=&from=&to=&page=0&size=50` answers
 `{"content": [...], "page": 0, "size": 50, "total": 1234}`, newest first. `GET /api/action-history/users` and

@@ -114,9 +114,13 @@ docker push <registry>/<project>/beadle:latest
 3. **External Service Accounts** (required on rd, qc and prod, which use only the real systems; the demo adapters run on a laptop only):
    ```bash
    oc create secret generic beadle-internal-jira --from-literal=JIRA_TOKEN='<token>'
+   oc create secret generic beadle-internal-cybertrack --from-literal=CYBERTRACK_TOKEN='<token>'
+   oc create secret generic beadle-internal-confluence --from-literal=CONFLUENCE_TOKEN='<token>'
+   oc create secret generic beadle-internal-qtest --from-literal=QTEST_TOKEN='<token>'
    oc create secret generic beadle-protech-account \
-     --from-literal=PROTECH_URL='https://bbh.service-now.com' \
-     --from-literal=PROTECH_USERNAME='<user>' --from-literal=PROTECH_PASSWORD='<password>'
+     --from-literal=PROTECH_URL='https://<protech-host>' \
+     --from-literal=PROTECH_USERNAME='<user>' --from-literal=PROTECH_PASSWORD='<password>' \
+     --from-literal=PROTECH_WEBHOOK_TOKEN='<webhook-token>'
    ```
 
 ### Step 3: Apply Kustomize Overlays (`rd`, `qc`, or `prod`)

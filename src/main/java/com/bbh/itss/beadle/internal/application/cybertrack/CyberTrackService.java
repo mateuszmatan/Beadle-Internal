@@ -27,7 +27,6 @@ import static org.apache.commons.lang3.StringUtils.trimToNull;
 @RequiredArgsConstructor
 public class CyberTrackService implements CyberTrackUseCase {
 
-
     private final CyberTrackPort cyberTrack;
     private final TrackedTicketPort tracked;
     private final Clock clock;

@@ -6,7 +6,6 @@ import com.bbh.itss.beadle.internal.domain.shared.ValidationProblems;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
-import static com.bbh.itss.beadle.internal.domain.cybertrack.SecureCoding.REQUIRED;
 import static com.bbh.itss.beadle.internal.domain.shared.Text.abbreviateBytes;
 import static java.time.format.DateTimeFormatter.ofPattern;
 import static org.apache.commons.lang3.ObjectUtils.getIfNull;
@@ -31,11 +30,11 @@ public record SecureCodingTicket(String changeNumber, String applicationName, Lo
         ValidationProblems problems = new ValidationProblems();
         SecureCodingTicket ticket = new SecureCodingTicket(changeNumber, applicationName, implementationDate,
                 getIfNull(inputs, SecureCoding.NONE));
-        problems.require("changeNumber", ticket.changeNumber(), REQUIRED)
+        problems.require("changeNumber", ticket.changeNumber())
                 .fits("changeNumber", ticket.changeNumber(), CHANGE_NUMBER_MAX)
-                .require("applicationName", ticket.applicationName(), REQUIRED)
+                .require("applicationName", ticket.applicationName())
                 .fits("applicationName", ticket.applicationName(), APPLICATION_MAX)
-                .require("implementationDate", implementationDate, REQUIRED);
+                .require("implementationDate", implementationDate);
         ticket.inputs().require(problems.at("inputs"));
         problems.throwIfAny();
         return ticket;

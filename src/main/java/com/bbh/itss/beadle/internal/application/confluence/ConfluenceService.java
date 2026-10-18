@@ -13,7 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 
-import static com.bbh.itss.beadle.internal.domain.confluence.NewConfluencePage.REQUIRED;
 import static com.bbh.itss.beadle.internal.domain.shared.Failures.notFound;
 import static org.apache.commons.lang3.StringUtils.trimToNull;
 
@@ -22,7 +21,6 @@ import static org.apache.commons.lang3.StringUtils.trimToNull;
 @RequiredArgsConstructor
 public class ConfluenceService implements ConfluenceUseCase {
 
-
     private final ConfluencePort confluence;
 
     @Override
@@ -30,7 +28,7 @@ public class ConfluenceService implements ConfluenceUseCase {
     public List<ConfluencePage> find(String spaceKey, String title) {
         String space = trimToNull(spaceKey);
         String name = trimToNull(title);
-        new ValidationProblems().require("spaceKey", space, REQUIRED).require("title", name, REQUIRED).throwIfAny();
+        new ValidationProblems().require("spaceKey", space).require("title", name).throwIfAny();
         return confluence.find(space, name).stream().map(ConfluencePage::withoutBody).toList();
     }
 

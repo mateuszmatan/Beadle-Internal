@@ -13,11 +13,11 @@ import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 
+import static com.bbh.itss.beadle.internal.domain.shared.ValidationProblems.REQUIRED;
+
 @UseCase
 @RequiredArgsConstructor
 public class QTestService implements QTestUseCase {
-
-    public static final String CYCLE_REQUIRED = "is required";
 
     private final QTestPort qtest;
 
@@ -37,7 +37,7 @@ public class QTestService implements QTestUseCase {
     @WithoutTransaction
     public List<QTestRun> runs(long projectId, Long cycleId) {
         if (cycleId == null) {
-            throw InvalidRequestException.of("cycleId", CYCLE_REQUIRED);
+            throw InvalidRequestException.of("cycleId", REQUIRED);
         }
         return qtest.runs(projectId, cycleId);
     }

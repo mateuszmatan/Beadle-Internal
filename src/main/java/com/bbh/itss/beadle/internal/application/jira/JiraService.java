@@ -13,13 +13,12 @@ import java.util.List;
 
 import static com.bbh.itss.beadle.internal.domain.jira.JiraVersion.UNRELEASED_NEWEST_FIRST;
 import static com.bbh.itss.beadle.internal.domain.shared.Text.clean;
+import static com.bbh.itss.beadle.internal.domain.shared.ValidationProblems.REQUIRED;
 import static org.apache.commons.lang3.StringUtils.trimToNull;
 
 @UseCase
 @RequiredArgsConstructor
 public class JiraService implements JiraUseCase {
-
-    public static final String REQUIRED = "is required";
 
     private final JiraPort jira;
 

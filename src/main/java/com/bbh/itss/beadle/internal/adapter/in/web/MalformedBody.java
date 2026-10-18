@@ -4,17 +4,15 @@ import com.bbh.itss.beadle.internal.domain.shared.InvalidRequestException.FieldP
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DatabindException;
-import tools.jackson.databind.exc.InvalidFormatException;
 
-import java.util.Arrays;
 import java.util.List;
 
-import static java.util.stream.Collectors.joining;
 import static org.apache.commons.lang3.Strings.CS;
 
 record MalformedBody(String detail, List<FieldProblem> problems) {
 
     private static final String MISSING = "Required request body is missing";
+    private static final String UNREADABLE = "has a value this field cannot hold";
 
     static MalformedBody of(HttpMessageNotReadableException e) {
         if (CS.startsWith(e.getMessage(), MISSING)) {
@@ -34,17 +32,7 @@ record MalformedBody(String detail, List<FieldProblem> problems) {
         if (field.isEmpty()) {
             return new MalformedBody("The request body does not have the shape this endpoint expects.", List.of());
         }
-        String reason = reasonOf(e);
-        return new MalformedBody(field + " " + reason, List.of(new FieldProblem(field, reason)));
-    }
-
-    private static String reasonOf(DatabindException e) {
-        if (e instanceof InvalidFormatException invalid && invalid.getTargetType() != null
-                && invalid.getTargetType().isEnum()) {
-            return "must be one of " + Arrays.stream(invalid.getTargetType().getEnumConstants())
-                    .map(String::valueOf).collect(joining(", "));
-        }
-        return "has a value this field cannot hold";
+        return new MalformedBody(field + " " + UNREADABLE, List.of(new FieldProblem(field, UNREADABLE)));
     }
 
     private static String fieldOf(JacksonException e) {

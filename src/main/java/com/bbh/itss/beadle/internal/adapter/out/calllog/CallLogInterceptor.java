@@ -84,18 +84,15 @@ public class CallLogInterceptor implements MethodInterceptor {
     public Object invoke(MethodInvocation invocation) throws Throwable {
         Method method = invocation.getMethod();
         Class<?> targetClass = invocation.getThis() == null ? method.getDeclaringClass() : invocation.getThis().getClass();
-        Optional<ExternalSystem> system = systemOf(method, targetClass);
-        if (system.isEmpty()) {
-            return invocation.proceed();
-        }
+        ExternalSystem system = systemOf(method, targetClass).orElseThrow();
         Instant at = now(clock.getIfAvailable(Clock::systemUTC));
         long started = System.nanoTime();
         try {
             Object result = invocation.proceed();
-            record(system.get(), method, invocation.getArguments(), at, started, SUCCESS, null);
+            record(system, method, invocation.getArguments(), at, started, SUCCESS, null);
             return result;
         } catch (Throwable e) {
-            record(system.get(), method, invocation.getArguments(), at, started, FAILURE,
+            record(system, method, invocation.getArguments(), at, started, FAILURE,
                     defaultIfBlank(e.getMessage(), e.getClass().getSimpleName()));
             throw e;
         }

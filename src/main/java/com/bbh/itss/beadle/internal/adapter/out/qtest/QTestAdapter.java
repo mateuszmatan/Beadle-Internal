@@ -277,13 +277,13 @@ class QTestAdapter implements QTestPort {
     record Project(long id, String name) {
     }
 
-    record Release(long id, String name) {
+    record Release(long id) {
     }
 
     record Cycle(long id, String name, String pid, @JsonProperty("test-cycles") List<Cycle> children) {
     }
 
-    record RunPage(Integer page, @JsonProperty("page_size") Integer pageSize, Integer total, List<Run> items) {
+    record RunPage(Integer total, List<Run> items) {
     }
 
     /**

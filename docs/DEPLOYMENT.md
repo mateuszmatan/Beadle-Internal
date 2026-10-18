@@ -111,7 +111,7 @@ docker push <registry>/<project>/beadle:latest
      --from-literal=DB_USERNAME='<user>' --from-literal=DB_PASSWORD='<password>'
    ```
 
-3. **External Service Accounts** *(Optional for live integrations, otherwise demo mode is used)*:
+3. **External Service Accounts** (required on rd, qc and prod, which use only the real systems; the demo adapters run on a laptop only):
    ```bash
    oc create secret generic beadle-internal-jira --from-literal=JIRA_TOKEN='<token>'
    oc create secret generic beadle-protech-account \

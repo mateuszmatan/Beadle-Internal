@@ -6,12 +6,17 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
 
 import java.time.Instant;
 
 import static lombok.AccessLevel.PRIVATE;
 import static lombok.AccessLevel.PROTECTED;
+import static org.hibernate.type.SqlTypes.NUMERIC;
 
+/**
+ * A followed ticket; its NUMBER columns are NUMERIC to JDBC on Oracle and H2 alike.
+ */
 @Entity
 @Table(name = "BEADLE_INTERNAL_CYBERTRACK_TICKET")
 @NoArgsConstructor(access = PROTECTED)
@@ -27,6 +32,7 @@ class TrackedTicketEntity {
     private Instant lastEventAt;
     private Instant closedAt;
     private boolean demo;
+    @JdbcTypeCode(NUMERIC)
     private int misses;
     private String changeNumber;
     private String ticketUrl;

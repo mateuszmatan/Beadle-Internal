@@ -230,30 +230,19 @@ class ApiSpec extends Specification {
         'u' * 250                                    || 'u' * (USER_MAX - 3) + '...'
     }
 
-    def "a correlation id of #length bytes is #outcome"() {
+    def "a correlation id of 64 bytes is taken, one more byte is refused naming the header, as cutting it would lose the callbacks"() {
         when:
-        def response = call(get('/api/internal/status').header('X-Correlation-Id', 'c' * length))
+        def taken = call(get('/api/internal/status').header('X-Correlation-Id', 'c' * CORRELATION_MAX))
+        def refused = call(get('/api/internal/status').header('X-Correlation-Id', 'c' * (CORRELATION_MAX + 1)))
 
         then:
-        response.status == code
-        callers*.correlationId() == accepted
-
-        where:
-        length              || code | accepted
-        CORRELATION_MAX     || 200  | ['c' * CORRELATION_MAX]
-        CORRELATION_MAX + 1 || 400  | []
-        outcome = code == 200 ? 'taken as it is' : 'refused, since cutting it would lose the callbacks of the action'
-    }
-
-    def "a correlation id too long is refused as a problem naming the header"() {
-        when:
-        def response = call(get('/api/internal/status').header('X-Correlation-Id', 'c' * 120))
-
-        then:
-        response.contentType == 'application/problem+json;charset=UTF-8'
-        parse(response.contentAsString) == [title   : 'Validation failed', status: 400,
-                                           detail  : 'X-Correlation-Id ' + ServiceTokenFilter.CORRELATION_TOO_LONG,
-                                           problems: [[field: 'X-Correlation-Id', message: ServiceTokenFilter.CORRELATION_TOO_LONG]]]
+        taken.status == 200
+        callers*.correlationId() == ['c' * CORRELATION_MAX]
+        refused.status == 400
+        refused.contentType == 'application/problem+json;charset=UTF-8'
+        parse(refused.contentAsString) == [title   : 'Validation failed', status: 400,
+                                          detail  : 'X-Correlation-Id ' + ServiceTokenFilter.CORRELATION_TOO_LONG,
+                                          problems: [[field: 'X-Correlation-Id', message: ServiceTokenFilter.CORRELATION_TOO_LONG]]]
     }
 
     private MockMvc mvc(String token) {

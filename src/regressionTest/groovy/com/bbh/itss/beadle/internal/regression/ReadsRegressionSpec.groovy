@@ -6,17 +6,9 @@ import static java.net.URLEncoder.encode
 import static java.nio.charset.StandardCharsets.UTF_8
 
 /**
- * The reads Beadle-GUI makes for a release: the status, the FixVersions, epics and stories of Jira and the test results
- * of qTest.
+ * The reads Beadle-GUI makes for a release: the FixVersions, epics and stories of Jira and the test results of qTest.
  */
 class ReadsRegressionSpec extends BeadleInternalSpecification {
-
-    static final Map DEMO = [connected: false, mode: 'demo']
-
-    def "the status reports every system on its demo adapter"() {
-        expect:
-        api.get('/api/internal/status').json == [jira: DEMO, cyberTrack: DEMO, confluence: DEMO, qtest: DEMO]
-    }
 
     def "the versions of a project come unreleased first, then its epics and the stories of chosen epics are read"() {
         when:

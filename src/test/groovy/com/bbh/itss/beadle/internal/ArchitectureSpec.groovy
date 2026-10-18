@@ -2,6 +2,7 @@ package com.bbh.itss.beadle.internal
 
 import com.bbh.itss.beadle.internal.application.UseCase
 import com.tngtech.archunit.base.DescribedPredicate
+import com.tngtech.archunit.core.domain.JavaAnnotation
 import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.domain.JavaClasses
 import com.tngtech.archunit.core.importer.ClassFileImporter
@@ -12,8 +13,10 @@ import com.tngtech.archunit.lang.ConditionEvents
 import jakarta.persistence.Converter
 import jakarta.persistence.Embeddable
 import jakarta.persistence.Entity
+import org.springframework.context.annotation.Profile
 import org.springframework.data.repository.Repository
 import org.springframework.scheduling.annotation.Scheduled
+import org.springframework.stereotype.Component
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import spock.lang.Shared
@@ -87,6 +90,10 @@ class ArchitectureSpec extends Specification {
              !type.isInterface() && type.allRawInterfaces.any { it.packageName.contains('.port.out') }
          }).should().resideInAPackage(ADAPTER_OUT),
          methods().that().areAnnotatedWith(Scheduled).should().beDeclaredInClassesThat().resideInAPackage(ADAPTER_IN),
+         classes().that().haveSimpleNameStartingWith('Demo').and().areAnnotatedWith(Component)
+                 .should().beAnnotatedWith(DescribedPredicate.describe('@Profile("local")', { JavaAnnotation<?> annotation ->
+                     annotation.rawType.isEquivalentTo(Profile) && annotation.get('value').map { it as List }.orElse([]) == ['local']
+                 } as Predicate<JavaAnnotation<?>>)),
          classes().should(new ArchCondition<JavaClass>('not depend on use case classes other than themselves') {
              @Override
              void check(JavaClass type, ConditionEvents events) {

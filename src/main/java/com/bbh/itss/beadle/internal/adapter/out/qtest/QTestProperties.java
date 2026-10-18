@@ -20,7 +20,4 @@ import java.time.Duration;
 public record QTestProperties(String url, String token, @Min(1) @Max(50) int concurrency,
                               @NotNull @DurationMin(millis = 1) @DurationMax(seconds = 30, inclusive = false)
                               Duration budget) {
-
-    static final String CONFIGURED = "'${beadle.qtest.url:}' != ''";
-    static final String NOT_CONFIGURED = "'${beadle.qtest.url:}' == ''";
 }

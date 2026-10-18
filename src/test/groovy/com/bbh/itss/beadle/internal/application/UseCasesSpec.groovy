@@ -167,11 +167,10 @@ class UseCasesSpec extends Specification {
         new StatusService(jira, cyberTrack, confluence, qtest).status() == new ServiceStatus(of(true), of(false), of(true), of(false))
     }
 
-    def "a secure coding ticket is created in #system, answered at once and followed with the caller's correlation id"() {
+    def "a secure coding ticket is created, answered at once and followed with the caller's correlation id"() {
         given:
         def service = new CyberTrackService(cyberTrack, tracked, fixed(NOW, UTC))
-        def created = new CreatedTicket('SCP-1234', url)
-        cyberTrack.connected() >> connected
+        def created = new CreatedTicket('SCP-1234', 'https://cybertrack.bbh.com/browse/SCP-1234')
 
         when:
         def result = CallerContext.as(USER) { service.create(ticket()) }
@@ -183,33 +182,19 @@ class UseCasesSpec extends Specification {
         1 * cyberTrack.create(ticket()) >> created
 
         then:
-        1 * tracked.track(new TrackedTicket('SCP-1234', null, 'corr-1', NOW, null, null, null, !connected, 0, 'CHG0031001', url))
+        1 * tracked.track(TrackedTicket.created(created, 'CHG0031001', 'corr-1', NOW))
         result == created
-
-        where:
-        system                   | connected | url
-        'CyberTrack'             | true      | 'https://cybertrack.bbh.com/browse/SCP-1234'
-        'the demo of CyberTrack' | false     | null
     }
 
-    def "a change asking again gets its open ticket, unless that ticket was raised by #raisedBy"() {
-        given:
-        def service = new CyberTrackService(cyberTrack, tracked, fixed(NOW, UTC))
-        cyberTrack.connected() >> true
-
+    def "a change asking again gets the ticket it has open, without a new one"() {
         when:
-        def result = service.create(ticket())
+        def result = new CyberTrackService(cyberTrack, tracked, fixed(NOW, UTC)).create(ticket())
 
         then:
-        1 * tracked.openFor('CHG0031001') >> Optional.of(trackedTicket(demo: demo))
-        created * cyberTrack.create(ticket()) >> new CreatedTicket('SCP-2000', null)
-        created * tracked.track({ it.key() == 'SCP-2000' })
-        result.key() == key
-
-        where:
-        raisedBy                  | demo  || created | key
-        'nobody else, it is kept' | false || 0       | 'SCP-1234'
-        'the demo'                | true  || 1       | 'SCP-2000'
+        1 * tracked.openFor('CHG0031001') >> Optional.of(trackedTicket())
+        0 * cyberTrack.create(_)
+        0 * tracked.track(_)
+        result == trackedTicket().asCreated()
     }
 
     def "two requests for the same change at once raise one ticket, and a ticket CyberTrack refused is not followed"() {

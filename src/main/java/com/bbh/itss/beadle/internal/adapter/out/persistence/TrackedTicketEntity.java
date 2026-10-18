@@ -31,7 +31,6 @@ class TrackedTicketEntity {
     private Instant lastSeenAt;
     private Instant lastEventAt;
     private Instant closedAt;
-    private boolean demo;
     @JdbcTypeCode(NUMERIC)
     private int misses;
     private String changeNumber;
@@ -39,12 +38,12 @@ class TrackedTicketEntity {
 
     static TrackedTicketEntity of(TrackedTicket ticket) {
         return new TrackedTicketEntity(ticket.key(), ticket.status(), ticket.correlationId(), ticket.createdAt(),
-                ticket.lastSeenAt(), ticket.lastEventAt(), ticket.closedAt(), ticket.demo(), ticket.misses(),
-                ticket.changeNumber(), ticket.url());
+                ticket.lastSeenAt(), ticket.lastEventAt(), ticket.closedAt(), ticket.misses(), ticket.changeNumber(),
+                ticket.url());
     }
 
     TrackedTicket toDomain() {
-        return new TrackedTicket(ticketKey, status, correlationId, createdAt, lastSeenAt, lastEventAt, closedAt,
-                demo, misses, changeNumber, ticketUrl);
+        return new TrackedTicket(ticketKey, status, correlationId, createdAt, lastSeenAt, lastEventAt, closedAt, misses,
+                changeNumber, ticketUrl);
     }
 }

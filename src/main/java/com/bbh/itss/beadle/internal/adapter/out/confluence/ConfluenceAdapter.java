@@ -1,5 +1,6 @@
 package com.bbh.itss.beadle.internal.adapter.out.confluence;
 
+import com.bbh.itss.beadle.internal.adapter.out.http.ConditionalOnSystemUrl;
 import com.bbh.itss.beadle.internal.adapter.out.http.SystemClient;
 import com.bbh.itss.beadle.internal.application.confluence.port.out.ConfluencePort;
 import com.bbh.itss.beadle.internal.domain.confluence.ConfluencePage;
@@ -7,7 +8,6 @@ import com.bbh.itss.beadle.internal.domain.confluence.ConfluencePageUpdate;
 import com.bbh.itss.beadle.internal.domain.confluence.NewConfluencePage;
 import com.bbh.itss.beadle.internal.domain.shared.Failures;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -18,7 +18,6 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import static com.bbh.itss.beadle.internal.adapter.out.confluence.ConfluenceProperties.CONFIGURED;
 import static com.bbh.itss.beadle.internal.adapter.out.http.SystemClient.thrown;
 import static com.bbh.itss.beadle.internal.domain.shared.Failures.notFound;
 import static org.apache.commons.collections4.ListUtils.emptyIfNull;
@@ -27,7 +26,7 @@ import static org.apache.commons.collections4.ListUtils.emptyIfNull;
  * Confluence through its REST API ({@code /rest/api/content}) with the bearer token of the Beadle service account.
  */
 @Component
-@ConditionalOnExpression(CONFIGURED)
+@ConditionalOnSystemUrl("confluence")
 class ConfluenceAdapter implements ConfluencePort {
 
     static final String EXPAND = "?expand=space,version,body.storage";

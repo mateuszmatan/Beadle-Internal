@@ -7,9 +7,7 @@ configMapGenerator:
     behavior: merge
     literals:
       - SPRING_PROFILES_ACTIVE=rd
-      # The systems of rd: fill in each URL before applying. Beadle-Internal does not start on rd, qc or prod while
-      # one is blank, since its demo adapter would answer in its place; <SYSTEM>_DEMO=true runs a system on its
-      # demo on purpose.
+      # The systems of rd: fill in each URL before applying; Beadle-Internal does not start while one is blank.
       - JIRA_URL=
       - CYBERTRACK_URL=
       - CONFLUENCE_URL=

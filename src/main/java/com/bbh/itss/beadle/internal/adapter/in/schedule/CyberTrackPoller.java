@@ -8,19 +8,15 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Polls the CyberTrack tickets Beadle created: every {@value #DEMO_INTERVAL} while the demo adapter moves them on
- * its clock, every {@code beadle.cybertrack.poll} (default {@value #LIVE_INTERVAL}) once CyberTrack is configured. A
- * tick never throws: what failed is logged and tried again on the next tick.
+ * Polls the CyberTrack tickets Beadle created every {@code beadle.cybertrack.poll}. A tick never throws: what failed
+ * is logged and tried again on the next tick.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class CyberTrackPoller {
 
-    public static final String DEMO_INTERVAL = "PT10S";
-    public static final String LIVE_INTERVAL = "PT5M";
-    static final String INTERVAL = "#{'${beadle.cybertrack.url:}' == '' ? '${beadle.cybertrack.demo-poll:" + DEMO_INTERVAL
-            + "}' : '${beadle.cybertrack.poll:" + LIVE_INTERVAL + "}'}";
+    static final String INTERVAL = "${beadle.cybertrack.poll}";
 
     private final CyberTrackPollUseCase cyberTrack;
 

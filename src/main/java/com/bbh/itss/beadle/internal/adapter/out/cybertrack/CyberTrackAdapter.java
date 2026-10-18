@@ -1,11 +1,11 @@
 package com.bbh.itss.beadle.internal.adapter.out.cybertrack;
 
+import com.bbh.itss.beadle.internal.adapter.out.http.ConditionalOnSystemUrl;
 import com.bbh.itss.beadle.internal.adapter.out.http.SystemClient;
 import com.bbh.itss.beadle.internal.application.cybertrack.port.out.CyberTrackPort;
 import com.bbh.itss.beadle.internal.domain.cybertrack.CreatedTicket;
 import com.bbh.itss.beadle.internal.domain.cybertrack.CyberTrackTicket;
 import com.bbh.itss.beadle.internal.domain.cybertrack.SecureCodingTicket;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import static com.bbh.itss.beadle.internal.adapter.out.cybertrack.CyberTrackProperties.CONFIGURED;
 import static com.bbh.itss.beadle.internal.adapter.out.http.Jql.list;
 import static com.bbh.itss.beadle.internal.adapter.out.http.SystemClient.thrown;
 import static com.bbh.itss.beadle.internal.adapter.out.http.SystemClient.timestamp;
@@ -29,7 +28,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
  * CyberTrack, the Jira of the Cybersecurity team, through the Jira REST API v2 on its own URL and service account.
  */
 @Component
-@ConditionalOnExpression(CONFIGURED)
+@ConditionalOnSystemUrl("cybertrack")
 class CyberTrackAdapter implements CyberTrackPort {
 
     static final String NO_KEY = "CyberTrack answered without the key of the new issue";

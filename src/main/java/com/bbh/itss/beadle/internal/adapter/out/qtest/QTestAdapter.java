@@ -1,5 +1,6 @@
 package com.bbh.itss.beadle.internal.adapter.out.qtest;
 
+import com.bbh.itss.beadle.internal.adapter.out.http.ConditionalOnSystemUrl;
 import com.bbh.itss.beadle.internal.adapter.out.http.SystemClient;
 import com.bbh.itss.beadle.internal.application.qtest.port.out.QTestPort;
 import com.bbh.itss.beadle.internal.domain.qtest.QTestCycle;
@@ -8,7 +9,6 @@ import com.bbh.itss.beadle.internal.domain.qtest.QTestRun;
 import com.bbh.itss.beadle.internal.domain.qtest.QTestSummary;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -36,7 +36,6 @@ import java.util.function.Supplier;
 
 import static com.bbh.itss.beadle.internal.adapter.out.http.SystemClient.thrown;
 import static com.bbh.itss.beadle.internal.adapter.out.http.SystemClient.timestamp;
-import static com.bbh.itss.beadle.internal.adapter.out.qtest.QTestProperties.CONFIGURED;
 import static com.bbh.itss.beadle.internal.domain.qtest.QTestSummary.UNEXECUTED;
 import static com.bbh.itss.beadle.internal.domain.shared.Failures.notFound;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
@@ -54,7 +53,7 @@ import static org.apache.commons.lang3.Strings.CI;
  */
 @Slf4j
 @Component
-@ConditionalOnExpression(CONFIGURED)
+@ConditionalOnSystemUrl("qtest")
 class QTestAdapter implements QTestPort {
 
     static final String QTEST = "qTest";

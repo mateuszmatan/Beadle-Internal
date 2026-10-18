@@ -1,5 +1,6 @@
 package com.bbh.itss.beadle.internal.adapter.out.cybertrack;
 
+import com.bbh.itss.beadle.internal.adapter.out.http.ConditionalOnSystemUrl;
 import com.bbh.itss.beadle.internal.application.cybertrack.port.out.CyberTrackPort;
 import com.bbh.itss.beadle.internal.application.cybertrack.port.out.TrackedTicketPort;
 import com.bbh.itss.beadle.internal.domain.cybertrack.CreatedTicket;
@@ -8,7 +9,7 @@ import com.bbh.itss.beadle.internal.domain.cybertrack.SecureCodingTicket;
 import com.bbh.itss.beadle.internal.domain.cybertrack.TrackedTicket;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.security.SecureRandom;
@@ -24,7 +25,6 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
-import static com.bbh.itss.beadle.internal.adapter.out.cybertrack.CyberTrackProperties.NOT_CONFIGURED;
 import static com.bbh.itss.beadle.internal.domain.shared.Failures.notFound;
 import static com.bbh.itss.beadle.internal.domain.shared.Timestamps.now;
 import static java.lang.Math.min;
@@ -39,7 +39,8 @@ import static java.time.Duration.ofMinutes;
  */
 @Slf4j
 @Component
-@ConditionalOnExpression(NOT_CONFIGURED)
+@Profile("local")
+@ConditionalOnSystemUrl(value = "cybertrack", set = false)
 @RequiredArgsConstructor
 class DemoCyberTrackAdapter implements CyberTrackPort {
 

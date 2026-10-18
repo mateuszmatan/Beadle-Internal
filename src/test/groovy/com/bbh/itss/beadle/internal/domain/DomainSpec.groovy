@@ -93,13 +93,9 @@ class DomainSpec extends Specification {
         def created = new CreatedTicket('SCP-1234', 'https://cybertrack.bbh.com/browse/SCP-1234')
 
         expect:
-        TrackedTicket.created(created, 'CHG0031001', 'corr-1', CREATED, demo) ==
-                trackedTicket(status: null, lastSeenAt: null, demo: demo)
+        TrackedTicket.created(created, 'CHG0031001', 'corr-1', CREATED) == trackedTicket(status: null, lastSeenAt: null)
         trackedTicket().asCreated() == created
         trackedTicket().open()
-
-        where:
-        demo << [false, true]
     }
 
     def "a ticket moved when CyberTrack tells another status than #known: #current"() {
@@ -116,11 +112,10 @@ class DomainSpec extends Specification {
 
     def "a reported status #status is the new known one and #verb the ticket"() {
         when:
-        def reported = trackedTicket(misses: 2, demo: true).reported(status, LATER, FOLLOW_UP)
+        def reported = trackedTicket(misses: 2).reported(status, LATER, FOLLOW_UP)
 
         then:
-        reported == trackedTicket(status: status, lastSeenAt: LATER, lastEventAt: LATER, closedAt: closes ? LATER : null,
-                demo: true)
+        reported == trackedTicket(status: status, lastSeenAt: LATER, lastEventAt: LATER, closedAt: closes ? LATER : null)
         reported.open() == !closes
 
         where:

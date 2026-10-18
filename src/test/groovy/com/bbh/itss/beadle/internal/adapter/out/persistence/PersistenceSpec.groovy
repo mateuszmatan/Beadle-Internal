@@ -68,13 +68,13 @@ class PersistenceSpec extends Specification {
 
     def "a followed ticket is written down and read back among the open ones, oldest first, until it is closed"() {
         when:
-        tickets.track(trackedTicket(key: 'SCP-2', createdAt: CREATED.plusSeconds(60), demo: true, misses: 2))
+        tickets.track(trackedTicket(key: 'SCP-2', createdAt: CREATED.plusSeconds(60), misses: 2))
         tickets.track(trackedTicket())
 
         then:
-        tickets.open() == [trackedTicket(), trackedTicket(key: 'SCP-2', createdAt: CREATED.plusSeconds(60), demo: true, misses: 2)]
-        jdbc.queryForMap("SELECT STATUS, CORRELATION_ID, DEMO, CHANGE_NUMBER FROM BEADLE_INTERNAL_CYBERTRACK_TICKET WHERE TICKET_KEY = 'SCP-1234'") ==
-                [STATUS: 'To Do', CORRELATION_ID: 'corr-1', DEMO: 0, CHANGE_NUMBER: 'CHG0031001']
+        tickets.open() == [trackedTicket(), trackedTicket(key: 'SCP-2', createdAt: CREATED.plusSeconds(60), misses: 2)]
+        jdbc.queryForMap("SELECT STATUS, CORRELATION_ID, MISSES, CHANGE_NUMBER FROM BEADLE_INTERNAL_CYBERTRACK_TICKET WHERE TICKET_KEY = 'SCP-1234'") ==
+                [STATUS: 'To Do', CORRELATION_ID: 'corr-1', MISSES: 0, CHANGE_NUMBER: 'CHG0031001']
 
         when:
         tickets.save(trackedTicket().reported('Done', LATER, FOLLOW_UP))
@@ -191,7 +191,7 @@ class PersistenceSpec extends Specification {
 
         when:
         liquibase.update('')
-        liquibase.rollback(5, '')
+        liquibase.rollback(6, '')
         Scope.currentScope.getSingleton(FastCheckService).clearCache()
 
         then:

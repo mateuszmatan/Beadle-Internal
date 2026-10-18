@@ -27,7 +27,7 @@ import static org.springframework.boot.test.context.SpringBootTest.WebEnvironmen
 @SpringBootTest(webEnvironment = RANDOM_PORT, properties = [
         'spring.datasource.url=jdbc:h2:mem:beadle-internal;MODE=Oracle;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1',
         'beadle.services.token=suite-service-token',
-        'beadle.cybertrack.demo-poll=PT0.2S'])
+        'beadle.cybertrack.poll=PT0.2S'])
 @ActiveProfiles('local')
 @Import(SuiteClock)
 abstract class BeadleInternalSpecification extends Specification {

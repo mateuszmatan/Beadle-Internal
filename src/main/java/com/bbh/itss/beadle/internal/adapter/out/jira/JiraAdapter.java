@@ -1,10 +1,10 @@
 package com.bbh.itss.beadle.internal.adapter.out.jira;
 
+import com.bbh.itss.beadle.internal.adapter.out.http.ConditionalOnSystemUrl;
 import com.bbh.itss.beadle.internal.adapter.out.http.SystemClient;
 import com.bbh.itss.beadle.internal.application.jira.port.out.JiraPort;
 import com.bbh.itss.beadle.internal.domain.jira.JiraIssue;
 import com.bbh.itss.beadle.internal.domain.jira.JiraVersion;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -27,7 +27,6 @@ import static com.bbh.itss.beadle.internal.adapter.out.http.Jql.list;
 import static com.bbh.itss.beadle.internal.adapter.out.http.Jql.quoted;
 import static com.bbh.itss.beadle.internal.adapter.out.http.SystemClient.thrown;
 import static com.bbh.itss.beadle.internal.adapter.out.http.SystemClient.timestamp;
-import static com.bbh.itss.beadle.internal.adapter.out.jira.JiraProperties.CONFIGURED;
 import static com.bbh.itss.beadle.internal.domain.shared.Failures.notFound;
 import static java.time.ZoneOffset.UTC;
 import static java.util.stream.Collectors.toCollection;
@@ -39,7 +38,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
  * The BBH Jira of the delivery teams, REST API v2, with the bearer token of the Beadle service account.
  */
 @Component
-@ConditionalOnExpression(CONFIGURED)
+@ConditionalOnSystemUrl("jira")
 class JiraAdapter implements JiraPort {
 
     static final int PAGE_SIZE = 100;

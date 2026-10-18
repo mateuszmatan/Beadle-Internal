@@ -1,10 +1,11 @@
 package com.bbh.itss.beadle.internal.adapter.out.confluence;
 
+import com.bbh.itss.beadle.internal.adapter.out.http.ConditionalOnSystemUrl;
 import com.bbh.itss.beadle.internal.application.confluence.port.out.ConfluencePort;
 import com.bbh.itss.beadle.internal.domain.confluence.ConfluencePage;
 import com.bbh.itss.beadle.internal.domain.confluence.ConfluencePageUpdate;
 import com.bbh.itss.beadle.internal.domain.confluence.NewConfluencePage;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -12,14 +13,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static com.bbh.itss.beadle.internal.adapter.out.confluence.ConfluenceProperties.NOT_CONFIGURED;
 import static com.bbh.itss.beadle.internal.domain.shared.Failures.notFound;
 import static com.bbh.itss.beadle.internal.domain.shared.Failures.staleVersion;
 import static java.util.Comparator.comparing;
 import static org.apache.commons.lang3.Strings.CI;
 
 @Component
-@ConditionalOnExpression(NOT_CONFIGURED)
+@Profile("local")
+@ConditionalOnSystemUrl(value = "confluence", set = false)
 class DemoConfluenceAdapter implements ConfluencePort {
 
     static final String DUPLICATE = "Confluence already has a page titled ";

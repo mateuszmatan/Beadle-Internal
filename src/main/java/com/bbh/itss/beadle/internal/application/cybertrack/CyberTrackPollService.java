@@ -33,19 +33,13 @@ import static org.apache.commons.lang3.ObjectUtils.getIfNull;
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 
 /**
- * Follows the CyberTrack tickets Beadle created: the demo adapter moves them on its clock, the live adapter reads
- * them from CyberTrack. The poll reads all open tickets in one call made by {@code system}; each callback carries the
- * correlation id of the user action that created its ticket. A ticket the demo made up is never looked for in the
- * real CyberTrack, where its key may belong to another ticket, nor a real one in the demo: once the adapter changed,
- * such a ticket is dropped. A ticket CyberTrack no longer finds is tried again on the next polls and dropped once
- * the {@link FollowUp} gives up on it.
+ * Follows the CyberTrack tickets Beadle created. The poll reads all open tickets in one call made by {@code system};
+ * each callback carries the correlation id of the user action that created its ticket. A ticket CyberTrack no longer
+ * finds is tried again on the next polls and dropped once the {@link FollowUp} gives up on it.
  */
 @UseCase
 @RequiredArgsConstructor
 public class CyberTrackPollService implements CyberTrackPollUseCase {
-
-    static final String DEMO_TICKET = "the demo CyberTrack made it up, and CyberTrack is configured now";
-    static final String REAL_TICKET = "it was created in CyberTrack, and the demo plays CyberTrack now";
 
     private final TrackedTicketPort tracked;
     private final CyberTrackPort cyberTrack;
@@ -60,25 +54,13 @@ public class CyberTrackPollService implements CyberTrackPollUseCase {
             return PollReport.NOTHING;
         }
         Instant now = now(clock);
-        boolean demo = !cyberTrack.connected();
         Map<String, String> failures = new LinkedHashMap<>();
         Map<String, String> dropped = new LinkedHashMap<>();
-        List<TrackedTicket> followed = new ArrayList<>();
-        for (TrackedTicket ticket : open) {
-            if (ticket.demo() == demo) {
-                followed.add(ticket);
-            } else {
-                drop(ticket, ticket.demo() ? DEMO_TICKET : REAL_TICKET, now, dropped, failures);
-            }
-        }
-        if (followed.isEmpty()) {
-            return pollReport(List.of(), failures, dropped);
-        }
         Map<String, CyberTrackTicket> current = CallerContext.as(new Caller(SYSTEM_USER, randomUUID().toString()),
-                        () -> cyberTrack.readAll(followed.stream().map(TrackedTicket::key).toList())).stream()
+                        () -> cyberTrack.readAll(open.stream().map(TrackedTicket::key).toList())).stream()
                 .collect(toMap(CyberTrackTicket::key, identity(), (first, second) -> first));
         List<StatusCallback> sent = new ArrayList<>();
-        for (TrackedTicket ticket : followed) {
+        for (TrackedTicket ticket : open) {
             CyberTrackTicket found = current.get(ticket.key());
             try {
                 if (found == null) {
@@ -104,16 +86,6 @@ public class CyberTrackPollService implements CyberTrackPollUseCase {
                     + " polls in a row before it is dropped)");
         } else {
             dropped.put(ticket.key(), reason + ": CyberTrack did not find it " + missed.misses() + " polls in a row");
-        }
-    }
-
-    private void drop(TrackedTicket ticket, String reason, Instant now, Map<String, String> dropped,
-                      Map<String, String> failures) {
-        try {
-            tracked.save(ticket.withClosedAt(now));
-            dropped.put(ticket.key(), reason);
-        } catch (RuntimeException e) {
-            failures.put(ticket.key(), defaultIfBlank(e.getMessage(), e.getClass().getSimpleName()));
         }
     }
 

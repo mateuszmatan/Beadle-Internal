@@ -27,13 +27,8 @@ class CyberTrackPollServiceSpec extends Specification {
     TrackedTicketPort tracked = Mock()
     CyberTrackPort cyberTrack = Mock()
     CallbackPort callbacks = Mock()
-    CyberTrackPort demoCyberTrack = Mock()
     def followUp = new FollowUp(['Done', 'Closed', 'Resolved', "Won't Do"], 3)
     def service = new CyberTrackPollService(tracked, cyberTrack, callbacks, followUp, fixed(NOW, UTC))
-
-    def setup() {
-        cyberTrack.connected() >> true
-    }
 
     def "nothing is asked of CyberTrack while no ticket is open"() {
         when:
@@ -159,42 +154,5 @@ class CyberTrackPollServiceSpec extends Specification {
         0 * callbacks._
         0 * tracked.save(_)
         thrown(UncheckedIOException)
-    }
-
-    def "a ticket made up by the demo is dropped once CyberTrack is configured, and a real one while the demo plays"() {
-        given:
-        def demo = new CyberTrackPollService(tracked, demoCyberTrack, callbacks, followUp, fixed(NOW, UTC))
-
-        when:
-        def live = service.poll()
-
-        then:
-        1 * tracked.open() >> [trackedTicket(key: 'SCP-1', demo: true), trackedTicket(key: 'SCP-2')]
-        1 * tracked.save(trackedTicket(key: 'SCP-1', demo: true, closedAt: NOW))
-        1 * cyberTrack.readAll(['SCP-2']) >> [cyberTrackTicket(key: 'SCP-2')]
-        1 * tracked.save(trackedTicket(key: 'SCP-2', lastSeenAt: NOW))
-        live == new PollReport([], [:], ['SCP-1': CyberTrackPollService.DEMO_TICKET])
-
-        when:
-        def played = demo.poll()
-
-        then:
-        1 * tracked.open() >> [trackedTicket(key: 'SCP-1', demo: true), trackedTicket(key: 'SCP-2')]
-        1 * tracked.save(trackedTicket(key: 'SCP-2', closedAt: NOW))
-        1 * demoCyberTrack.readAll(['SCP-1']) >> [cyberTrackTicket(key: 'SCP-1')]
-        1 * tracked.save(trackedTicket(key: 'SCP-1', demo: true, lastSeenAt: NOW))
-        played == new PollReport([], [:], ['SCP-2': CyberTrackPollService.REAL_TICKET])
-    }
-
-    def "only dropped tickets ask nothing of CyberTrack, and a drop that cannot be written down is tried again"() {
-        when:
-        def report = service.poll()
-
-        then:
-        1 * tracked.open() >> [trackedTicket(key: 'SCP-1', demo: true), trackedTicket(key: 'SCP-2', demo: true)]
-        1 * tracked.save({ it.key() == 'SCP-1' }) >> { throw new IllegalStateException('database down') }
-        1 * tracked.save(trackedTicket(key: 'SCP-2', demo: true, closedAt: NOW))
-        0 * cyberTrack.readAll(_)
-        report == new PollReport([], ['SCP-1': 'database down'], ['SCP-2': CyberTrackPollService.DEMO_TICKET])
     }
 }

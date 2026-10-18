@@ -1,12 +1,13 @@
 package com.bbh.itss.beadle.internal.adapter.out.qtest;
 
+import com.bbh.itss.beadle.internal.adapter.out.http.ConditionalOnSystemUrl;
 import com.bbh.itss.beadle.internal.application.qtest.port.out.QTestPort;
 import com.bbh.itss.beadle.internal.domain.qtest.QTestCycle;
 import com.bbh.itss.beadle.internal.domain.qtest.QTestProject;
 import com.bbh.itss.beadle.internal.domain.qtest.QTestRun;
 import com.bbh.itss.beadle.internal.domain.qtest.QTestSummary;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
@@ -16,7 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import static com.bbh.itss.beadle.internal.adapter.out.qtest.QTestProperties.NOT_CONFIGURED;
 import static com.bbh.itss.beadle.internal.domain.qtest.QTestSummary.BLOCKED;
 import static com.bbh.itss.beadle.internal.domain.qtest.QTestSummary.FAILED;
 import static com.bbh.itss.beadle.internal.domain.qtest.QTestSummary.PASSED;
@@ -27,7 +27,8 @@ import static java.time.Duration.ofHours;
 import static java.time.temporal.ChronoUnit.DAYS;
 
 @Component
-@ConditionalOnExpression(NOT_CONFIGURED)
+@Profile("local")
+@ConditionalOnSystemUrl(value = "qtest", set = false)
 @RequiredArgsConstructor
 class DemoQTestAdapter implements QTestPort {
 

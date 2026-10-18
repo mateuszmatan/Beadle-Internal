@@ -40,9 +40,7 @@ public class CyberTrackService implements CyberTrackUseCase {
     @Override
     public CreatedTicket create(SecureCodingTicket ticket) {
         synchronized (changes.computeIfAbsent(ticket.changeNumber(), change -> new Object())) {
-            boolean demo = !cyberTrack.connected();
-            Optional<TrackedTicket> raised = tracked.openFor(ticket.changeNumber())
-                    .filter(open -> open.demo() == demo);
+            Optional<TrackedTicket> raised = tracked.openFor(ticket.changeNumber());
             if (raised.isPresent()) {
                 log.info("Change {} asked again for its secure coding ticket and gets {}", ticket.changeNumber(),
                         raised.get().key());
@@ -51,7 +49,7 @@ public class CyberTrackService implements CyberTrackUseCase {
             CreatedTicket created = cyberTrack.create(ticket);
             log.info("Raised the CyberTrack ticket {} for change {}", created.key(), ticket.changeNumber());
             tracked.track(TrackedTicket.created(created, ticket.changeNumber(), CallerContext.current().correlationId(),
-                    now(clock), demo));
+                    now(clock)));
             return created;
         }
     }

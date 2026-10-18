@@ -9,6 +9,7 @@ import com.bbh.itss.beadle.internal.application.cybertrack.port.out.CyberTrackPo
 import com.bbh.itss.beadle.internal.application.cybertrack.port.out.TrackedTicketPort
 import com.bbh.itss.beadle.internal.application.jira.port.out.JiraPort
 import com.bbh.itss.beadle.internal.application.qtest.port.out.QTestPort
+import com.bbh.itss.beadle.internal.application.status.StatusService
 import com.bbh.itss.beadle.internal.domain.calllog.CallLogEntry
 import com.bbh.itss.beadle.internal.domain.calllog.CallLogPage
 import com.bbh.itss.beadle.internal.domain.calllog.CallLogQuery
@@ -45,8 +46,8 @@ import static java.time.ZoneOffset.UTC
 import static org.springframework.boot.WebApplicationType.NONE
 
 /**
- * The wiring of Beadle-Internal: the profiles and the variables that configure them, the refusal to run rd, qc or prod
- * on a demo, the adapter each system gets and the call log around every port.
+ * The wiring of Beadle-Internal: the profiles and the variables that configure them, the adapter each system gets in
+ * each profile and the call log around every port.
  */
 class ConfigurationSpec extends Specification {
 
@@ -54,8 +55,6 @@ class ConfigurationSpec extends Specification {
     static final Caller USER = new Caller('Mateusz Matan', 'corr-1')
     static final Map ORACLE = [DB_URL: 'jdbc:oracle:thin:@//oracle.bbh.test:1521/BEADLE', DB_USERNAME: 'BEADLE_INTERNAL',
                                DB_PASSWORD: 'secret']
-    static final Map REAL_SYSTEMS = [JIRA_URL: 'https://jira.bbh.com', CYBERTRACK_URL: 'https://cybertrack.bbh.com',
-                                     CONFLUENCE_URL: 'https://confluence.bbh.com', QTEST_URL: 'https://qtest.bbh.com']
     static final Map VARIABLES = [BEADLE_SERVICE_TOKEN  : 'beadle.services.token', BEADLE_GUI_URL: 'beadle.gui.url',
                                   JIRA_URL              : 'beadle.jira.url', JIRA_TOKEN: 'beadle.jira.token',
                                   JIRA_EPIC_LINK_FIELD  : 'beadle.jira.epic-link-field',
@@ -80,7 +79,7 @@ class ConfigurationSpec extends Specification {
          urls: ['jira', 'cybertrack', 'confluence', 'qtest'].collect { env.getProperty("beadle.${it}.url") }.unique(),
          poll: env.getProperty('beadle.cybertrack.poll'), misses: env.getProperty('beadle.cybertrack.max-misses'),
          budget: env.getProperty('beadle.qtest.budget')] ==
-                [server: '8082', ddl: 'validate', health: 'always', gui: 'http://localhost:8081', urls: [''], poll: 'PT5M',
+                [server: '8082', ddl: 'validate', health: 'always', gui: 'http://localhost:8081', urls: [''], poll: 'PT10S',
                  misses: '12', budget: '20s']
         env.getProperty('spring.datasource.url') == "jdbc:h2:file:${System.getProperty('user.home')}/bbh-devsecops/beadle-internal/beadle-internal;MODE=Oracle;DEFAULT_NULL_ORDERING=HIGH;AUTO_SERVER=TRUE"
         environment([], [BEADLE_INTERNAL_DATA_DIR: '/var/beadle']).getProperty('spring.datasource.url')
@@ -105,6 +104,7 @@ class ConfigurationSpec extends Specification {
         [env.getProperty('spring.datasource.url'), env.getProperty('spring.datasource.username'),
          env.getProperty('spring.datasource.password')] == [ORACLE.DB_URL, 'BEADLE_INTERNAL', 'secret']
         env.getProperty('spring.jpa.hibernate.ddl-auto') == 'validate'
+        env.getProperty('beadle.cybertrack.poll') == 'PT5M'
         env.getProperty('spring.datasource.hikari.maximum-pool-size') == poolSize
         env.getProperty('management.endpoint.health.show-details') == health
         env.getProperty('logging.level.com.bbh.itss.beadle') == level
@@ -125,47 +125,25 @@ class ConfigurationSpec extends Specification {
         missing.message.contains('DB_URL')
     }
 
-    def "#name starts #started, since a demo adapter would answer in place of a blank system"() {
-        when:
-        def failure = null
-        try {
-            environment(profile ? [profile] : [], (profile ? ORACLE + REAL_SYSTEMS : [:]) + variables, RealSystemsConfiguration)
-        } catch (IllegalStateException e) {
-            failure = e.message
+    def "the #profile profile with #urls gets #adapters, as a demo adapter answers only on a laptop"() {
+        expect:
+        adapters(profile, urls).run { context ->
+            assert [JiraPort, CyberTrackPort, ConfluencePort, QTestPort].collectMany { context.getBeansOfType(it).values()*.class*.simpleName } == adapters
         }
 
-        then:
-        failure == null ? started == 'on its systems' : failure.startsWith("The rd, qc and prod profiles need the real systems, but $started")
-
         where:
-        profile | variables                                     || started
-        'prod'  | [:]                                           || 'on its systems'
-        'prod'  | [CYBERTRACK_URL: '']                          || 'CYBERTRACK_URL is blank'
-        'qc'    | [JIRA_URL: ' ', QTEST_URL: '']                || 'JIRA_URL, QTEST_URL are blank'
-        'rd'    | [CYBERTRACK_URL: '', CYBERTRACK_DEMO: 'false'] || 'CYBERTRACK_URL is blank'
-        'rd'    | [CONFLUENCE_URL: '', CONFLUENCE_DEMO: 'true'] || 'on its systems'
-        null    | [:]                                           || 'on its systems'
-        name = (profile ?: 'local') + (variables ? ' with ' + variables : '')
+        profile | urls                                                          || adapters
+        'local' | []                                                            || ['DemoJiraAdapter', 'DemoCyberTrackAdapter', 'DemoConfluenceAdapter', 'DemoQTestAdapter']
+        'local' | ['jira.url', 'cybertrack.url', 'confluence.url', 'qtest.url'] || ['JiraAdapter', 'CyberTrackAdapter', 'ConfluenceAdapter', 'QTestAdapter']
+        'rd'    | ['jira.url', 'cybertrack.url', 'confluence.url', 'qtest.url'] || ['JiraAdapter', 'CyberTrackAdapter', 'ConfluenceAdapter', 'QTestAdapter']
+        'prod'  | ['jira.url', 'qtest.url']                                     || ['JiraAdapter', 'QTestAdapter']
     }
 
-    def "a system with a URL gets its adapter, and one without it gets its demo"() {
-        given:
-        def runner = new ApplicationContextRunner()
-                .withUserConfiguration(Adapters)
-                .withBean(RestClient.Builder, { RestClient.builder() } as Supplier<RestClient.Builder>)
-                .withBean(Clock, { Clock.systemUTC() } as Supplier<Clock>)
-                .withBean(TrackedTicketPort, { [:] as TrackedTicketPort } as Supplier<TrackedTicketPort>)
-                .withPropertyValues('beadle.qtest.concurrency=8', 'beadle.qtest.budget=20s')
-
+    def "rd, qc and prod do not start while the URL of a system is blank"() {
         expect:
-        runner.withPropertyValues(urls.collect { "beadle.$it=https://${it.tokenize('.')[0]}.bbh.com".toString() } as String[]).run { context ->
-            assert [JiraPort, CyberTrackPort, ConfluencePort, QTestPort].collect { context.getBean(it).class.simpleName } == adapters
+        adapters('qc', ['jira.url', 'cybertrack.url', 'confluence.url']).withUserConfiguration(StatusService).run { context ->
+            assert context.startupFailure.message.contains("No qualifying bean of type '${QTestPort.name}'")
         }
-
-        where:
-        urls                                                          || adapters
-        []                                                            || ['DemoJiraAdapter', 'DemoCyberTrackAdapter', 'DemoConfluenceAdapter', 'DemoQTestAdapter']
-        ['jira.url', 'cybertrack.url', 'confluence.url', 'qtest.url'] || ['JiraAdapter', 'CyberTrackAdapter', 'ConfluenceAdapter', 'QTestAdapter']
     }
 
     def "qTest is pressed with #concurrency reads at once and a budget of #budget: #outcome"() {
@@ -244,6 +222,16 @@ class ConfigurationSpec extends Specification {
         }
         calls.recorded*.userName() == ['u' * (CallLogEntry.USER_MAX - 3) + '...']
         calls.recorded*.correlationId() == ['c' * (CallLogEntry.CORRELATION_MAX - 3) + '...']
+    }
+
+    private static ApplicationContextRunner adapters(String profile, List<String> urls) {
+        new ApplicationContextRunner()
+                .withUserConfiguration(Adapters)
+                .withBean(RestClient.Builder, { RestClient.builder() } as Supplier<RestClient.Builder>)
+                .withBean(Clock, { Clock.systemUTC() } as Supplier<Clock>)
+                .withBean(TrackedTicketPort, { [:] as TrackedTicketPort } as Supplier<TrackedTicketPort>)
+                .withPropertyValues(["spring.profiles.active=$profile", 'beadle.qtest.concurrency=8', 'beadle.qtest.budget=20s'] +
+                        urls.collect { "beadle.$it=https://${it.tokenize('.')[0]}.bbh.com" }*.toString() as String[])
     }
 
     private Map callLog() {

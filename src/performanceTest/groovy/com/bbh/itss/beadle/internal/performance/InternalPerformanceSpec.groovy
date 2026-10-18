@@ -5,24 +5,20 @@ import com.bbh.itss.beadle.internal.support.LatencyStats
 
 class InternalPerformanceSpec extends BeadleInternalSpecification {
 
-    def "status, jira and call log respond with low p95 latencies"() {
+    def "#path answers 20 calls on 4 threads with a p95 under #limit ms"() {
         when:
-        def statusStats = LatencyStats.measure([calls: 30, threads: 4], 'GET /api/internal/status') {
-            api.get('/api/internal/status').status == 200
-        }
-        def jiraStats = LatencyStats.measure([calls: 20, threads: 2], 'GET /api/internal/jira/projects/BDL/versions') {
-            api.get('/api/internal/jira/projects/BDL/versions').status == 200
-        }
-        def callLogStats = LatencyStats.measure([calls: 20, threads: 2], 'GET /api/internal/call-log') {
-            api.get('/api/internal/call-log?page=0&size=10').status == 200
-        }
+        def stats = LatencyStats.measure(20, 4) { api.get(path).status == 200 }
 
         then:
-        statusStats.p95 < 500
-        jiraStats.p95 < 500
-        callLogStats.p95 < 600
-        statusStats.errors == 0
-        jiraStats.errors == 0
-        callLogStats.errors == 0
+        stats.errors == 0
+        stats.p95 < limit
+
+        where:
+        path                                                          || limit
+        '/api/internal/status'                                        || 300
+        '/api/internal/jira/projects/CERT/versions'                   || 500
+        '/api/internal/jira/projects/CERT/epics?fixVersion=CERT%201.4' || 500
+        '/api/internal/qtest/projects/1/test-cycles/11/summary'       || 500
+        '/api/internal/call-log?size=50'                              || 500
     }
 }

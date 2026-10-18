@@ -6,23 +6,22 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 
-import static com.bbh.itss.beadle.internal.support.Json.toJson
 import static java.net.http.HttpClient.Builder.NO_PROXY
-import static java.net.http.HttpRequest.BodyPublishers.noBody
 import static java.net.http.HttpRequest.BodyPublishers.ofString
 import static java.time.Duration.ofSeconds
 
+/**
+ * Calls the API of the running application over HTTP, as Beadle-GUI does.
+ */
 class ServiceClient {
+
+    private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(ofSeconds(5)).proxy(NO_PROXY).build()
 
     final String baseUrl
     final Map<String, String> headers
-    private final HttpClient http = HttpClient.newBuilder()
-            .connectTimeout(ofSeconds(5))
-            .proxy(NO_PROXY)
-            .build()
 
     ServiceClient(String baseUrl, Map<String, String> headers = [:]) {
-        this.baseUrl = baseUrl.replaceAll('/+$', '')
+        this.baseUrl = baseUrl
         this.headers = headers.asImmutable()
     }
 
@@ -30,44 +29,27 @@ class ServiceClient {
         new ServiceClient(baseUrl, headers + more)
     }
 
-    ServiceClient withoutHeader(String name) {
-        new ServiceClient(baseUrl, headers.findAll { !it.key.equalsIgnoreCase(name) })
-    }
-
     Response get(String path) {
         send(request(path).GET())
     }
 
-    Response post(String path, Object body = null) {
-        send(request(path).POST(body == null ? noBody() : json(body)))
-    }
-
-    Response postRaw(String path, String contentType, String body) {
-        send(request(path, contentType).POST(ofString(body)))
+    Response post(String path, Object body) {
+        send(request(path).POST(ofString(Json.toJson(body))))
     }
 
     Response put(String path, Object body) {
-        send(request(path).PUT(json(body)))
+        send(request(path).PUT(ofString(Json.toJson(body))))
     }
 
-    Response delete(String path) {
-        send(request(path).DELETE())
-    }
-
-    private HttpRequest.Builder request(String path, String contentType = 'application/json') {
-        def builder = HttpRequest.newBuilder(URI.create(baseUrl + path))
-                .timeout(ofSeconds(30))
-                .header('Content-Type', contentType)
+    private HttpRequest.Builder request(String path) {
+        def builder = HttpRequest.newBuilder(URI.create(baseUrl + path)).timeout(ofSeconds(30))
+                .header('Content-Type', 'application/json')
         headers.each { name, value -> builder.header(name, value) }
         builder
     }
 
-    private static HttpRequest.BodyPublisher json(Object body) {
-        ofString(toJson(body))
-    }
-
-    private Response send(HttpRequest.Builder request) {
-        HttpResponse<String> response = http.send(request.build(), HttpResponse.BodyHandlers.ofString())
+    private static Response send(HttpRequest.Builder request) {
+        HttpResponse<String> response = HTTP.send(request.build(), HttpResponse.BodyHandlers.ofString())
         new Response(response.statusCode(), response.headers().map(), response.body())
     }
 

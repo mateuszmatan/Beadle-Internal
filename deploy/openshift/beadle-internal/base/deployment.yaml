@@ -27,8 +27,9 @@ spec:
                 name: beadle-internal-config
             - secretRef:
                 name: beadle-internal-db
+            # BEADLE_SERVICE_TOKEN, the one token Beadle-GUI, Beadle-Internal and Beadle-ProTech share in the project
             - secretRef:
-                name: beadle-internal-services
+                name: beadle-services
             - secretRef:
                 name: beadle-internal-jira
                 optional: true
@@ -41,9 +42,6 @@ spec:
             - secretRef:
                 name: beadle-internal-qtest
                 optional: true
-          env:
-            - name: MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED
-              value: "true"
           resources:
             requests:
               cpu: 250m

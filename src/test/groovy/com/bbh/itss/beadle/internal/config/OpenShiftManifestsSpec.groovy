@@ -8,7 +8,7 @@ import static groovy.io.FileType.FILES
 
 /**
  * The OpenShift manifests: one pod of Beadle-Internal in the one project of the Beadle services, reached by Beadle-GUI
- * through the Service only, configured by ConfigMaps and Secrets named after the service.
+ * through the Service only, configured by its own ConfigMap and Secrets plus the service token shared in the project.
  */
 class OpenShiftManifestsSpec extends Specification {
 
@@ -30,6 +30,8 @@ class OpenShiftManifestsSpec extends Specification {
         expect:
         manifest.every { !(it.kind in ['Route', 'Ingress']) && !it.namespace && !it.metadata?.namespace }
         !file.path.contains('overlays') || manifest.first().subMap(['resources', 'components']) == [resources: ['../../base']]
+        !file.path.contains('overlays') || manifest.first().configMapGenerator.first().literals.first() ==
+                "SPRING_PROFILES_ACTIVE=${file.parentFile.name}"
 
         where:
         file << manifests()
@@ -44,10 +46,13 @@ class OpenShiftManifestsSpec extends Specification {
         container.ports == [[name: 'http', containerPort: 8082, protocol: 'TCP']]
     }
 
-    def "the pod is configured by ConfigMaps and Secrets of its own and probed on its health groups"() {
+    def "the pod is configured by its own ConfigMap and Secrets, shares the service token of the project and is probed on its health groups"() {
         expect:
-        container.envFrom.collect { (it.configMapRef ?: it.secretRef).name }.every { it.startsWith('beadle-internal-') }
-        documents('base/kustomization.yaml').first().configMapGenerator*.name == ['beadle-internal-config']
+        container.envFrom.collect { (it.configMapRef ?: it.secretRef).name } ==
+                ['beadle-internal-config', 'beadle-internal-db', 'beadle-services', 'beadle-internal-jira',
+                 'beadle-internal-cybertrack', 'beadle-internal-confluence', 'beadle-internal-qtest']
+        documents('base/kustomization.yaml').first().configMapGenerator ==
+                [[name: 'beadle-internal-config', literals: ['BEADLE_GUI_URL=http://beadle:8081']]]
         [container.startupProbe, container.livenessProbe, container.readinessProbe]*.httpGet ==
                 [[path: '/actuator/health/liveness', port: 'http'], [path: '/actuator/health/liveness', port: 'http'],
                  [path: '/actuator/health/readiness', port: 'http']]

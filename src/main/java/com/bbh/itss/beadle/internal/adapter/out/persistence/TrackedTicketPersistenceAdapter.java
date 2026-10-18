@@ -38,7 +38,7 @@ class TrackedTicketPersistenceAdapter implements TrackedTicketPort {
             return tickets.findFirstByChangeNumberAndClosedAtIsNullOrderByCreatedAtDesc(changeNumber)
                     .map(TrackedTicketEntity::toDomain);
         } catch (RuntimeException e) {
-            log.warn("The open CyberTrack ticket of {} could not be looked up, so a new one is raised: {}",
+            log.warn("The open CyberTrack ticket of {} could not be looked up, so a new one is created: {}",
                     changeNumber, e.getMessage());
             return Optional.empty();
         }

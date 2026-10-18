@@ -197,7 +197,7 @@ class UseCasesSpec extends Specification {
         result == trackedTicket().asCreated()
     }
 
-    def "two requests for the same change at once raise one ticket, and a ticket CyberTrack refused is not followed"() {
+    def "two requests for the same change at once create one ticket, and a ticket CyberTrack refused is not followed"() {
         given:
         Map<String, TrackedTicket> followed = [:].asSynchronized()
         def memory = [openFor: { String change -> Optional.ofNullable(followed.values().find { it.changeNumber() == change }) },

@@ -124,7 +124,7 @@ class PersistenceSpec extends Specification {
         thrown(RuntimeException)
     }
 
-    def "a change whose open ticket cannot be looked up has none, so that its ticket is raised"() {
+    def "a change whose open ticket cannot be looked up has none, so that its ticket is created"() {
         given:
         jdbc.execute('ALTER TABLE BEADLE_INTERNAL_CYBERTRACK_TICKET RENAME COLUMN CHANGE_NUMBER TO CHANGE_NO')
 

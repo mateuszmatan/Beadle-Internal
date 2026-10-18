@@ -1,12 +1,12 @@
 # Beadle-Internal
 
 Beadle-Internal connects Beadle to the systems of BBH's delivery teams. For Beadle-GUI it reads Jira versions, epics
-and stories, raises and follows CyberTrack secure coding tickets, reads and writes Confluence pages, and reads qTest
+and stories, creates and follows CyberTrack secure coding tickets, reads and writes Confluence pages, and reads qTest
 projects, test cycles and test runs. It signs in to those systems with Beadle's generic service accounts, logs every
 call it makes, and calls Beadle-GUI back when a CyberTrack ticket changes status.
 
 Jira is the BBH Jira of the delivery teams. CyberTrack is the Jira of the Cybersecurity team, where secure coding
-tickets are raised. Each has its own adapter and configuration.
+tickets are created. Each has its own adapter and configuration.
 
 ## How it fits with the other two services
 
@@ -63,7 +63,7 @@ The build uses the BBH Nexus only, so it runs inside the BBH network or on the V
 | `./gradlew build` | jar, all test suites, coverage gates | about 1.5 min |
 | `./gradlew bootJar` | `build/libs/beadle-internal-<version>.jar` | 10 s |
 | `./gradlew test` | unit specs (Spock), JaCoCo gate of 60% of lines | 20 s |
-| `./gradlew smokeTest` | health, status, Jira versions, raising a ticket, 401 without the token | 15 s |
+| `./gradlew smokeTest` | health, status, Jira versions, creating a ticket, 401 without the token | 15 s |
 | `./gradlew regressionTest` | the key journeys over HTTP on H2 with the demo adapters | 20 s |
 | `./gradlew performanceTest` | p95 latency of the Jira reads and ticket creation | 5 s |
 | `./gradlew jacocoSuitesReport` | combined coverage of the three suites, gate of 30% | part of `build` |

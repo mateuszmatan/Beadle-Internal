@@ -89,7 +89,10 @@ public class ServiceTokenFilter extends OncePerRequestFilter {
             return;
         }
         String correlationId = trimToNull(request.getHeader(CORRELATION_HEADER));
-        if (correlationId != null && bytes(correlationId) > CORRELATION_MAX) {
+        int length = correlationId == null ? 0 : bytes(correlationId);
+        if (length > CORRELATION_MAX) {
+            log.warn("Refused {} {}: an X-Correlation-Id of {} bytes is longer than {} bytes", request.getMethod(),
+                    request.getRequestURI(), length, CORRELATION_MAX);
             problem(response, BAD_REQUEST.value(), CORRELATION_PROBLEM);
             return;
         }

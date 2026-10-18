@@ -1,7 +1,6 @@
 package com.bbh.itss.beadle.internal.application.cybertrack;
 
 import com.bbh.itss.beadle.internal.application.UseCase;
-import com.bbh.itss.beadle.internal.application.WithoutTransaction;
 import com.bbh.itss.beadle.internal.application.callback.port.out.CallbackPort;
 import com.bbh.itss.beadle.internal.application.calllog.CallerContext;
 import com.bbh.itss.beadle.internal.application.cybertrack.port.in.CyberTrackPollUseCase;
@@ -55,7 +54,6 @@ public class CyberTrackPollService implements CyberTrackPollUseCase {
     private final Clock clock;
 
     @Override
-    @WithoutTransaction
     public synchronized PollReport poll() {
         List<TrackedTicket> open = tracked.open();
         if (open.isEmpty()) {

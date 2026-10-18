@@ -1,7 +1,6 @@
 package com.bbh.itss.beadle.internal.application.cybertrack;
 
 import com.bbh.itss.beadle.internal.application.UseCase;
-import com.bbh.itss.beadle.internal.application.WithoutTransaction;
 import com.bbh.itss.beadle.internal.application.calllog.CallerContext;
 import com.bbh.itss.beadle.internal.application.cybertrack.port.in.CyberTrackUseCase;
 import com.bbh.itss.beadle.internal.application.cybertrack.port.out.CyberTrackPort;
@@ -39,7 +38,6 @@ public class CyberTrackService implements CyberTrackUseCase {
      * status the ticket starts in.
      */
     @Override
-    @WithoutTransaction
     public CreatedTicket create(SecureCodingTicket ticket) {
         synchronized (changes.computeIfAbsent(ticket.changeNumber(), change -> new Object())) {
             boolean demo = !cyberTrack.connected();
@@ -59,7 +57,6 @@ public class CyberTrackService implements CyberTrackUseCase {
     }
 
     @Override
-    @WithoutTransaction
     public CyberTrackTicket read(String key) {
         String trimmed = trimToNull(key);
         if (trimmed == null) {

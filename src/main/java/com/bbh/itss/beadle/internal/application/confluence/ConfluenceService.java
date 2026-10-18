@@ -1,7 +1,6 @@
 package com.bbh.itss.beadle.internal.application.confluence;
 
 import com.bbh.itss.beadle.internal.application.UseCase;
-import com.bbh.itss.beadle.internal.application.WithoutTransaction;
 import com.bbh.itss.beadle.internal.application.confluence.port.in.ConfluenceUseCase;
 import com.bbh.itss.beadle.internal.application.confluence.port.out.ConfluencePort;
 import com.bbh.itss.beadle.internal.domain.confluence.ConfluencePage;
@@ -24,7 +23,6 @@ public class ConfluenceService implements ConfluenceUseCase {
     private final ConfluencePort confluence;
 
     @Override
-    @WithoutTransaction
     public List<ConfluencePage> find(String spaceKey, String title) {
         String space = trimToNull(spaceKey);
         String name = trimToNull(title);
@@ -33,13 +31,11 @@ public class ConfluenceService implements ConfluenceUseCase {
     }
 
     @Override
-    @WithoutTransaction
     public ConfluencePage get(String id) {
         return confluence.get(required(id));
     }
 
     @Override
-    @WithoutTransaction
     public ConfluencePage create(NewConfluencePage page) {
         ConfluencePage created = confluence.create(page);
         log.info("Created the Confluence page {} '{}' in space {}", created.id(), created.title(), created.spaceKey());
@@ -47,7 +43,6 @@ public class ConfluenceService implements ConfluenceUseCase {
     }
 
     @Override
-    @WithoutTransaction
     public ConfluencePage update(String id, ConfluencePageUpdate update) {
         ConfluencePage updated = confluence.update(required(id), update);
         log.info("Updated the Confluence page {} to version {}", updated.id(), updated.version());

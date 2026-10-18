@@ -1,7 +1,6 @@
 package com.bbh.itss.beadle.internal.application.status;
 
 import com.bbh.itss.beadle.internal.application.UseCase;
-import com.bbh.itss.beadle.internal.application.WithoutTransaction;
 import com.bbh.itss.beadle.internal.application.confluence.port.out.ConfluencePort;
 import com.bbh.itss.beadle.internal.application.cybertrack.port.out.CyberTrackPort;
 import com.bbh.itss.beadle.internal.application.jira.port.out.JiraPort;
@@ -22,7 +21,6 @@ public class StatusService implements StatusUseCase {
     private final QTestPort qtest;
 
     @Override
-    @WithoutTransaction
     public ServiceStatus status() {
         return new ServiceStatus(of(jira.connected()), of(cyberTrack.connected()), of(confluence.connected()),
                 of(qtest.connected()));

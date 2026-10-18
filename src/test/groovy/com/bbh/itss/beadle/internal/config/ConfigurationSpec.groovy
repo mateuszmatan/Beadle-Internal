@@ -1,24 +1,19 @@
 package com.bbh.itss.beadle.internal.config
 
 import com.bbh.itss.beadle.internal.adapter.out.qtest.QTestProperties
-import com.bbh.itss.beadle.internal.application.UseCase
 import com.bbh.itss.beadle.internal.application.callback.port.out.CallbackPort
 import com.bbh.itss.beadle.internal.application.calllog.CallerContext
 import com.bbh.itss.beadle.internal.application.calllog.port.out.CallLogPort
 import com.bbh.itss.beadle.internal.application.confluence.port.out.ConfluencePort
-import com.bbh.itss.beadle.internal.application.cybertrack.port.in.CyberTrackPollUseCase
 import com.bbh.itss.beadle.internal.application.cybertrack.port.out.CyberTrackPort
 import com.bbh.itss.beadle.internal.application.cybertrack.port.out.TrackedTicketPort
-import com.bbh.itss.beadle.internal.application.jira.port.in.JiraUseCase
 import com.bbh.itss.beadle.internal.application.jira.port.out.JiraPort
 import com.bbh.itss.beadle.internal.application.qtest.port.out.QTestPort
-import com.bbh.itss.beadle.internal.application.status.port.in.StatusUseCase
 import com.bbh.itss.beadle.internal.domain.calllog.CallLogEntry
 import com.bbh.itss.beadle.internal.domain.calllog.CallLogPage
 import com.bbh.itss.beadle.internal.domain.calllog.CallLogQuery
 import com.bbh.itss.beadle.internal.domain.calllog.Caller
 import com.bbh.itss.beadle.internal.domain.cybertrack.FollowUp
-import org.springframework.aop.support.AopUtils
 import org.springframework.boot.autoconfigure.AutoConfigurations
 import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration
 import org.springframework.boot.builder.SpringApplicationBuilder
@@ -28,10 +23,6 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import org.springframework.context.annotation.ComponentScan
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.env.Environment
-import org.springframework.transaction.PlatformTransactionManager
-import org.springframework.transaction.TransactionDefinition
-import org.springframework.transaction.support.AbstractPlatformTransactionManager
-import org.springframework.transaction.support.DefaultTransactionStatus
 import org.springframework.web.client.RestClient
 import spock.lang.Specification
 
@@ -52,11 +43,10 @@ import static com.bbh.itss.beadle.internal.support.Fixtures.version
 import static java.time.Clock.fixed
 import static java.time.ZoneOffset.UTC
 import static org.springframework.boot.WebApplicationType.NONE
-import static org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive
 
 /**
  * The wiring of Beadle-Internal: the profiles and the variables that configure them, the refusal to run rd, qc or prod
- * on a demo, the adapter each system gets, the call log around every port and the transactions around the use cases.
+ * on a demo, the adapter each system gets and the call log around every port.
  */
 class ConfigurationSpec extends Specification {
 
@@ -256,39 +246,6 @@ class ConfigurationSpec extends Specification {
         calls.recorded*.correlationId() == ['c' * (CallLogEntry.CORRELATION_MAX - 3) + '...']
     }
 
-    def "every use case runs in a transaction proxy, and its calls to the systems run outside any transaction"() {
-        given:
-        def transactions = new RecordingTransactionManager()
-        List<Boolean> inTransaction = []
-        def runner = new ApplicationContextRunner()
-                .withConfiguration(AutoConfigurations.of(AopAutoConfiguration))
-                .withUserConfiguration(UseCaseConfiguration)
-                .withBean(PlatformTransactionManager, { transactions } as Supplier<PlatformTransactionManager>)
-                .withBean(JiraPort, { [connected: { false }, versions: { String project ->
-                    inTransaction << isActualTransactionActive()
-                    [version()]
-                }] as JiraPort } as Supplier<JiraPort>)
-                .withBean(CyberTrackPort, { [connected: { true }] as CyberTrackPort } as Supplier<CyberTrackPort>)
-                .withBean(ConfluencePort, { [connected: { false }] as ConfluencePort } as Supplier<ConfluencePort>)
-                .withBean(QTestPort, { [connected: { true }] as QTestPort } as Supplier<QTestPort>)
-                .withBean(CallLogPort, { [:] as CallLogPort } as Supplier<CallLogPort>)
-                .withBean(CallbackPort, { [:] as CallbackPort } as Supplier<CallbackPort>)
-                .withBean(TrackedTicketPort, { [open: { inTransaction << isActualTransactionActive(); [] }] as TrackedTicketPort } as Supplier<TrackedTicketPort>)
-                .withBean(Clock, { Clock.systemUTC() } as Supplier<Clock>)
-                .withBean(FollowUp, { new FollowUp(['Done'], 12) } as Supplier<FollowUp>)
-
-        expect:
-        runner.run { context ->
-            def useCases = context.getBeansWithAnnotation(UseCase).values()
-            assert useCases.size() == 7 && useCases.every { AopUtils.isAopProxy(it) }
-            assert context.getBean(JiraUseCase).versions('CERT') == [version()]
-            assert context.getBean(StatusUseCase).status().cyberTrack().mode() == 'live'
-            assert context.getBean(CyberTrackPollUseCase).poll().sent() == []
-        }
-        inTransaction == [false, false]
-        transactions.begun == []
-    }
-
     private Map callLog() {
         def calls = [recorded: [], down: false]
         calls.runner = new ApplicationContextRunner()
@@ -342,28 +299,5 @@ class ConfigurationSpec extends Specification {
 
     @EnableConfigurationProperties(CyberTrackFollowUpProperties)
     static class FollowUpSettings {
-    }
-
-    static class RecordingTransactionManager extends AbstractPlatformTransactionManager {
-
-        final List<TransactionDefinition> begun = []
-
-        @Override
-        protected Object doGetTransaction() {
-            new Object()
-        }
-
-        @Override
-        protected void doBegin(Object transaction, TransactionDefinition definition) {
-            begun << definition
-        }
-
-        @Override
-        protected void doCommit(DefaultTransactionStatus status) {
-        }
-
-        @Override
-        protected void doRollback(DefaultTransactionStatus status) {
-        }
     }
 }

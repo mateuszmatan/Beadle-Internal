@@ -27,7 +27,7 @@ public class ConfluenceService implements ConfluenceUseCase {
         String space = trimToNull(spaceKey);
         String name = trimToNull(title);
         new ValidationProblems().require("spaceKey", space).require("title", name).throwIfAny();
-        return confluence.find(space, name).stream().map(ConfluencePage::withoutBody).toList();
+        return confluence.find(space, name);
     }
 
     @Override

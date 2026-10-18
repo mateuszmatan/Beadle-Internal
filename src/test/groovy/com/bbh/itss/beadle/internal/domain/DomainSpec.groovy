@@ -217,7 +217,6 @@ class DomainSpec extends Specification {
         pageUpdate().replaces(page(version: 3))
         !pageUpdate().replaces(page(version: 4))
         page().replacedBy(pageUpdate()) == page(version: 4, body: '<p>Beadle 1.1</p>')
-        page().withoutBody() == page(body: null)
         pageUpdate().callTarget() == 'Beadle release notes'
     }
 

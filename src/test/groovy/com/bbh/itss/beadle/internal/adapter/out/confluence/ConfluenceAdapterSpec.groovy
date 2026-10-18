@@ -43,7 +43,7 @@ class ConfluenceAdapterSpec extends Specification {
     def server = MockRestServiceServer.bindTo(builder).build()
     def confluence = new ConfluenceAdapter(new ConfluenceProperties(URL + '/', 'secret-token'), builder)
 
-    def "pages are found by space and title, with their version and link but without their body"() {
+    def "pages are found by space and title, with their version and link"() {
         given:
         server.expect(requestToUriTemplate(CONTENT + '?type=page&spaceKey={s}&title={t}&expand=space,version&limit=50',
                 'DSO', 'Beadle release notes'))
@@ -57,7 +57,7 @@ class ConfluenceAdapterSpec extends Specification {
 
         then:
         confluence.connected()
-        pages == [page(url: URL + '/display/DSO/Beadle+release+notes', body: null),
+        pages == [page(url: URL + '/display/DSO/Beadle+release+notes'),
                   new ConfluencePage('100002', 'DSO', 'Other', 1, null, null)]
         server.verify()
     }

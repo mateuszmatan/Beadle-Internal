@@ -89,7 +89,7 @@ class ApiSpec extends Specification {
         jira.stories('CERT', 'CERT 1.4', ['CERT-12', 'CERT-13']) >> [issue(key: 'CERT-20', epicKey: 'CERT-12', updated: null)]
         cyberTrack.create(ticket()) >> new CreatedTicket('SCP-1234', 'https://cybertrack.bbh.com/browse/SCP-1234')
         cyberTrack.read('SCP-1234') >> cyberTrackTicket()
-        confluence.find('DSO', 'Beadle release notes') >> [page(body: null)]
+        confluence.find('DSO', 'Beadle release notes') >> [page()]
         confluence.get('100001') >> page()
         confluence.create(newPage()) >> page(id: '100009', title: 'Change CHG0031001', version: 1, body: '<p>Evidence</p>')
         confluence.update('100001', pageUpdate()) >> page(version: 4, body: '<p>Beadle 1.1</p>')

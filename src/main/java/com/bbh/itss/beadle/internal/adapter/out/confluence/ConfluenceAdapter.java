@@ -51,7 +51,7 @@ class ConfluenceAdapter implements ConfluencePort {
                         spaceKey, title, LIMIT)
                 .retrieve().body(Results.class));
         return results == null ? List.of()
-                : emptyIfNull(results.results()).stream().map(this::toPage).map(ConfluencePage::withoutBody).toList();
+                : emptyIfNull(results.results()).stream().map(this::toPage).toList();
     }
 
     @Override

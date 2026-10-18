@@ -111,7 +111,7 @@ class UseCasesSpec extends Specification {
         field = fields.join(' and ')
     }
 
-    def "Confluence pages are found without their bodies, read, created and updated by their trimmed id"() {
+    def "Confluence pages are found, read, created and updated by their trimmed id"() {
         given:
         def service = new ConfluenceService(confluence)
 
@@ -126,7 +126,7 @@ class UseCasesSpec extends Specification {
         1 * confluence.get('100001') >> page()
         1 * confluence.create(newPage()) >> page(id: '100009', version: 1)
         1 * confluence.update('100001', pageUpdate()) >> page(version: 4)
-        found == [page(body: null)]
+        found == [page()]
         read == page()
         created.id() == '100009'
         updated.version() == 4

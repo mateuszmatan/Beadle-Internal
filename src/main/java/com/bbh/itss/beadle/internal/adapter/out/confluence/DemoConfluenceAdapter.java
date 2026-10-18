@@ -46,7 +46,7 @@ class DemoConfluenceAdapter implements ConfluencePort {
         synchronized (pages) {
             return pages.values().stream()
                     .filter(page -> CI.equals(page.spaceKey(), spaceKey) && CI.equals(page.title(), title))
-                    .map(ConfluencePage::withoutBody).sorted(comparing(ConfluencePage::title)).toList();
+                    .sorted(comparing(ConfluencePage::title)).toList();
         }
     }
 

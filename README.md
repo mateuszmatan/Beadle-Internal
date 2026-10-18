@@ -203,9 +203,7 @@ kustomize edit set image beadle-internal=<registry>/<project>/beadle-internal:0.
 oc apply -k .
 ```
 
-The Deployment runs one replica with the `Recreate` strategy: the CyberTrack poll runs in every pod and each would
-send the same callbacks, so a rollout stops the old pod before the new one starts, and Beadle-Internal is away for
-the seconds the new pod takes to start. Keep it at one replica.
+The Deployment runs 1 replica (`replicas: 1`) on test (`rd`, `qc`) and production (`prod`) OpenShift environments. Redundant instances are not needed because OpenShift automatically respawns the pod if it becomes unavailable. It mounts emptyDir `/application/logs` for rolling logs. Callbacks to Beadle-GUI are idempotent.
 
 ## Tests
 

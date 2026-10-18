@@ -3,9 +3,7 @@ kind: Deployment
 metadata:
   name: beadle-internal
 spec:
-  # Two pods are safe: every pod schedules the CyberTrack poll, but the ShedLock row in BEADLE_INTERNAL_SHEDLOCK lets
-  # one pod at a time run it, so Beadle-GUI gets each callback once, also during a rolling update.
-  replicas: 2
+  replicas: 1
   revisionHistoryLimit: 5
   strategy:
     type: RollingUpdate
@@ -83,3 +81,9 @@ spec:
             capabilities:
               drop:
                 - ALL
+          volumeMounts:
+            - name: logs
+              mountPath: /application/logs
+      volumes:
+        - name: logs
+          emptyDir: {}

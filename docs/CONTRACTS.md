@@ -75,7 +75,7 @@ Mirrors the `ProTechPort` and `ProTechLookupPort` of Beadle-GUI one to one, so t
 | `POST /api/protech/changes/read` | `[Change, ...]` (the changes Beadle-GUI knows) | `{"CHG0001234": Change, ...}`: the current state of each one as ProTech holds it |
 | `PUT /api/protech/changes/{number}` | a `Change` | `204` |
 | `POST /api/protech/changes/{number}/reminders` | `{"role": "BUSINESS" or null, "task": "CTASK0001234" or null}` | `["Rebecca Lawson", ...]`: the people reminded |
-| `GET /api/protech/lookups/{kind}?q=&limit=20` | | `[{"value": "...", "detail": "..."}]`; `kind` is one of `users`, `departments`, `assignment-groups`, `releases`, `configuration-items`, `incidents`, `problems`, `clients` |
+| `GET /api/protech/lookups/{kind}?q=&limit=20` | | `[{"value": "...", "detail": "..."}]`; `kind` is one of `users`, `business-services`, `departments`, `assignment-groups`, `releases`, `configuration-items`, `incidents`, `problems`, `clients` |
 
 `Change` and `ChangeTask` are the JSON Jackson makes of the records `ProductionChange` and `ChangeTask` of
 Beadle-GUI (`domain/change`), with every nested record (`ChangeSchedule`, `ChangeTemplate` and its
@@ -142,7 +142,7 @@ Every use case that changes something or calls another system records exactly on
 when there is one, and a `FAILURE` row when the use case throws. Actions (`ACTION` values):
 `CHANGE_PREVIEWED`, `CHANGE_RAISED`, `CHANGE_EDITED`, `CHANGE_TASKS_CREATED`, `SECURE_CODING_TICKET_CREATED`,
 `REMINDER_SENT`, `CHANGE_SYNCED`, `PRODUCT_CREATED`, `PRODUCT_UPDATED`, `PRODUCT_DELETED`,
-`CHANGE_PROFILE_UPDATED`, `DEPARTMENT_CREATED`, `DEPARTMENT_RENAMED`, `DEPARTMENT_DELETED`, `USER_SIGNED_IN`,
+`CHANGE_PROFILE_UPDATED`, `BUSINESS_SERVICE_CREATED`, `BUSINESS_SERVICE_RENAMED`, `BUSINESS_SERVICE_DELETED`, `USER_SIGNED_IN`,
 `CALLBACK_PROTECH`, `CALLBACK_INTERNAL`. Reads are not recorded, except `CHANGE_SYNCED` when opening a change
 pulled a newer state from ProTech.
 
